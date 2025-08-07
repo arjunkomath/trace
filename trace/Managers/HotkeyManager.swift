@@ -1,0 +1,97 @@
+//
+//  HotkeyManager.swift
+//  trace
+//
+//  Created by Arjun on 7/8/2025.
+//
+
+import Carbon
+import Cocoa
+
+class HotkeyManager {
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandler: EventHandlerRef?
+    private let signature = OSType("TRAC".fourCharCodeValue)
+    private let hotKeyID = EventHotKeyID(signature: OSType("TRAC".fourCharCodeValue), id: 1)
+    
+    var onHotkeyPressed: (() -> Void)?
+    
+    init() {
+        setupEventHandler()
+    }
+    
+    deinit {
+        unregisterHotkey()
+        if let handler = eventHandler {
+            RemoveEventHandler(handler)
+        }
+    }
+    
+    private func setupEventHandler() {
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        
+        let callback: EventHandlerUPP = { _, event, userData in
+            guard let event = event else { return OSStatus(eventNotHandledErr) }
+            
+            var hotKeyID = EventHotKeyID()
+            let status = GetEventParameter(
+                event,
+                EventParamName(kEventParamDirectObject),
+                EventParamType(typeEventHotKeyID),
+                nil,
+                MemoryLayout<EventHotKeyID>.size,
+                nil,
+                &hotKeyID
+            )
+            
+            if status == noErr {
+                let manager = Unmanaged<HotkeyManager>.fromOpaque(userData!).takeUnretainedValue()
+                DispatchQueue.main.async {
+                    manager.onHotkeyPressed?()
+                }
+            }
+            
+            return noErr
+        }
+        
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            callback,
+            1,
+            &eventType,
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandler
+        )
+    }
+    
+    func registerHotkey(keyCode: UInt32, modifiers: UInt32) {
+        unregisterHotkey()
+        
+        let hotKeyID = self.hotKeyID
+        RegisterEventHotKey(
+            keyCode,
+            modifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+    }
+    
+    func unregisterHotkey() {
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
+            hotKeyRef = nil
+        }
+    }
+}
+
+extension String {
+    var fourCharCodeValue: UInt32 {
+        var result: UInt32 = 0
+        for char in self.utf8 {
+            result = (result << 8) + UInt32(char)
+        }
+        return result
+    }
+}
