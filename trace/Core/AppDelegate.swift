@@ -10,6 +10,11 @@ import SwiftUI
 import Carbon
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    // MARK: - Constants
+    private enum Constants {
+        static let defaultKeyCode: UInt32 = 49 // Space key
+        static let menuOffset = NSPoint(x: 0, y: 5)
+    }
     var statusItem: NSStatusItem!
     var launcherWindow: LauncherWindow!
     var hotkeyManager: HotkeyManager!
@@ -53,32 +58,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let savedKeyCode = UserDefaults.standard.integer(forKey: "hotkey_keyCode")
         let savedModifiers = UserDefaults.standard.integer(forKey: "hotkey_modifiers")
         
-        let keyCode = savedKeyCode > 0 ? UInt32(savedKeyCode) : 49
+        let keyCode = savedKeyCode > 0 ? UInt32(savedKeyCode) : Constants.defaultKeyCode
         let modifiers = savedModifiers > 0 ? UInt32(savedModifiers) : UInt32(optionKey)
         
-        hotkeyManager.registerHotkey(keyCode: keyCode, modifiers: modifiers)
+        do {
+            try hotkeyManager.registerHotkey(keyCode: keyCode, modifiers: modifiers)
+        } catch {
+            NSLog("Failed to register hotkey: %@", error.localizedDescription)
+        }
     }
     
     private func requestAccessibilityPermissions() {
-        // First check if we have permissions
         let accessEnabled = AXIsProcessTrusted()
         
         if !accessEnabled {
-            // Request permissions with prompt
-            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-            let _ = AXIsProcessTrustedWithOptions(options)
-            print("Accessibility permissions needed for global hotkey - please check System Preferences")
+            do {
+                let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+                let hasPermissions = AXIsProcessTrustedWithOptions(options)
+                
+                if !hasPermissions {
+                    NSLog("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
+                }
+            } catch {
+                NSLog("Failed to request accessibility permissions: %@", error.localizedDescription)
+            }
         }
     }
     
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        if let event = NSApp.currentEvent {
-            if event.type == .rightMouseUp {
-                statusItem.menu?.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 5), in: sender)
-            } else {
-                statusItem.menu = nil
-                showLauncher()
-            }
+        guard let event = NSApp.currentEvent else { return }
+        
+        if event.type == .rightMouseUp {
+            let menuPosition = NSPoint(x: Constants.menuOffset.x, y: sender.bounds.height + Constants.menuOffset.y)
+            statusItem.menu?.popUp(positioning: nil, at: menuPosition, in: sender)
+        } else {
+            statusItem.menu = nil
+            showLauncher()
         }
     }
     
@@ -88,13 +103,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc func showPreferences() {
-        print("AppDelegate showPreferences called - DEBUG")
-        // Use the proper SwiftUI Settings scene approach
         if let settingsScene = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
             settingsScene.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
         } else {
-            // Trigger the Settings scene to open
             NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -111,6 +123,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startGlobalEventMonitoring() {
+        guard globalEventMonitor == nil else { return }
+        
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.launcherWindow.hide()
             self?.stopGlobalEventMonitoring()

@@ -10,6 +10,12 @@ import AppKit
 import Cocoa
 
 class AppSearchManager: ObservableObject {
+    // MARK: - Constants
+    private enum Constants {
+        static let refreshInterval: TimeInterval = 60.0
+        static let iconSize = NSSize(width: 24, height: 24)
+        static let defaultSearchLimit = 10
+    }
     static let shared = AppSearchManager()
     
     private var apps: [String: Application] = [:] // bundleId -> Application
@@ -17,6 +23,7 @@ class AppSearchManager: ObservableObject {
     private let queue = DispatchQueue(label: "com.trace.appsearch", qos: .userInitiated, attributes: .concurrent)
     private let iconQueue = DispatchQueue(label: "com.trace.appsearch.icons", qos: .utility)
     private var fileSystemWatcher: Any?
+    private var refreshTimer: Timer?
     private var isLoading = false
     
     private let applicationPaths = [
@@ -32,11 +39,13 @@ class AppSearchManager: ObservableObject {
     
     deinit {
         stopFileSystemWatcher()
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     // MARK: - Public API
     
-    func searchApps(query: String, limit: Int = 10) -> [Application] {
+    func searchApps(query: String, limit: Int = Constants.defaultSearchLimit) -> [Application] {
         guard !query.isEmpty else { return [] }
         
         let queryLower = query.lowercased()
@@ -95,7 +104,7 @@ class AppSearchManager: ObservableObject {
         
         iconQueue.async { [weak self] in
             let icon = NSWorkspace.shared.icon(forFile: app.url.path)
-            icon.size = NSSize(width: 24, height: 24)
+            icon.size = Constants.iconSize
             
             DispatchQueue.main.async {
                 self?.apps[app.bundleIdentifier]?.icon = icon
@@ -155,18 +164,22 @@ class AppSearchManager: ObservableObject {
         let fileManager = FileManager.default
         var apps: [Application] = []
         
-        guard let contents = try? fileManager.contentsOfDirectory(at: URL(fileURLWithPath: path),
-                                                                  includingPropertiesForKeys: [.isApplicationKey, .contentModificationDateKey],
-                                                                  options: [.skipsHiddenFiles]) else {
-            return apps
-        }
-        
-        for url in contents {
-            guard url.pathExtension == "app" else { continue }
+        do {
+            let contents = try fileManager.contentsOfDirectory(
+                at: URL(fileURLWithPath: path),
+                includingPropertiesForKeys: [.isApplicationKey, .contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            )
             
-            if let app = createApp(from: url) {
-                apps.append(app)
+            for url in contents {
+                guard url.pathExtension == "app" else { continue }
+                
+                if let app = createApp(from: url) {
+                    apps.append(app)
+                }
             }
+        } catch {
+            NSLog("Failed to scan directory %@: %@", path, error.localizedDescription)
         }
         
         return apps
@@ -183,10 +196,12 @@ class AppSearchManager: ObservableObject {
         let name = url.deletingPathExtension().lastPathComponent
         
         let lastModified: Date
-        if let modificationDate = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
-            lastModified = modificationDate
-        } else {
+        do {
+            let resourceValues = try url.resourceValues(forKeys: [.contentModificationDateKey])
+            lastModified = resourceValues.contentModificationDate ?? Date.distantPast
+        } catch {
             lastModified = Date.distantPast
+            NSLog("Failed to get modification date for %@: %@", url.path, error.localizedDescription)
         }
         
         return Application(
@@ -204,7 +219,7 @@ class AppSearchManager: ObservableObject {
         apps = newApps
         rebuildNameIndex()
         
-        print("AppSearchManager: Loaded \(apps.count) applications")
+        NSLog("AppSearchManager: Loaded %d applications", apps.count)
     }
     
     private func rebuildNameIndex() {
@@ -228,15 +243,21 @@ class AppSearchManager: ObservableObject {
     // MARK: - File System Monitoring
     
     private func setupFileSystemWatcher() {
-        // TODO: Implement FSEventStream for monitoring app directory changes
-        // For now, we'll refresh periodically
-        Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+        // For now, use timer-based monitoring for reliability
+        // FSEvents can be implemented later if needed
+        setupTimerBasedWatcher()
+    }
+    
+    private func setupTimerBasedWatcher() {
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: Constants.refreshInterval, repeats: true) { [weak self] _ in
             self?.loadAppsInBackground()
         }
     }
     
     private func stopFileSystemWatcher() {
-        // TODO: Stop FSEventStream
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     // MARK: - Search Scoring

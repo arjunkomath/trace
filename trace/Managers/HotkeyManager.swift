@@ -8,6 +8,12 @@
 import Carbon
 import Cocoa
 
+enum HotkeyError: Error {
+    case registrationFailed(OSStatus)
+    case eventHandlerInstallFailed(OSStatus)
+    case invalidParameters
+}
+
 class HotkeyManager {
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
@@ -23,7 +29,11 @@ class HotkeyManager {
     deinit {
         unregisterHotkey()
         if let handler = eventHandler {
-            RemoveEventHandler(handler)
+            let status = RemoveEventHandler(handler)
+            if status != noErr {
+                NSLog("Failed to remove event handler: %d", status)
+            }
+            eventHandler = nil
         }
     }
     
@@ -31,7 +41,10 @@ class HotkeyManager {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         
         let callback: EventHandlerUPP = { _, event, userData in
-            guard let event = event else { return OSStatus(eventNotHandledErr) }
+            guard let event = event,
+                  let userData = userData else { 
+                return OSStatus(eventNotHandledErr) 
+            }
             
             var hotKeyID = EventHotKeyID()
             let status = GetEventParameter(
@@ -45,7 +58,7 @@ class HotkeyManager {
             )
             
             if status == noErr {
-                let manager = Unmanaged<HotkeyManager>.fromOpaque(userData!).takeUnretainedValue()
+                let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
                 DispatchQueue.main.async {
                     manager.onHotkeyPressed?()
                 }
@@ -54,7 +67,7 @@ class HotkeyManager {
             return noErr
         }
         
-        InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             callback,
             1,
@@ -62,13 +75,20 @@ class HotkeyManager {
             Unmanaged.passUnretained(self).toOpaque(),
             &eventHandler
         )
+        
+        if status != noErr {
+            NSLog("Failed to install event handler: %d", status)
+        }
     }
     
-    func registerHotkey(keyCode: UInt32, modifiers: UInt32) {
+    func registerHotkey(keyCode: UInt32, modifiers: UInt32) throws {
         unregisterHotkey()
         
-        let hotKeyID = self.hotKeyID
-        RegisterEventHotKey(
+        guard keyCode > 0 else {
+            throw HotkeyError.invalidParameters
+        }
+        
+        let status = RegisterEventHotKey(
             keyCode,
             modifiers,
             hotKeyID,
@@ -76,11 +96,19 @@ class HotkeyManager {
             0,
             &hotKeyRef
         )
+        
+        if status != noErr {
+            NSLog("Failed to register hotkey (keyCode: %d, modifiers: %d): %d", keyCode, modifiers, status)
+            throw HotkeyError.registrationFailed(status)
+        }
     }
     
     func unregisterHotkey() {
         if let ref = hotKeyRef {
-            UnregisterEventHotKey(ref)
+            let status = UnregisterEventHotKey(ref)
+            if status != noErr {
+                NSLog("Failed to unregister hotkey: %d", status)
+            }
             hotKeyRef = nil
         }
     }

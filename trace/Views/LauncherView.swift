@@ -10,6 +10,17 @@ import AppKit
 import CoreGraphics
 
 struct LauncherView: View {
+    // MARK: - Constants
+    private enum Constants {
+        static let windowWidth: CGFloat = 750
+        static let windowHeight: CGFloat = 60
+        static let maxResultsHeight: CGFloat = 300
+        static let searchPadding: CGFloat = 30
+        static let cornerRadius: CGFloat = 12
+        static let shadowRadius: CGFloat = 12
+        static let shadowOffset = CGSize(width: 0, height: 6)
+        static let commaKeyCode: CGKeyCode = 0x2B
+    }
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @FocusState private var isSearchFocused: Bool
@@ -47,7 +58,7 @@ struct LauncherView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .frame(height: 60) // Fixed height
+            .frame(height: Constants.windowHeight)
             
             // Results section - expandable
             VStack(spacing: 0) {
@@ -69,28 +80,28 @@ struct LauncherView: View {
                             }
                         }
                     }
-                    .frame(maxHeight: 300)
+                    .frame(maxHeight: Constants.maxResultsHeight)
                 }
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-        .frame(width: 750)
+        .frame(width: Constants.windowWidth)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Constants.cornerRadius)
                 .fill(.regularMaterial)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: Constants.cornerRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Constants.cornerRadius)
                 .stroke(Color.primary.opacity(colorScheme == .dark ? 0.2 : 0.15), lineWidth: 1)
         )
         .shadow(
             color: Color.black.opacity(colorScheme == .dark ? 0.6 : 0.3),
-            radius: 12,
-            x: 0,
-            y: 6
+            radius: Constants.shadowRadius,
+            x: Constants.shadowOffset.width,
+            y: Constants.shadowOffset.height
         )
-        .padding(30)
+        .padding(Constants.searchPadding)
         .onAppear {
             searchText = ""
             selectedIndex = 0
@@ -147,12 +158,12 @@ struct LauncherView: View {
                         let source = CGEventSource(stateID: .combinedSessionState)
                         
                         // Create keydown event for comma with command modifier
-                        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x2B, keyDown: true) // 0x2B is comma key
+                        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: Constants.commaKeyCode, keyDown: true)
                         keyDown?.flags = .maskCommand
                         keyDown?.post(tap: .cghidEventTap)
                         
                         // Create keyup event
-                        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x2B, keyDown: false)
+                        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: Constants.commaKeyCode, keyDown: false)
                         keyUp?.flags = .maskCommand
                         keyUp?.post(tap: .cghidEventTap)
                     }

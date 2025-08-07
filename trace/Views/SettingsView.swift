@@ -175,7 +175,11 @@ struct SettingsView: View {
     
     func updateHotkey() {
         if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.hotkeyManager.registerHotkey(keyCode: UInt32(savedKeyCode), modifiers: UInt32(savedModifiers))
+            do {
+                try appDelegate.hotkeyManager.registerHotkey(keyCode: UInt32(savedKeyCode), modifiers: UInt32(savedModifiers))
+            } catch {
+                NSLog("Failed to update hotkey: %@", error.localizedDescription)
+            }
         }
     }
     
