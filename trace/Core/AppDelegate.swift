@@ -38,6 +38,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         hotkeyManager = HotkeyManager()
         hotkeyManager?.onHotkeyPressed = { [weak self] in
+            // Track the window IMMEDIATELY when hotkey is pressed, before Trace becomes active
+            WindowManager.shared.trackCurrentActiveWindow()
+            
+            // Show launcher immediately
             self?.toggleLauncher()
         }
         

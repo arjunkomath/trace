@@ -96,6 +96,9 @@ struct LauncherView: View {
         .onAppear {
             searchText = ""
             selectedIndex = 0
+            
+            // Force focus immediately and then again after a delay
+            isSearchFocused = true
             DispatchQueue.main.asyncAfter(deadline: .now() + AppConstants.Animation.focusDelay) {
                 isSearchFocused = true
             }
@@ -200,6 +203,10 @@ struct LauncherView: View {
             .map { $0.0 }
         allResults.append(contentsOf: sortedSystemCommands)
         
+        // Add window management commands
+        let windowCommands = getWindowManagementCommands(query: searchLower)
+        allResults.append(contentsOf: windowCommands)
+        
         // Always add Google search as last option
         let googleSearchResult = SearchResult(
             title: "Search Google for '\(searchText)'",
@@ -292,6 +299,91 @@ struct LauncherView: View {
         }.max() ?? 0
         
         return bestMatch
+    }
+    
+    // MARK: - Window Management
+    
+    private func getWindowManagementCommands(query: String) -> [SearchResult] {
+        var commands: [SearchResult] = []
+        
+        // Only show window commands if user is searching for window-related terms
+        let windowTerms = [
+            "window", "win", "resize", "move", "position", "left", "right", "center", "top", "bottom",
+            "half", "third", "quarter", "maximize", "max", "larger", "smaller", "split"
+        ]
+        
+        let hasWindowMatch = windowTerms.contains { term in
+            fuzzyMatch(query: query, text: term) > 0.3
+        }
+        
+        // Also check direct matches against position names
+        let directMatches = WindowPosition.allCases.filter { position in
+            let searchTerms = [
+                position.rawValue,
+                position.displayName.lowercased(),
+                position.displayName.replacingOccurrences(of: " ", with: "").lowercased()
+            ]
+            return searchTerms.contains { term in
+                fuzzyMatch(query: query, text: term) > 0.3
+            }
+        }
+        
+        if hasWindowMatch || !directMatches.isEmpty {
+            // If we have direct matches, prioritize those, otherwise show common ones
+            let positionsToShow = !directMatches.isEmpty ? directMatches : [
+                .leftHalf, .rightHalf, .center, .maximize, .almostMaximize,
+                .topLeft, .topRight, .bottomLeft, .bottomRight
+            ]
+            
+            for position in positionsToShow {
+                let searchTerms = [
+                    position.rawValue,
+                    position.displayName.lowercased(),
+                    position.displayName.replacingOccurrences(of: " ", with: "").lowercased()
+                ]
+                
+                let score = searchTerms.compactMap { term in
+                    fuzzyMatch(query: query, text: term)
+                }.max() ?? (hasWindowMatch ? 0.5 : 0)
+                
+                if score > 0.3 {
+                    commands.append(SearchResult(
+                        title: position.displayName,
+                        subtitle: position.subtitle,
+                        icon: .system(getWindowIcon(for: position)),
+                        type: .command,
+                        category: "Window",
+                        shortcut: nil, // Will be populated from settings later
+                        lastUsed: nil,
+                        action: {
+                            WindowManager.shared.applyWindowPosition(position)
+                        }
+                    ))
+                }
+            }
+        }
+        
+        return commands.sorted { $0.title < $1.title }
+    }
+    
+    private func getWindowIcon(for position: WindowPosition) -> String {
+        switch position {
+        case .leftHalf: return "rectangle.split.2x1"
+        case .rightHalf: return "rectangle.split.2x1"
+        case .centerHalf: return "rectangle.center.inset.filled"
+        case .topHalf: return "rectangle.split.1x2"
+        case .bottomHalf: return "rectangle.split.1x2"
+        case .topLeft, .topRight, .bottomLeft, .bottomRight: return "rectangle.split.2x2"
+        case .firstThird, .centerThird, .lastThird: return "rectangle.split.3x1"
+        case .firstTwoThirds, .lastTwoThirds: return "rectangle.split.3x1"
+        case .maximize: return "arrow.up.left.and.arrow.down.right"
+        case .almostMaximize: return "macwindow"
+        case .maximizeHeight: return "arrow.up.and.down"
+        case .smaller: return "minus.rectangle"
+        case .larger: return "plus.rectangle"
+        case .center: return "target"
+        case .centerProminently: return "viewfinder"
+        }
     }
 }
 

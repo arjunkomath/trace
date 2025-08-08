@@ -26,4 +26,5 @@ enum AppLogger {
     static let settingsView = logger(for: "SettingsView")
     static let launcherView = logger(for: "LauncherView")
     static let launcherWindow = logger(for: "LauncherWindow")
+    static let windowManager = logger(for: "WindowManager")
 }
