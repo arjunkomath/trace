@@ -15,6 +15,8 @@ enum HotkeyError: Error {
 }
 
 class HotkeyManager {
+    private let logger = AppLogger.hotkeyManager
+    
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private let signature = OSType("TRAC".fourCharCodeValue)
@@ -31,7 +33,7 @@ class HotkeyManager {
         if let handler = eventHandler {
             let status = RemoveEventHandler(handler)
             if status != noErr {
-                NSLog("Failed to remove event handler: %d", status)
+                logger.error("Failed to remove event handler: \(status)")
             }
             eventHandler = nil
         }
@@ -77,7 +79,7 @@ class HotkeyManager {
         )
         
         if status != noErr {
-            NSLog("Failed to install event handler: %d", status)
+            logger.error("Failed to install event handler: \(status)")
         }
     }
     
@@ -98,7 +100,7 @@ class HotkeyManager {
         )
         
         if status != noErr {
-            NSLog("Failed to register hotkey (keyCode: %d, modifiers: %d): %d", keyCode, modifiers, status)
+            logger.error("Failed to register hotkey (keyCode: \(keyCode), modifiers: \(modifiers)): \(status)")
             throw HotkeyError.registrationFailed(status)
         }
     }
@@ -107,7 +109,7 @@ class HotkeyManager {
         if let ref = hotKeyRef {
             let status = UnregisterEventHotKey(ref)
             if status != noErr {
-                NSLog("Failed to unregister hotkey: %d", status)
+                logger.error("Failed to unregister hotkey: \(status)")
             }
             hotKeyRef = nil
         }

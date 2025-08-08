@@ -10,40 +10,26 @@ import SwiftUI
 import Carbon
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    // MARK: - Constants
-    private enum Constants {
-        static let defaultKeyCode: UInt32 = 49 // Space key
-        static let menuOffset = NSPoint(x: 0, y: 5)
-    }
-    var statusItem: NSStatusItem!
-    var launcherWindow: LauncherWindow!
-    var hotkeyManager: HotkeyManager!
-    var globalEventMonitor: Any?
+    private let logger = AppLogger.appDelegate
+    private let settingsService = SettingsService()
+    
+    private var launcherWindow: LauncherWindow?
+    private var hotkeyManager: HotkeyManager?
+    private var globalEventMonitor: Any?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        setupStatusItem()
         setupLauncherWindow()
         setupHotkey()
         requestAccessibilityPermissions()
     }
     
-    private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
-        if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Trace")
-            button.action = #selector(statusItemClicked)
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        }
-        
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Open Trace", action: #selector(showLauncher), keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Preferences...", action: #selector(showPreferences), keyEquivalent: ","))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit Trace", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        statusItem.menu = menu
+    deinit {
+        hotkeyManager?.unregisterHotkey()
+        stopGlobalEventMonitoring()
+        logger.debug("AppDelegate deinitialized")
     }
+    
+
     
     private func setupLauncherWindow() {
         launcherWindow = LauncherWindow()
@@ -51,20 +37,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupHotkey() {
         hotkeyManager = HotkeyManager()
-        hotkeyManager.onHotkeyPressed = { [weak self] in
+        hotkeyManager?.onHotkeyPressed = { [weak self] in
             self?.toggleLauncher()
         }
         
-        let savedKeyCode = UserDefaults.standard.integer(forKey: "hotkey_keyCode")
-        let savedModifiers = UserDefaults.standard.integer(forKey: "hotkey_modifiers")
-        
-        let keyCode = savedKeyCode > 0 ? UInt32(savedKeyCode) : Constants.defaultKeyCode
-        let modifiers = savedModifiers > 0 ? UInt32(savedModifiers) : UInt32(optionKey)
+        let keyCode = settingsService.hotkeyKeyCode
+        let modifiers = settingsService.hotkeyModifiers
         
         do {
-            try hotkeyManager.registerHotkey(keyCode: keyCode, modifiers: modifiers)
+            try hotkeyManager?.registerHotkey(keyCode: keyCode, modifiers: modifiers)
         } catch {
-            NSLog("Failed to register hotkey: %@", error.localizedDescription)
+            logger.error("Failed to register hotkey: \(error.localizedDescription)")
         }
     }
     
@@ -77,42 +60,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let hasPermissions = AXIsProcessTrustedWithOptions(options)
                 
                 if !hasPermissions {
-                    NSLog("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
+                    logger.warning("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
                 }
             } catch {
-                NSLog("Failed to request accessibility permissions: %@", error.localizedDescription)
+                logger.error("Failed to request accessibility permissions: \(error.localizedDescription)")
             }
         }
     }
     
-    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        guard let event = NSApp.currentEvent else { return }
-        
-        if event.type == .rightMouseUp {
-            let menuPosition = NSPoint(x: Constants.menuOffset.x, y: sender.bounds.height + Constants.menuOffset.y)
-            statusItem.menu?.popUp(positioning: nil, at: menuPosition, in: sender)
-        } else {
-            statusItem.menu = nil
-            showLauncher()
-        }
-    }
+
     
     @objc private func showLauncher() {
-        launcherWindow.show()
+        launcherWindow?.show()
         startGlobalEventMonitoring()
     }
     
-    @objc func showPreferences() {
-        if let settingsScene = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
-            settingsScene.makeKeyAndOrderFront(nil)
+    func showPreferences() {
+        // First check if settings window is already open
+        if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
+            settingsWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
-        } else {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            NSApp.activate(ignoringOtherApps: true)
+            return
         }
+        
+        // Use the main menu approach to open settings
+        // This is the most reliable way for SwiftUI Settings scenes
+        if let mainMenu = NSApp.mainMenu {
+            for menuItem in mainMenu.items {
+                if let submenu = menuItem.submenu {
+                    for subMenuItem in submenu.items {
+                        if subMenuItem.title.contains("Settings") || subMenuItem.title.contains("Preferences") {
+                            NSApp.sendAction(subMenuItem.action!, to: subMenuItem.target, from: nil)
+                            NSApp.activate(ignoringOtherApps: true)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: try the standard preferences action
+        NSApp.orderFrontStandardAboutPanel(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     private func toggleLauncher() {
+        guard let launcherWindow = launcherWindow else { return }
+        
         if launcherWindow.isVisible {
             launcherWindow.hide()
             stopGlobalEventMonitoring()
@@ -126,7 +120,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard globalEventMonitor == nil else { return }
         
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.launcherWindow.hide()
+            self?.launcherWindow?.hide()
             self?.stopGlobalEventMonitoring()
         }
     }
@@ -139,12 +133,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        hotkeyManager.unregisterHotkey()
+        hotkeyManager?.unregisterHotkey()
         stopGlobalEventMonitoring()
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showLauncher()
         return true
+    }
+    
+    // MARK: - Public API
+    
+    func updateHotkey(keyCode: UInt32, modifiers: UInt32) throws {
+        try hotkeyManager?.registerHotkey(keyCode: keyCode, modifiers: modifiers)
     }
 }

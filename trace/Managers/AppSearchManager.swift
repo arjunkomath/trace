@@ -10,12 +10,8 @@ import AppKit
 import Cocoa
 
 class AppSearchManager: ObservableObject {
-    // MARK: - Constants
-    private enum Constants {
-        static let refreshInterval: TimeInterval = 60.0
-        static let iconSize = NSSize(width: 24, height: 24)
-        static let defaultSearchLimit = 10
-    }
+    
+    private let logger = AppLogger.appSearchManager
     static let shared = AppSearchManager()
     
     private var apps: [String: Application] = [:] // bundleId -> Application
@@ -26,11 +22,7 @@ class AppSearchManager: ObservableObject {
     private var refreshTimer: Timer?
     private var isLoading = false
     
-    private let applicationPaths = [
-        "/Applications",
-        "/System/Applications",
-        "~/Applications"
-    ]
+    private let applicationPaths = AppConstants.Paths.applications
     
     private init() {
         loadAppsInBackground()
@@ -45,71 +37,84 @@ class AppSearchManager: ObservableObject {
     
     // MARK: - Public API
     
-    func searchApps(query: String, limit: Int = Constants.defaultSearchLimit) -> [Application] {
+    func searchApps(query: String, limit: Int = AppConstants.Search.defaultLimit) -> [Application] {
         guard !query.isEmpty else { return [] }
         
         let queryLower = query.lowercased()
-        var results: [Application] = []
-        var scores: [String: Double] = [:]
+        var scoredResults: [(Application, Double)] = []
+        var processedBundleIds = Set<String>()
         
         // Fast path: exact name matches
         if let bundleIds = appsByName[queryLower] {
             for bundleId in bundleIds {
                 if let app = apps[bundleId] {
-                    results.append(app)
-                    scores[bundleId] = 1.0
+                    scoredResults.append((app, 1.0))
+                    processedBundleIds.insert(bundleId)
                 }
             }
         }
         
-        // Fuzzy matching for partial matches
-        if results.count < limit {
-            for (name, bundleIds) in appsByName {
-                if results.count >= limit { break }
-                
-                if name.contains(queryLower) && !bundleIds.allSatisfy({ scores.keys.contains($0) }) {
-                    let score = calculateMatchScore(query: queryLower, text: name)
-                    
-                    for bundleId in bundleIds {
-                        if !scores.keys.contains(bundleId), let app = apps[bundleId] {
-                            results.append(app)
-                            scores[bundleId] = score
-                            
-                            if results.count >= limit { break }
+        // Early return if we have enough exact matches
+        if scoredResults.count >= limit {
+            return Array(scoredResults.prefix(limit).map { $0.0 })
+        }
+        
+        // Fuzzy matching for partial matches - improved algorithm
+        for (name, bundleIds) in appsByName {
+            let score = calculateMatchScore(query: queryLower, text: name)
+            
+            // Only include results with meaningful scores
+            if score > 0.1 {
+                for bundleId in bundleIds where !processedBundleIds.contains(bundleId) {
+                    if let app = apps[bundleId] {
+                        scoredResults.append((app, score))
+                        processedBundleIds.insert(bundleId)
+                        
+                        if scoredResults.count >= limit * 3 { // Get more for better sorting
+                            break
                         }
                     }
                 }
             }
+            
+            if scoredResults.count >= limit * 3 {
+                break
+            }
         }
         
-        // Sort by relevance score (higher is better)
-        return results.sorted { app1, app2 in
-            let score1 = scores[app1.bundleIdentifier] ?? 0
-            let score2 = scores[app2.bundleIdentifier] ?? 0
-            
-            if score1 != score2 {
-                return score1 > score2
+        // Sort by relevance score and return top results
+        return scoredResults
+            .sorted { $0.1 > $1.1 || ($0.1 == $1.1 && $0.0.displayName.localizedCaseInsensitiveCompare($1.0.displayName) == .orderedAscending) }
+            .prefix(limit)
+            .map { $0.0 }
+    }
+    
+    @MainActor
+    func getAppIcon(for app: Application) async -> NSImage? {
+        // Return cached icon if available
+        if let cachedIcon = apps[app.bundleIdentifier]?.icon {
+            return cachedIcon
+        }
+        
+        // Load icon asynchronously
+        return await withCheckedContinuation { continuation in
+            iconQueue.async { [weak self] in
+                let icon = NSWorkspace.shared.icon(forFile: app.url.path)
+                icon.size = AppConstants.Search.iconSize
+                
+                Task { @MainActor in
+                    self?.apps[app.bundleIdentifier]?.icon = icon
+                    continuation.resume(returning: icon)
+                }
             }
-            
-            // Secondary sort: alphabetical by display name
-            return app1.displayName.localizedCaseInsensitiveCompare(app2.displayName) == .orderedAscending
         }
     }
     
+    // Legacy completion-based method for backward compatibility
     func getAppIcon(for app: Application, completion: @escaping (NSImage?) -> Void) {
-        if let cachedIcon = apps[app.bundleIdentifier]?.icon {
-            completion(cachedIcon)
-            return
-        }
-        
-        iconQueue.async { [weak self] in
-            let icon = NSWorkspace.shared.icon(forFile: app.url.path)
-            icon.size = Constants.iconSize
-            
-            DispatchQueue.main.async {
-                self?.apps[app.bundleIdentifier]?.icon = icon
-                completion(icon)
-            }
+        Task {
+            let icon = await getAppIcon(for: app)
+            completion(icon)
         }
     }
     
@@ -179,7 +184,7 @@ class AppSearchManager: ObservableObject {
                 }
             }
         } catch {
-            NSLog("Failed to scan directory %@: %@", path, error.localizedDescription)
+            logger.error("Failed to scan directory \(path): \(error.localizedDescription)")
         }
         
         return apps
@@ -201,7 +206,7 @@ class AppSearchManager: ObservableObject {
             lastModified = resourceValues.contentModificationDate ?? Date.distantPast
         } catch {
             lastModified = Date.distantPast
-            NSLog("Failed to get modification date for %@: %@", url.path, error.localizedDescription)
+            logger.warning("Failed to get modification date for \(url.path): \(error.localizedDescription)")
         }
         
         return Application(
@@ -219,7 +224,7 @@ class AppSearchManager: ObservableObject {
         apps = newApps
         rebuildNameIndex()
         
-        NSLog("AppSearchManager: Loaded %d applications", apps.count)
+        logger.info("Loaded \(self.apps.count) applications")
     }
     
     private func rebuildNameIndex() {
@@ -250,7 +255,7 @@ class AppSearchManager: ObservableObject {
     
     private func setupTimerBasedWatcher() {
         refreshTimer?.invalidate()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: Constants.refreshInterval, repeats: true) { [weak self] _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: AppConstants.Search.refreshInterval, repeats: true) { [weak self] _ in
             self?.loadAppsInBackground()
         }
     }
@@ -290,18 +295,38 @@ class AppSearchManager: ObservableObject {
         
         var queryIndex = 0
         var matches = 0
+        var consecutiveMatches = 0
+        var maxConsecutive = 0
+        var lastMatchIndex = -1
         
-        for textChar in textChars {
+        for (textIndex, textChar) in textChars.enumerated() {
             if queryIndex < queryChars.count && queryChars[queryIndex] == textChar {
                 matches += 1
                 queryIndex += 1
+                
+                // Track consecutive matches for bonus scoring
+                if textIndex == lastMatchIndex + 1 {
+                    consecutiveMatches += 1
+                } else {
+                    consecutiveMatches = 1
+                }
+                maxConsecutive = max(maxConsecutive, consecutiveMatches)
+                lastMatchIndex = textIndex
             }
         }
         
-        if matches == queryChars.count {
-            return 0.5 * (Double(matches) / Double(text.count))
-        }
+        // All query characters must be found
+        guard matches == queryChars.count else { return 0 }
         
-        return 0
+        // Base score from match ratio
+        let matchRatio = Double(matches) / Double(textChars.count)
+        
+        // Bonus for consecutive matches (rewards word boundaries and prefixes)
+        let consecutiveBonus = Double(maxConsecutive) / Double(queryChars.count) * 0.3
+        
+        // Bonus for early matches (rewards prefix matches)
+        let earlyMatchBonus = lastMatchIndex < textChars.count / 2 ? 0.1 : 0
+        
+        return min(0.6, matchRatio * 0.4 + consecutiveBonus + earlyMatchBonus)
     }
 }

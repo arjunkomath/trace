@@ -69,7 +69,7 @@ struct SearchCategory {
 
 // MARK: - Application Model
 
-struct Application: Identifiable, Hashable {
+struct Application: Identifiable, Hashable, Sendable {
     let id: String // bundle identifier
     let name: String
     let displayName: String
