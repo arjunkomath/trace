@@ -7,14 +7,15 @@
 
 import Cocoa
 import SwiftUI
+import ApplicationServices
 
-class LauncherWindow: NSWindow {
+class LauncherWindow: NSPanel {
     private var hostingView: NSHostingView<LauncherView>?
     
     init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 810, height: 360),
-            styleMask: [.borderless],
+            styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
         )
@@ -25,6 +26,9 @@ class LauncherWindow: NSWindow {
     
     private func setupWindow() {
         isReleasedWhenClosed = false
+        
+        // Critical settings for full-screen overlay
+        isFloatingPanel = true
         level = .floating
         backgroundColor = .clear
         isOpaque = false
@@ -32,7 +36,17 @@ class LauncherWindow: NSWindow {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         isMovableByWindowBackground = false
-        collectionBehavior = []
+        
+        // Essential collection behaviors for full-screen overlay
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        
+        // Hide standard window buttons
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
+        
+        // Request accessibility permissions if not already granted
+        requestAccessibilityPermissions()
     }
     
     private func setupContent() {
@@ -46,24 +60,33 @@ class LauncherWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     
-    func show() {
-        centerOnScreen()
-        
-        orderFrontRegardless()
-        makeKeyAndOrderFront(nil)
-        
-        NSApp.activate(ignoringOtherApps: true)
-        
-        // Ensure focus is properly set after window becomes key
+    override func resignKey() {
+        // Close panel when it loses key status for launcher behavior
+        super.resignKey()
         DispatchQueue.main.async { [weak self] in
-            self?.ensureFocus()
+            self?.hide()
         }
     }
     
     override func becomeKey() {
         super.becomeKey()
+        // Ensure app is activated when panel becomes key
+        NSApp.activate(ignoringOtherApps: true)
         // Post notification when window becomes key so LauncherView can focus
         NotificationCenter.default.post(name: .launcherWindowDidBecomeKey, object: self)
+    }
+    
+    func show() {
+        centerOnScreen()
+        
+        // NSPanel specific showing for full-screen overlay
+        orderFrontRegardless()
+        makeKeyAndOrderFront(nil)
+        
+        // Ensure focus is properly set after panel becomes key
+        DispatchQueue.main.async { [weak self] in
+            self?.ensureFocus()
+        }
     }
     
     private func ensureFocus() {
@@ -91,6 +114,19 @@ class LauncherWindow: NSWindow {
         let y = screenFrame.midY - windowFrame.height / 2 + 200 // Position higher for better visual balance with results
         
         setFrameOrigin(NSPoint(x: x, y: y))
+    }
+    
+    // MARK: - Accessibility Permissions
+    
+    private func requestAccessibilityPermissions() {
+        // Check if accessibility is already enabled
+        let trusted = AXIsProcessTrusted()
+        
+        if !trusted {
+            // Request accessibility permissions
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            AXIsProcessTrustedWithOptions(options)
+        }
     }
 }
 

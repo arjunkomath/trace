@@ -218,7 +218,7 @@ struct AboutSettingsView: View {
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                             
-                            Text("System-wide search and app launcher for macOS")
+                            Text("System-wide search and launcher for macOS")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
@@ -228,12 +228,12 @@ struct AboutSettingsView: View {
                     
                     // Developer Info and Links
                     VStack(spacing: 16) {
-                        Text("Created by Arjun Komath")
+                        Text("Created by Arjun Komath & Claude")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                         
                         HStack(spacing: 20) {
-                            Link("GitHub", destination: URL(string: "https://github.com/arjunkomath/trace")!)
+                            Link("GitHub", destination: URL(string: "https://github.com/arjunkomath")!)
                                 .font(.system(size: 12))
                             
                             Link("Twitter", destination: URL(string: "https://twitter.com/arjunz")!)
