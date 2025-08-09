@@ -328,7 +328,7 @@ class WindowManager: ObservableObject {
             let height = screenFrame.height * 0.9
             return CGRect(
                 x: screenFrame.origin.x + (screenFrame.width - width) / 2,
-                y: screenFrame.origin.y + (screenFrame.height - height) / 2,
+                y: screenFrame.origin.y + (screenFrame.height - height) / 2 + 25,
                 width: width,
                 height: height
             )

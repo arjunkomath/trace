@@ -9,6 +9,7 @@ import Cocoa
 import SwiftUI
 
 class LauncherWindow: NSWindow {
+    private var hostingView: NSHostingView<LauncherView>?
     
     init() {
         super.init(
@@ -38,6 +39,7 @@ class LauncherWindow: NSWindow {
         let hostingView = NSHostingView(rootView: LauncherView { [weak self] in
             self?.hide()
         })
+        self.hostingView = hostingView
         contentView = hostingView
     }
     
@@ -48,6 +50,28 @@ class LauncherWindow: NSWindow {
         centerOnScreen()
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        
+        // Ensure focus is properly set after window becomes key
+        DispatchQueue.main.async { [weak self] in
+            self?.ensureFocus()
+        }
+    }
+    
+    override func becomeKey() {
+        super.becomeKey()
+        // Post notification when window becomes key so LauncherView can focus
+        NotificationCenter.default.post(name: .launcherWindowDidBecomeKey, object: self)
+    }
+    
+    private func ensureFocus() {
+        // Multiple attempts with increasing delays to ensure focus works
+        let delays: [TimeInterval] = [0.05, 0.1, 0.2]
+        
+        for (_, delay) in delays.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                NotificationCenter.default.post(name: .shouldFocusSearchField, object: nil)
+            }
+        }
     }
     
     func hide() {
@@ -65,4 +89,11 @@ class LauncherWindow: NSWindow {
         
         setFrameOrigin(NSPoint(x: x, y: y))
     }
+}
+
+// MARK: - Notifications
+
+extension Notification.Name {
+    static let launcherWindowDidBecomeKey = Notification.Name("launcherWindowDidBecomeKey")
+    static let shouldFocusSearchField = Notification.Name("shouldFocusSearchField")
 }

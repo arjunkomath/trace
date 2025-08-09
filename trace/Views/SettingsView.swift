@@ -58,7 +58,7 @@ struct SettingsView: View {
             WindowManagementSettingsView()
                 .tabItem {
                     Image(systemName: "macwindow")
-                    Text("Window Management")
+                    Text("Windows")
                 }
                 .tag(2)
             
@@ -403,7 +403,7 @@ struct PermissionsSettingsView: View {
     
     private func openNotificationSettings() {
         // Open System Settings to Notifications for this app
-        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.trace.app"
+        let _ = Bundle.main.bundleIdentifier ?? "com.trace.app"
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
             NSWorkspace.shared.open(url)
         }

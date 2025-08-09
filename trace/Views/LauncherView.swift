@@ -40,6 +40,10 @@ struct LauncherView: View {
                     Button(action: { 
                         searchText = ""
                         selectedIndex = 0
+                        // Restore focus after clearing search
+                        DispatchQueue.main.async {
+                            isSearchFocused = true
+                        }
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
@@ -98,9 +102,16 @@ struct LauncherView: View {
             searchText = ""
             selectedIndex = 0
             
-            // Force focus immediately and then again after a delay
+            // Set focus immediately
             isSearchFocused = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + AppConstants.Animation.focusDelay) {
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .shouldFocusSearchField)) { _ in
+            // Respond to focus requests from LauncherWindow
+            isSearchFocused = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .launcherWindowDidBecomeKey)) { _ in
+            // Additional focus attempt when window becomes key
+            DispatchQueue.main.async {
                 isSearchFocused = true
             }
         }
@@ -433,13 +444,22 @@ struct LauncherView: View {
                 }.max() ?? (hasWindowMatch ? 0.5 : 0)
                 
                 if score > 0.3 {
+                    // Check if this window position has a hotkey assigned
+                    let assignedHotkey = UserDefaults.standard.string(forKey: "window_\(position.rawValue)_hotkey")
+                    let shortcut: KeyboardShortcut? = {
+                        if let hotkeyString = assignedHotkey, !hotkeyString.isEmpty {
+                            return KeyboardShortcut(keyCombo: hotkeyString)
+                        }
+                        return nil
+                    }()
+                    
                     commands.append(SearchResult(
                         title: position.displayName,
                         subtitle: position.subtitle,
                         icon: .system(getWindowIcon(for: position)),
                         type: .command,
                         category: "Window",
-                        shortcut: nil, // Will be populated from settings later
+                        shortcut: shortcut,
                         lastUsed: nil,
                         action: {
                             WindowManager.shared.applyWindowPosition(position)
@@ -520,14 +540,8 @@ struct ResultRowView: View {
             
             // Result type
             Text(result.type.displayName)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(isSelected ? .white.opacity(0.85) : .secondary.opacity(0.8))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(isSelected ? Color.white.opacity(0.1) : Color.secondary.opacity(0.08))
-                )
+                .font(.system(size: 11))
+                .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
             
             // Shortcut
             if let shortcut = result.shortcut {

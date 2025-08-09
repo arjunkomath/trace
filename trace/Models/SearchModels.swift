@@ -60,6 +60,31 @@ struct KeyboardShortcut {
     var displayString: String {
         (modifiers + [key]).joined(separator: "")
     }
+    
+    init(key: String, modifiers: [String]) {
+        self.key = key
+        self.modifiers = modifiers
+    }
+    
+    init(keyCombo: String) {
+        // Parse a key combo string like "⌘⌥A" into modifiers and key
+        let keys = KeyBindingView.parseKeyCombo(keyCombo)
+        
+        var modifiers: [String] = []
+        var key = ""
+        
+        for keyString in keys {
+            switch keyString {
+            case "⌘", "⌃", "⌥", "⇧":
+                modifiers.append(keyString)
+            default:
+                key = keyString
+            }
+        }
+        
+        self.key = key
+        self.modifiers = modifiers
+    }
 }
 
 struct SearchCategory {
