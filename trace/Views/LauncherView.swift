@@ -17,7 +17,7 @@ struct LauncherView: View {
     @AppStorage("resultsLayout") private var resultsLayout: ResultsLayout = .compact
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
-    @ObservedObject private var windowManager = WindowManager.shared
+    @ObservedObject private var services = ServiceContainer.shared
     
     let onClose: () -> Void
     
@@ -179,20 +179,20 @@ struct LauncherView: View {
         var scoredResults: [(SearchResult, Double)] = []
         
         // Get usage scores for all items
-        let usageScores = UsageTracker.shared.getAllUsageScores()
+        let usageScores = services.usageTracker.getAllUsageScores()
         
         // Get apps but calculate our own scores for fair comparison
-        let apps = AppSearchManager.shared.searchApps(query: searchText, limit: 30)
+        let apps = services.appSearchManager.searchApps(query: searchText, limit: 30)
         for app in apps {
             // Calculate match score ourselves for consistency
-            let matchScore = fuzzyMatch(query: searchLower, text: app.displayName.lowercased())
+            let matchScore = FuzzyMatcher.match(query: searchLower, text: app.displayName.lowercased())
             
             // Skip if match score is too low
             if matchScore < 0.3 { continue }
             
             // Check if there's a hotkey assigned for this app
             let shortcut: KeyboardShortcut? = {
-                if let hotkeyString = AppHotkeyManager.shared.getHotkey(for: app.bundleIdentifier), !hotkeyString.isEmpty {
+                if let hotkeyString = services.appHotkeyManager.getHotkey(for: app.bundleIdentifier), !hotkeyString.isEmpty {
                     return KeyboardShortcut(keyCombo: hotkeyString)
                 }
                 return nil
@@ -207,8 +207,8 @@ struct LauncherView: View {
                 shortcut: shortcut,
                 lastUsed: nil,
                 commandId: app.bundleIdentifier,
-                action: {
-                    AppSearchManager.shared.launchApp(app)
+                action: { [services] in
+                    services.appSearchManager.launchApp(app)
                 }
             )
             
@@ -288,8 +288,8 @@ struct LauncherView: View {
         let controlCenterCommands = getControlCenterCommands(query: searchLower)
         for command in controlCenterCommands {
             // Calculate match score for control center command (check both title and subtitle)
-            var matchScore = fuzzyMatch(query: searchLower, text: command.title.lowercased())
-            let subtitleScore = fuzzyMatch(query: searchLower, text: command.subtitle.lowercased())
+            var matchScore = FuzzyMatcher.match(query: searchLower, text: command.title.lowercased())
+            let subtitleScore = FuzzyMatcher.match(query: searchLower, text: command.subtitle.lowercased())
             matchScore = max(matchScore, subtitleScore)
             if matchScore > 0.3 {
                 let commandId = "com.trace.controlcenter.\(command.id)"
@@ -317,9 +317,9 @@ struct LauncherView: View {
         let windowCommands = getWindowManagementCommands(query: searchLower)
         for command in windowCommands {
             // Calculate match score for window command (check both title and subtitle)
-            var matchScore = fuzzyMatch(query: searchLower, text: command.title.lowercased())
+            var matchScore = FuzzyMatcher.match(query: searchLower, text: command.title.lowercased())
             if let subtitle = command.subtitle {
-                let subtitleScore = fuzzyMatch(query: searchLower, text: subtitle.lowercased())
+                let subtitleScore = FuzzyMatcher.match(query: searchLower, text: subtitle.lowercased())
                 matchScore = max(matchScore, subtitleScore)
             }
             if matchScore > 0.3 {
@@ -406,15 +406,15 @@ struct LauncherView: View {
         switch result.type {
         case .application:
             if case .app(let bundleId) = result.icon {
-                UsageTracker.shared.recordUsage(for: bundleId, type: .application)
+                services.usageTracker.recordUsage(for: bundleId, type: .application)
             }
         case .command:
             // Use the command's semantic identifier for tracking
             let commandId = result.commandId ?? getCommandIdentifier(for: result.title)
-            UsageTracker.shared.recordUsage(for: commandId, type: .command)
+            services.usageTracker.recordUsage(for: commandId, type: .command)
         case .suggestion:
             let commandId = result.commandId ?? "com.trace.search.unknown"
-            UsageTracker.shared.recordUsage(for: commandId, type: .webSearch)
+            services.usageTracker.recordUsage(for: commandId, type: .webSearch)
         case .file, .person, .recent:
             // These types aren't implemented yet, so no tracking for now
             break
@@ -444,67 +444,10 @@ struct LauncherView: View {
         return "com.trace.command.\(title.lowercased().replacingOccurrences(of: " ", with: "_"))"
     }
     
-    // MARK: - Fuzzy Search Helper
-    
-    private func fuzzyMatch(query: String, text: String) -> Double {
-        let queryLower = query.lowercased()
-        let textLower = text.lowercased()
-        
-        // Exact match gets highest score
-        if textLower == queryLower {
-            return 1.0
-        }
-        
-        // Prefix match gets high score
-        if textLower.hasPrefix(queryLower) {
-            return 0.9
-        }
-        
-        // Contains match gets medium score
-        if textLower.contains(queryLower) {
-            return 0.7
-        }
-        
-        // Fuzzy character-by-character matching
-        return fuzzyCharacterMatch(query: queryLower, text: textLower)
-    }
-    
-    private func fuzzyCharacterMatch(query: String, text: String) -> Double {
-        let queryChars = Array(query)
-        let textChars = Array(text)
-        
-        var queryIndex = 0
-        var matches = 0
-        var consecutiveMatches = 0
-        var maxConsecutive = 0
-        
-        for textChar in textChars {
-            if queryIndex < queryChars.count && queryChars[queryIndex] == textChar {
-                matches += 1
-                queryIndex += 1
-                consecutiveMatches += 1
-                maxConsecutive = max(maxConsecutive, consecutiveMatches)
-            } else {
-                consecutiveMatches = 0
-            }
-        }
-        
-        // All query characters must be found
-        guard matches == queryChars.count else { return 0 }
-        
-        // Score based on match ratio and consecutive matches
-        let matchRatio = Double(matches) / Double(textChars.count)
-        let consecutiveBonus = Double(maxConsecutive) / Double(queryChars.count)
-        
-        return min(0.6, matchRatio * 0.4 + consecutiveBonus * 0.2)
-    }
+    // MARK: - Helper Functions
     
     private func matchesSearchTerms(query: String, terms: [String]) -> Double {
-        let bestMatch = terms.compactMap { term in
-            fuzzyMatch(query: query, text: term)
-        }.max() ?? 0
-        
-        return bestMatch
+        return FuzzyMatcher.matchBest(query: query, terms: terms)
     }
     
     // MARK: - Window Management
@@ -519,7 +462,7 @@ struct LauncherView: View {
         ]
         
         let hasWindowMatch = windowTerms.contains { term in
-            fuzzyMatch(query: query, text: term) > 0.3
+            FuzzyMatcher.match(query: query, text: term) > 0.3
         }
         
         // Also check direct matches against position names
@@ -530,7 +473,7 @@ struct LauncherView: View {
                 position.displayName.replacingOccurrences(of: " ", with: "").lowercased()
             ]
             return searchTerms.contains { term in
-                fuzzyMatch(query: query, text: term) > 0.3
+                FuzzyMatcher.match(query: query, text: term) > 0.3
             }
         }
         
@@ -548,9 +491,7 @@ struct LauncherView: View {
                     position.displayName.replacingOccurrences(of: " ", with: "").lowercased()
                 ]
                 
-                let score = searchTerms.compactMap { term in
-                    fuzzyMatch(query: query, text: term)
-                }.max() ?? (hasWindowMatch ? 0.5 : 0)
+                let score = FuzzyMatcher.matchBest(query: query, terms: searchTerms)
                 
                 if score > 0.3 {
                     // Check if this window position has a hotkey assigned
@@ -562,17 +503,21 @@ struct LauncherView: View {
                         return nil
                     }()
                     
+                    // Check if we have accessibility permissions
+                    let hasPermissions = AXIsProcessTrusted()
+                    let subtitle = hasPermissions ? position.subtitle : "⚠️ Requires accessibility permission"
+                    
                     commands.append(SearchResult(
                         title: position.displayName,
-                        subtitle: position.subtitle,
+                        subtitle: subtitle,
                         icon: .system(getWindowIcon(for: position)),
                         type: .command,
-                        category: "Window",
+                        category: hasPermissions ? "Window" : "Permission Required",
                         shortcut: shortcut,
                         lastUsed: nil,
                         commandId: "com.trace.window.\(position.rawValue)",
-                        action: {
-                            WindowManager.shared.applyWindowPosition(position)
+                        action: { [services] in
+                            services.windowManager.applyWindowPosition(position)
                         }
                     ))
                 }
@@ -642,9 +587,12 @@ struct ResultRowView: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 
                 if let subtitle = result.subtitle {
+                    // Show warning style for permission-required items
+                    let isPermissionRequired = subtitle.contains("⚠️")
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                        .foregroundColor(isPermissionRequired && !isSelected ? .orange : 
+                                       (isSelected ? .white.opacity(0.7) : .secondary))
                 }
             }
             
@@ -706,9 +654,12 @@ struct CompactResultRowView: View {
             
             // Subtitle (inline)
             if let subtitle = result.subtitle {
+                // Show warning style for permission-required items
+                let isPermissionRequired = subtitle.contains("⚠️")
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                    .foregroundColor(isPermissionRequired && !isSelected ? .orange : 
+                                   (isSelected ? .white.opacity(0.7) : .secondary))
                     .lineLimit(1)
             }
             
@@ -752,6 +703,7 @@ struct CompactResultRowView: View {
 struct AppIconView: View {
     let bundleIdentifier: String
     @State private var icon: NSImage?
+    @State private var loadingTask: Task<Void, Never>?
     
     var body: some View {
         Group {
@@ -768,15 +720,34 @@ struct AppIconView: View {
         .onAppear {
             loadIcon()
         }
+        .onChange(of: bundleIdentifier) { _, newBundleId in
+            // Cancel existing task and reload when bundle identifier changes
+            loadingTask?.cancel()
+            icon = nil
+            loadIcon()
+        }
+        .onDisappear {
+            loadingTask?.cancel()
+        }
     }
     
     private func loadIcon() {
-        guard let app = AppSearchManager.shared.getApp(by: bundleIdentifier) else { return }
+        loadingTask?.cancel()
         
-        Task {
-            let loadedIcon = await AppSearchManager.shared.getAppIcon(for: app)
+        let services = ServiceContainer.shared
+        guard let app = services.appSearchManager.getApp(by: bundleIdentifier) else { return }
+        
+        loadingTask = Task { [bundleIdentifier] in
+            let loadedIcon = await services.appSearchManager.getAppIcon(for: app)
+            
+            // Only update if this task hasn't been cancelled and bundle ID hasn't changed
+            guard !Task.isCancelled else { return }
+            
             await MainActor.run {
-                self.icon = loadedIcon
+                // Double-check bundle identifier hasn't changed while loading
+                if self.bundleIdentifier == bundleIdentifier {
+                    self.icon = loadedIcon
+                }
             }
         }
     }

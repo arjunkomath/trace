@@ -38,7 +38,7 @@ struct AboutSettingsView: View {
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                             
-                            Text("System-wide search and launcher for macOS")
+                            Text("Spotlight alternative and shortcut toolkit for macOS")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
@@ -211,9 +211,10 @@ struct AboutSettingsView: View {
     }
     
     private func refreshAppCache() {
-        // Trigger app cache refresh by accessing the singleton
-        // The singleton will automatically reload apps when needed
-        _ = AppSearchManager.shared
+        // Trigger app cache refresh through ServiceContainer
+        let services = ServiceContainer.shared
+        // AppSearchManager will reload apps as needed when accessed
+        _ = services.appSearchManager
     }
     
     private func openDataFolder() {

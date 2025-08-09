@@ -15,7 +15,7 @@ enum AppConstants {
     enum Window {
         static let launcherWidth: CGFloat = 750
         static let launcherHeight: CGFloat = 60
-        static let maxResultsHeight: CGFloat = 300
+        static let maxResultsHeight: CGFloat = 400
         static let cornerRadius: CGFloat = 12
         static let shadowRadius: CGFloat = 12
         static let shadowOffset = CGSize(width: 0, height: 6)
@@ -45,7 +45,8 @@ enum AppConstants {
         static let applications = [
             "/Applications",
             "/System/Applications",
-            "~/Applications"
+            "/usr/local",
+            "~/Applications",
         ]
     }
 }

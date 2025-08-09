@@ -53,7 +53,9 @@ class AppHotkeyManager {
             type: .applicationLauncher(bundleId),
             action: { [weak self] in
                 self?.logger.info("🎯 App hotkey pressed for \(bundleId)")
-                self?.launchApp(bundleId: bundleId)
+                Task { @MainActor in
+                    self?.launchApp(bundleId: bundleId)
+                }
             }
         ) else {
             logger.error("❌ Failed to register app hotkey for \(bundleId) through registry")
@@ -72,13 +74,15 @@ class AppHotkeyManager {
         }
     }
     
+    @MainActor
     private func launchApp(bundleId: String) {
-        if let app = AppSearchManager.shared.getApp(by: bundleId) {
+        let services = ServiceContainer.shared
+        if let app = services.appSearchManager.getApp(by: bundleId) {
             logger.info("🚀 Launching app: \(app.displayName) (\(bundleId))")
-            AppSearchManager.shared.launchApp(app)
+            services.appSearchManager.launchApp(app)
             
             // Track usage
-            UsageTracker.shared.recordUsage(for: bundleId)
+            services.usageTracker.recordUsage(for: bundleId)
         } else {
             logger.warning("⚠️ App not found for bundle ID: \(bundleId)")
         }

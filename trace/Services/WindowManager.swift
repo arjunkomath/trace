@@ -155,6 +155,18 @@ class WindowManager: ObservableObject {
     func applyWindowPosition(_ position: WindowPosition) {
         logger.info("🪟 applyWindowPosition called with position: \(position.rawValue)")
         
+        // Check and request accessibility permissions when user actually tries to use window management
+        if !hasAccessibilityPermissions() {
+            logger.info("📋 Requesting accessibility permissions for window management")
+            
+            // Show a more helpful message with action button
+            showPermissionAlert()
+            
+            // Request permissions after showing the alert
+            requestAccessibilityPermissions()
+            return
+        }
+        
         // Try to get the current active window if we don't have one tracked, or if the tracked one is stale
         var windowToManage = previousActiveWindow
         
@@ -555,6 +567,32 @@ class WindowManager: ObservableObject {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 self.logger.error("Failed to show notification: \(error)")
+            }
+        }
+    }
+    
+    private func showPermissionAlert() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Accessibility Permission Required"
+            alert.informativeText = """
+            Trace needs accessibility permission to:
+            • Resize and position windows
+            • Use window management hotkeys
+            • Track active windows
+            
+            After granting permission, please try your action again.
+            """
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Not Now")
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // Open System Settings directly to Privacy & Security > Accessibility
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
             }
         }
     }

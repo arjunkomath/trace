@@ -19,13 +19,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var skipQuitConfirmation = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Ensure the app is truly a background app without dock icon
+        NSApp.setActivationPolicy(.accessory)
+        logger.info("✅ Set app activation policy to .accessory (background app)")
+        
         // Initialize unified hotkey registry first
         _ = HotkeyRegistry.shared
         logger.info("✅ HotkeyRegistry initialized")
         
         setupLauncherWindow()
         setupHotkey()
-        requestAccessibilityPermissions()
+        // REMOVED: requestAccessibilityPermissions() - now only requested when needed
         
         // Initialize window hotkey manager to register saved hotkeys
         _ = WindowHotkeyManager.shared
@@ -49,8 +53,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         hotkeyManager = HotkeyManager()
         hotkeyManager?.onHotkeyPressed = { [weak self] in
-            // Track the window IMMEDIATELY when hotkey is pressed, before Trace becomes active
-            WindowManager.shared.trackCurrentActiveWindow()
+            // Only track window if we have permissions (for window management features)
+            // Don't request permissions here - just silently skip if not granted
+            if AXIsProcessTrusted() {
+                WindowManager.shared.trackCurrentActiveWindow()
+            }
             
             // Show launcher immediately
             self?.toggleLauncher()
@@ -66,27 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    private func requestAccessibilityPermissions() {
-        let accessEnabled = AXIsProcessTrusted()
-        
-        if !accessEnabled {
-            logger.warning("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
-            
-            // Only prompt once per session to avoid repeated dialogs
-            let hasPromptedKey = "HasPromptedForAccessibility"
-            let hasPrompted = UserDefaults.standard.bool(forKey: hasPromptedKey)
-            
-            if !hasPrompted {
-                let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-                AXIsProcessTrustedWithOptions(options)
-                UserDefaults.standard.set(true, forKey: hasPromptedKey)
-                logger.info("Showed accessibility permissions dialog")
-            }
-        } else {
-            // Reset the prompt flag when permissions are granted
-            UserDefaults.standard.removeObject(forKey: "HasPromptedForAccessibility")
-        }
-    }
+    // Removed requestAccessibilityPermissions - now handled on-demand by WindowManager
     
 
     

@@ -13,6 +13,7 @@ struct AppHotkeysSettingsView: View {
     @State private var apps: [Application] = []
     @State private var configuredHotkeys: [String: String] = [:]
     @State private var isLoading = true
+    @ObservedObject private var services = ServiceContainer.shared
     
     var filteredApps: [Application] {
         if searchQuery.isEmpty {
@@ -27,7 +28,7 @@ struct AppHotkeysSettingsView: View {
                 }
             }
         } else {
-            return AppSearchManager.shared.searchApps(query: searchQuery, limit: 50)
+            return services.appSearchManager.searchApps(query: searchQuery, limit: 50)
         }
     }
     
@@ -96,12 +97,12 @@ struct AppHotkeysSettingsView: View {
     }
     
     private func loadApps() {
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task { @MainActor in
             var allApps: [Application] = []
             let letters = "abcdefghijklmnopqrstuvwxyz"
             
             for letter in letters {
-                let apps = AppSearchManager.shared.searchApps(query: String(letter), limit: 200)
+                let apps = services.appSearchManager.searchApps(query: String(letter), limit: 200)
                 allApps.append(contentsOf: apps)
             }
             
@@ -109,26 +110,24 @@ struct AppHotkeysSettingsView: View {
                 app1.displayName.localizedCaseInsensitiveCompare(app2.displayName) == .orderedAscending
             }
             
-            DispatchQueue.main.async {
-                self.apps = uniqueApps
-                self.isLoading = false
-            }
+            self.apps = uniqueApps
+            self.isLoading = false
         }
     }
     
     private func loadConfiguredHotkeys() {
-        configuredHotkeys = AppHotkeyManager.shared.getAllConfiguredAppHotkeys()
+        configuredHotkeys = services.appHotkeyManager.getAllConfiguredAppHotkeys()
     }
     
     private func updateHotkey(for app: Application, hotkey: String?, keyCode: UInt32, modifiers: UInt32) {
-        AppHotkeyManager.shared.saveHotkey(
+        services.appHotkeyManager.saveHotkey(
             for: app.bundleIdentifier,
             hotkey: hotkey,
             keyCode: keyCode,
             modifiers: modifiers
         )
         
-        AppHotkeyManager.shared.updateHotkey(
+        services.appHotkeyManager.updateHotkey(
             for: app.bundleIdentifier,
             keyCombo: hotkey,
             keyCode: keyCode,
@@ -225,8 +224,9 @@ struct AppHotkeyRow: View {
     }
     
     private func loadAppIcon() {
-        Task {
-            appIcon = await AppSearchManager.shared.getAppIcon(for: app)
+        Task { @MainActor in
+            let services = ServiceContainer.shared
+            appIcon = await services.appSearchManager.getAppIcon(for: app)
         }
     }
     

@@ -7,10 +7,12 @@
 
 import SwiftUI
 import Carbon
+import ApplicationServices
 
 struct WindowManagementSettingsView: View {
     @State private var accessibilityEnabled = false
     @State private var showingAccessibilityAlert = false
+    @State private var isRefreshing = false
     
     var body: some View {
         Group {
@@ -32,11 +34,23 @@ struct WindowManagementSettingsView: View {
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 20)
                             
-                            Button("Grant Permissions") {
-                                WindowManager.shared.requestAccessibilityPermissions()
-                                showingAccessibilityAlert = true
+                            HStack(spacing: 12) {
+                                Button("Grant Permissions") {
+                                    WindowManager.shared.requestAccessibilityPermissions()
+                                    showingAccessibilityAlert = true
+                                }
+                                .buttonStyle(.borderedProminent)
+                                
+                                Button("Refresh") {
+                                    isRefreshing = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        checkAccessibilityPermissions()
+                                        isRefreshing = false
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(isRefreshing)
                             }
-                            .buttonStyle(.borderedProminent)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 20)
@@ -60,6 +74,12 @@ struct WindowManagementSettingsView: View {
         .onAppear {
             checkAccessibilityPermissions()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // Refresh permissions when app becomes active (in case user granted them in System Preferences)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                checkAccessibilityPermissions()
+            }
+        }
         .alert("Accessibility Permissions", isPresented: $showingAccessibilityAlert) {
             Button("OK") {
                 checkAccessibilityPermissions()
@@ -70,7 +90,33 @@ struct WindowManagementSettingsView: View {
     }
     
     private func checkAccessibilityPermissions() {
-        accessibilityEnabled = WindowManager.shared.hasAccessibilityPermissions()
+        // Use the same reliable checking logic as PermissionsSettingsView
+        let isGranted = AXIsProcessTrusted()
+        accessibilityEnabled = isGranted
+        
+        // If false, try with a practical test to ensure accuracy
+        if !isGranted {
+            // Try to access the frontmost app's title to verify permissions
+            let frontmostApp = NSWorkspace.shared.frontmostApplication
+            let pid = frontmostApp?.processIdentifier ?? 0
+            
+            if pid > 0 {
+                let appRef = AXUIElementCreateApplication(pid)
+                var value: CFTypeRef?
+                let result = AXUIElementCopyAttributeValue(appRef, kAXTitleAttribute as CFString, &value)
+                
+                // If we can access the title, permissions are actually granted
+                if result == .success {
+                    accessibilityEnabled = true
+                    return
+                }
+            }
+            
+            // Double-check with a slight delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.accessibilityEnabled = AXIsProcessTrusted()
+            }
+        }
     }
 }
 
