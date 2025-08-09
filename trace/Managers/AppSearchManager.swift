@@ -53,8 +53,10 @@ class AppSearchManager: ObservableObject {
                 if let app = apps[bundleId] {
                     let matchScore = 1.0
                     let usageScore = usageScores[bundleId] ?? 0.0
-                    // Combine match score with usage score (70% match, 30% usage)
-                    let combinedScore = (matchScore * 0.7) + (min(usageScore / 100.0, 1.0) * 0.3)
+                    // Normalize usage score better - use square root to give high-usage items more weight
+                    let normalizedUsage = min(sqrt(usageScore) / 10.0, 1.0)
+                    // Use 60% match, 40% usage like LauncherView for better usage prioritization
+                    let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
                     scoredResults.append((app, combinedScore))
                     processedBundleIds.insert(bundleId)
                 }
@@ -78,8 +80,10 @@ class AppSearchManager: ObservableObject {
                 for bundleId in bundleIds where !processedBundleIds.contains(bundleId) {
                     if let app = apps[bundleId] {
                         let usageScore = usageScores[bundleId] ?? 0.0
-                        // Combine match score with usage score (70% match, 30% usage)
-                        let combinedScore = (matchScore * 0.7) + (min(usageScore / 100.0, 1.0) * 0.3)
+                        // Normalize usage score better - use square root to give high-usage items more weight
+                        let normalizedUsage = min(sqrt(usageScore) / 10.0, 1.0)
+                        // Use 60% match, 40% usage like LauncherView for better usage prioritization
+                        let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
                         scoredResults.append((app, combinedScore))
                         processedBundleIds.insert(bundleId)
                         

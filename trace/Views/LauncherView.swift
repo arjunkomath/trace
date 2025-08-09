@@ -540,8 +540,8 @@ struct ResultRowView: View {
             
             // Result type
             Text(result.type.displayName)
-                .font(.system(size: 11))
-                .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
             
             // Shortcut
             if let shortcut = result.shortcut {

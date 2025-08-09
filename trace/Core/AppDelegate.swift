@@ -28,6 +28,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Initialize window hotkey manager to register saved hotkeys
         _ = WindowHotkeyManager.shared
+        
+        // Initialize app hotkey manager to register saved app hotkeys
+        _ = AppHotkeyManager.shared
     }
     
     deinit {
