@@ -13,6 +13,7 @@ struct GeneralSettingsView: View {
     @Binding var currentKeyCombo: String
     @Binding var isRecording: Bool
     @AppStorage("resultsLayout") private var resultsLayout: ResultsLayout = .compact
+    @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     @State private var eventMonitor: Any?
     @State private var showingRestartAlert = false
     let onLaunchAtLoginChange: (Bool) -> Void
@@ -121,7 +122,24 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(width: 100)
+                    .frame(width: 140)
+                }
+                .padding(.vertical, 4)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Show Menu Bar Icon")
+                            .font(.system(size: 13))
+                        Text("Display Trace icon in the menu bar")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $showMenuBarIcon)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                 }
                 .padding(.vertical, 4)
             } header: {

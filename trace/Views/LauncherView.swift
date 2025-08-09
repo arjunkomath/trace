@@ -145,6 +145,8 @@ struct LauncherView: View {
             }
         }
         .onKeyPress(.escape) {
+            searchText = ""
+            selectedIndex = 0
             onClose()
             return .handled
         }
@@ -583,12 +585,9 @@ struct ResultRowView: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 
                 if let subtitle = result.subtitle {
-                    // Show warning style for permission-required items
-                    let isPermissionRequired = subtitle.contains("⚠️")
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundColor(isPermissionRequired && !isSelected ? .orange : 
-                                       (isSelected ? .white.opacity(0.7) : .secondary))
+                        .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
                 }
             }
             
@@ -650,36 +649,17 @@ struct CompactResultRowView: View {
             
             // Subtitle (inline)
             if let subtitle = result.subtitle {
-                // Show warning style for permission-required items
-                let isPermissionRequired = subtitle.contains("⚠️")
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundColor(isPermissionRequired && !isSelected ? .orange : 
-                                   (isSelected ? .white.opacity(0.7) : .secondary))
+                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
                     .lineLimit(1)
             }
             
             Spacer()
             
-            // Category badge (like Pro, Command, etc.)
-            if let category = result.category, category != "Web" {
-                Text(category)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.secondary.opacity(0.2))
-                    )
-            }
-            
-            // Result type (only show if no category badge is shown)
-            if result.category == nil || result.category == "Web" {
-                Text(result.type.displayName)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
-            }
+            Text(result.type.displayName)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
             
             // Shortcut
             if let shortcut = result.shortcut {
