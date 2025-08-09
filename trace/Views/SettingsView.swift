@@ -1101,6 +1101,7 @@ struct WindowCommandRow: View {
         case .firstThird, .centerThird, .lastThird: return "rectangle.split.3x1"
         case .firstTwoThirds, .lastTwoThirds: return "rectangle.split.3x1"
         case .maximize: return "arrow.up.left.and.arrow.down.right"
+        case .fullScreen: return "rectangle.fill"
         case .almostMaximize: return "macwindow"
         case .maximizeHeight: return "arrow.up.and.down"
         case .smaller: return "minus.rectangle"

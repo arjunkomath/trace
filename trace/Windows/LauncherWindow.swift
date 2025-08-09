@@ -32,7 +32,7 @@ class LauncherWindow: NSWindow {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         isMovableByWindowBackground = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        collectionBehavior = []
     }
     
     private func setupContent() {
@@ -48,7 +48,10 @@ class LauncherWindow: NSWindow {
     
     func show() {
         centerOnScreen()
+        
+        orderFrontRegardless()
         makeKeyAndOrderFront(nil)
+        
         NSApp.activate(ignoringOtherApps: true)
         
         // Ensure focus is properly set after window becomes key

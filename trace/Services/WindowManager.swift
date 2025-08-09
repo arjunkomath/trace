@@ -8,6 +8,8 @@
 import AppKit
 import CoreGraphics
 import UserNotifications
+import SwiftUI
+import os.log
 
 enum WindowPosition: String, CaseIterable {
     case leftHalf = "left-half"
@@ -25,6 +27,7 @@ enum WindowPosition: String, CaseIterable {
     case firstTwoThirds = "first-two-thirds"
     case lastTwoThirds = "last-two-thirds"
     case maximize = "maximize"
+    case fullScreen = "full-screen"
     case almostMaximize = "almost-maximize"
     case maximizeHeight = "maximize-height"
     case smaller = "smaller"
@@ -49,6 +52,7 @@ enum WindowPosition: String, CaseIterable {
         case .firstTwoThirds: return "First Two Thirds"
         case .lastTwoThirds: return "Last Two Thirds"
         case .maximize: return "Maximize"
+        case .fullScreen: return "Full Screen"
         case .almostMaximize: return "Almost Maximize"
         case .maximizeHeight: return "Maximize Height"
         case .smaller: return "Smaller"
@@ -75,6 +79,7 @@ enum WindowPosition: String, CaseIterable {
         case .firstTwoThirds: return "Move window to first two thirds of screen"
         case .lastTwoThirds: return "Move window to last two thirds of screen"
         case .maximize: return "Maximize window to full screen"
+        case .fullScreen: return "Enter native macOS full screen mode"
         case .almostMaximize: return "Maximize with small margins"
         case .maximizeHeight: return "Maximize window height only"
         case .smaller: return "Make window smaller"
@@ -92,9 +97,6 @@ class WindowManager: ObservableObject {
     private var previousActiveWindow: AXUIElement?
     private var previousActiveApp: NSRunningApplication?
     
-    @Published var showToast = false
-    @Published var toastMessage = ""
-    @Published var toastType: ToastView.ToastType = .error
     
     private init() {
         requestNotificationPermissions()
@@ -178,6 +180,20 @@ class WindowManager: ObservableObject {
         
         logger.info("✅ Window available for management")
         
+        // Handle full screen mode separately using accessibility action
+        if position == .fullScreen {
+            let success = toggleFullScreen(window)
+            if success {
+                if let app = previousActiveApp {
+                    app.activate()
+                }
+                logger.info("Toggled full screen mode")
+            } else {
+                showSystemNotification("Window Management Error", "Failed to toggle full screen mode")
+            }
+            return
+        }
+        
         guard let screen = NSScreen.main else {
             logger.error("Could not get main screen")
             showSystemNotification("Window Management Error", "Screen not available")
@@ -203,7 +219,7 @@ class WindowManager: ObservableObject {
     }
     
     private func calculateFrame(for position: WindowPosition, screenFrame: CGRect, window: AXUIElement) -> CGRect {
-        let margin: CGFloat = 20 // For almost-maximize
+        let _: CGFloat = 20 // For almost-maximize
         let resizeStep: CGFloat = 50 // For smaller/larger
         
         switch position {
@@ -323,6 +339,10 @@ class WindowManager: ObservableObject {
         case .maximize:
             return screenFrame
             
+        case .fullScreen:
+            // This case is handled separately in applyWindowPosition, but we need this case for exhaustiveness
+            return screenFrame
+            
         case .almostMaximize:
             let width = screenFrame.width * 0.9
             let height = screenFrame.height * 0.9
@@ -424,13 +444,56 @@ class WindowManager: ObservableObject {
         return positionResult == .success && sizeResult == .success
     }
     
-    private func showToastMessage(_ message: String, type: ToastView.ToastType) {
-        DispatchQueue.main.async { [weak self] in
-            self?.toastMessage = message
-            self?.toastType = type
-            self?.showToast = true
+    private func toggleFullScreen(_ window: AXUIElement) -> Bool {
+        // Method 1: Use the standard AXZoomButton action (most reliable)
+        let zoomResult = AXUIElementPerformAction(window, kAXZoomButtonAttribute as CFString)
+        if zoomResult == .success {
+            return true
         }
+        
+        // Method 2: Try the fullscreen attribute directly
+        var isFullScreen: CFTypeRef?
+        if AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &isFullScreen) == .success {
+            let newValue = !(isFullScreen as? Bool ?? false)
+            let fullScreenValue = newValue as CFBoolean
+            let result = AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString, fullScreenValue)
+            if result == .success {
+                return true
+            }
+        }
+        
+        // Method 3: Send keyboard shortcut (Cmd+Ctrl+F) - most universal fallback
+        return sendFullScreenKeyboardShortcut()
     }
+    
+    private func sendFullScreenKeyboardShortcut() -> Bool {
+        // Send Cmd+Ctrl+F keyboard shortcut (standard macOS full screen)
+        let source = CGEventSource(stateID: .hidSystemState)
+        
+        // Key down events
+        guard let cmdCtrlFDown = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: true) else { return false }
+        cmdCtrlFDown.flags = [.maskCommand, .maskControl]
+        
+        // Key up events  
+        guard let cmdCtrlFUp = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: false) else { return false }
+        cmdCtrlFUp.flags = [.maskCommand, .maskControl]
+        
+        // Post the events
+        cmdCtrlFDown.post(tap: .cghidEventTap)
+        cmdCtrlFUp.post(tap: .cghidEventTap)
+        
+        return true
+    }
+    
+    private func isWindowInFullScreen(_ window: AXUIElement) -> Bool {
+        var isFullScreen: CFTypeRef?
+        if AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &isFullScreen) == .success,
+           let fullScreenValue = isFullScreen as? Bool {
+            return fullScreenValue
+        }
+        return false
+    }
+    
     
     // MARK: - Improved Window Detection
     
