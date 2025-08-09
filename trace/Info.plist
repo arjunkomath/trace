@@ -7,7 +7,7 @@
     <key>NSAppleEventsUsageDescription</key>
     <string>Trace needs permission to control system settings like appearance through Apple Events.</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>Trace needs accessibility permission to control system appearance and other system settings.</string>
+    <string>Trace needs accessibility permission to manage window positions, resize windows, and provide window management hotkeys. This allows Trace to help you organize and control application windows on your desktop.</string>
     <key>NSSystemAdministrationUsageDescription</key>
     <string>Trace needs permission to control system settings like appearance mode.</string>
 </dict>

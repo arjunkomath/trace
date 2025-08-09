@@ -122,56 +122,10 @@ struct PermissionsSettingsView: View {
     }
     
     private func checkAccessibilityPermissions() {
-        // Initial check
-        let isGranted = AXIsProcessTrusted()
-        accessibilityEnabled = isGranted
-        
-        // If false, try again with multiple attempts (helps with release builds)
-        if !isGranted {
-            // Try to perform an actual accessibility operation to trigger proper permission check
-            let frontmostApp = NSWorkspace.shared.frontmostApplication
-            let pid = frontmostApp?.processIdentifier ?? 0
-            
-            if pid > 0 {
-                let appRef = AXUIElementCreateApplication(pid)
-                var value: CFTypeRef?
-                let result = AXUIElementCopyAttributeValue(appRef, kAXTitleAttribute as CFString, &value)
-                
-                // If we can access the title, permissions are actually granted
-                if result == .success {
-                    accessibilityEnabled = true
-                    refreshingAccessibility = false
-                    return
-                }
-            }
-            
-            // Fallback: multiple checks with delays
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.accessibilityEnabled = AXIsProcessTrusted()
-                
-                if !self.accessibilityEnabled {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.accessibilityEnabled = AXIsProcessTrusted()
-                        
-                        // Final attempt after 1 second
-                        if !self.accessibilityEnabled {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                self.accessibilityEnabled = AXIsProcessTrusted()
-                                self.refreshingAccessibility = false
-                            }
-                        } else {
-                            self.refreshingAccessibility = false
-                        }
-                    }
-                } else {
-                    self.refreshingAccessibility = false
-                }
-            }
-        } else {
-            // Permissions are granted, reset refreshing state
-            refreshingAccessibility = false
-        }
+        accessibilityEnabled = WindowManager.shared.hasAccessibilityPermissions()
+        refreshingAccessibility = false
     }
+    
     
     private func openAccessibilitySettings() {
         // Open System Settings to Accessibility

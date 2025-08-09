@@ -158,11 +158,6 @@ class WindowManager: ObservableObject {
         // Check and request accessibility permissions when user actually tries to use window management
         if !hasAccessibilityPermissions() {
             logger.info("📋 Requesting accessibility permissions for window management")
-            
-            // Show a more helpful message with action button
-            showPermissionAlert()
-            
-            // Request permissions after showing the alert
             requestAccessibilityPermissions()
             return
         }
@@ -600,31 +595,31 @@ class WindowManager: ObservableObject {
     // MARK: - Accessibility Permissions
     
     func hasAccessibilityPermissions() -> Bool {
-        let hasPermissions = AXIsProcessTrusted()
-        
-        // Reset prompt flags when permissions are granted
-        if hasPermissions {
-            UserDefaults.standard.removeObject(forKey: "WindowManager_HasPromptedForAccessibility")
-            UserDefaults.standard.removeObject(forKey: "HasPromptedForAccessibility")
+        // Primary check - this works fine in debug builds
+        if AXIsProcessTrusted() {
+            return true
         }
         
-        return hasPermissions
+        // Release build fallback - actually test if we can use accessibility APIs
+        // This addresses the false negative issue in release builds
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            return false
+        }
+        
+        let pid = frontmostApp.processIdentifier
+        let appRef = AXUIElementCreateApplication(pid)
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(appRef, kAXTitleAttribute as CFString, &value)
+        
+        // If we can access accessibility attributes, permissions are granted
+        return result == .success
     }
     
     func requestAccessibilityPermissions() {
-        // Only show prompt if permissions aren't already granted
         guard !hasAccessibilityPermissions() else { return }
         
-        // Only prompt once per session to avoid repeated dialogs
-        let hasPromptedKey = "WindowManager_HasPromptedForAccessibility"
-        let hasPrompted = UserDefaults.standard.bool(forKey: hasPromptedKey)
-        
-        if !hasPrompted {
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-            AXIsProcessTrustedWithOptions(options as CFDictionary)
-            UserDefaults.standard.set(true, forKey: hasPromptedKey)
-            logger.info("Showed accessibility permissions dialog from WindowManager")
-        }
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
     
     private func requestNotificationPermissions() {

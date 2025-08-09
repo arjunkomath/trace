@@ -90,33 +90,7 @@ struct WindowManagementSettingsView: View {
     }
     
     private func checkAccessibilityPermissions() {
-        // Use the same reliable checking logic as PermissionsSettingsView
-        let isGranted = AXIsProcessTrusted()
-        accessibilityEnabled = isGranted
-        
-        // If false, try with a practical test to ensure accuracy
-        if !isGranted {
-            // Try to access the frontmost app's title to verify permissions
-            let frontmostApp = NSWorkspace.shared.frontmostApplication
-            let pid = frontmostApp?.processIdentifier ?? 0
-            
-            if pid > 0 {
-                let appRef = AXUIElementCreateApplication(pid)
-                var value: CFTypeRef?
-                let result = AXUIElementCopyAttributeValue(appRef, kAXTitleAttribute as CFString, &value)
-                
-                // If we can access the title, permissions are actually granted
-                if result == .success {
-                    accessibilityEnabled = true
-                    return
-                }
-            }
-            
-            // Double-check with a slight delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.accessibilityEnabled = AXIsProcessTrusted()
-            }
-        }
+        accessibilityEnabled = WindowManager.shared.hasAccessibilityPermissions()
     }
 }
 

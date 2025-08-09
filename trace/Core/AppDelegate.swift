@@ -55,7 +55,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager?.onHotkeyPressed = { [weak self] in
             // Only track window if we have permissions (for window management features)
             // Don't request permissions here - just silently skip if not granted
-            if AXIsProcessTrusted() {
+            if WindowManager.shared.hasAccessibilityPermissions() {
                 WindowManager.shared.trackCurrentActiveWindow()
             }
             

@@ -503,16 +503,12 @@ struct LauncherView: View {
                         return nil
                     }()
                     
-                    // Check if we have accessibility permissions
-                    let hasPermissions = AXIsProcessTrusted()
-                    let subtitle = hasPermissions ? position.subtitle : "⚠️ Requires accessibility permission"
-                    
                     commands.append(SearchResult(
                         title: position.displayName,
-                        subtitle: subtitle,
+                        subtitle: position.subtitle,
                         icon: .system(getWindowIcon(for: position)),
                         type: .command,
-                        category: hasPermissions ? "Window" : "Permission Required",
+                        category: "Window",
                         shortcut: shortcut,
                         lastUsed: nil,
                         commandId: "com.trace.window.\(position.rawValue)",
