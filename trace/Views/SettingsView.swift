@@ -8,6 +8,7 @@
 import SwiftUI
 import Carbon
 import ServiceManagement
+import UserNotifications
 
 struct SettingsView: View {
     private let logger = AppLogger.settingsView
@@ -47,26 +48,33 @@ struct SettingsView: View {
             }
             .tag(0)
             
+            PermissionsSettingsView()
+                .tabItem {
+                    Image(systemName: "lock.shield")
+                    Text("Permissions")
+                }
+                .tag(1)
+            
             WindowManagementSettingsView()
                 .tabItem {
                     Image(systemName: "macwindow")
                     Text("Window Management")
                 }
-                .tag(1)
+                .tag(2)
             
             AboutSettingsView()
                 .tabItem {
                     Image(systemName: "info.circle")
                     Text("About")
                 }
-                .tag(2)
+                .tag(3)
             
             DebugSettingsView()
                 .tabItem {
                     Image(systemName: "wrench.and.screwdriver")
                     Text("Debug")
                 }
-                .tag(3)
+                .tag(4)
         }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
         .onAppear {
@@ -298,6 +306,180 @@ struct WindowManagementSettingsView: View {
     
     private func checkAccessibilityPermissions() {
         accessibilityEnabled = WindowManager.shared.hasAccessibilityPermissions()
+    }
+}
+
+struct PermissionsSettingsView: View {
+    @State private var accessibilityEnabled = false
+    @State private var notificationEnabled = false
+    @State private var checkingPermissions = false
+    
+    var body: some View {
+        Form {
+            Section {
+                // Accessibility Permission
+                PermissionRow(
+                    title: "Accessibility Access",
+                    subtitle: "Required for window management and global hotkeys",
+                    icon: "accessibility",
+                    status: accessibilityEnabled ? .granted : .denied,
+                    action: {
+                        openAccessibilitySettings()
+                    }
+                )
+                
+                // Notification Permission
+                PermissionRow(
+                    title: "Notifications",
+                    subtitle: "Shows window management feedback notifications",
+                    icon: "bell",
+                    status: notificationEnabled ? .granted : .denied,
+                    action: {
+                        openNotificationSettings()
+                    }
+                )
+            } header: {
+                Text("System Permissions")
+                    .font(.system(size: 11, weight: .medium))
+                    .textCase(.uppercase)
+            } footer: {
+                Text("These permissions help Trace work seamlessly with macOS. Click 'Open Settings' to grant missing permissions.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            
+            Section {
+                HStack {
+                    Text("Permission status is checked automatically when this tab opens.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Button(action: checkPermissions) {
+                        HStack(spacing: 4) {
+                            Image(systemName: checkingPermissions ? "arrow.clockwise" : "arrow.clockwise")
+                                .font(.system(size: 11))
+                                .rotationEffect(checkingPermissions ? .degrees(360) : .degrees(0))
+                                .animation(checkingPermissions ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: checkingPermissions)
+                            Text("Refresh")
+                                .font(.system(size: 11))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(checkingPermissions)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .onAppear {
+            checkPermissions()
+        }
+    }
+    
+    private func checkPermissions() {
+        checkingPermissions = true
+        
+        // Check accessibility permissions
+        accessibilityEnabled = AXIsProcessTrusted()
+        
+        // Check notification permissions
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.notificationEnabled = settings.authorizationStatus == .authorized
+                self.checkingPermissions = false
+            }
+        }
+    }
+    
+    private func openAccessibilitySettings() {
+        // Open System Settings to Accessibility
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    
+    private func openNotificationSettings() {
+        // Open System Settings to Notifications for this app
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.trace.app"
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+enum PermissionStatus {
+    case granted
+    case denied
+    case checking
+    
+    var color: Color {
+        switch self {
+        case .granted: return .green
+        case .denied: return .orange
+        case .checking: return .secondary
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .granted: return "checkmark.circle.fill"
+        case .denied: return "exclamationmark.triangle.fill"
+        case .checking: return "clock"
+        }
+    }
+    
+    var statusText: String {
+        switch self {
+        case .granted: return "Granted"
+        case .denied: return "Not Granted"
+        case .checking: return "Checking..."
+        }
+    }
+}
+
+struct PermissionRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let status: PermissionStatus
+    let action: () -> Void
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 13))
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: status.icon)
+                        .font(.system(size: 11))
+                        .foregroundColor(status.color)
+                    
+                    Text(status.statusText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(status.color)
+                }
+                
+                if status == .denied {
+                    Button("Open Settings") {
+                        action()
+                    }
+                    .font(.system(size: 10))
+                    .buttonStyle(.link)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
@@ -721,7 +903,7 @@ struct HotkeyRecorderView: View {
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(.blue)
                 } else {
-                    KeyBindingView(keyCombo: keyCombo)
+                    KeyBindingView(keyCombo: keyCombo, size: .small)
                 }
                 
                 if !isRecording {
@@ -733,7 +915,7 @@ struct HotkeyRecorderView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .frame(width: 140)
+            .frame(width: 120)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.05))

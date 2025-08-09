@@ -7,6 +7,7 @@
 
 import AppKit
 import CoreGraphics
+import UserNotifications
 
 enum WindowPosition: String, CaseIterable {
     case leftHalf = "left-half"
@@ -95,7 +96,9 @@ class WindowManager: ObservableObject {
     @Published var toastMessage = ""
     @Published var toastType: ToastView.ToastType = .error
     
-    private init() {}
+    private init() {
+        requestNotificationPermissions()
+    }
     
     // MARK: - Window Tracking
     
@@ -150,17 +153,34 @@ class WindowManager: ObservableObject {
     func applyWindowPosition(_ position: WindowPosition) {
         logger.info("🪟 applyWindowPosition called with position: \(position.rawValue)")
         
-        guard let window = previousActiveWindow else {
-            logger.error("No previous active window to manage - ensure accessibility permissions are granted and try activating another app first")
-            showToastMessage("No window to manage", type: .error)
+        // Try to get the current active window if we don't have one tracked, or if the tracked one is stale
+        var windowToManage = previousActiveWindow
+        
+        if windowToManage == nil {
+            logger.info("🔍 No tracked window, attempting to find current active window...")
+            windowToManage = getCurrentActiveWindow()
+        } else {
+            // Verify the tracked window is still valid
+            if !isWindowValid(windowToManage!) {
+                logger.warning("⚠️ Tracked window is no longer valid, finding current active window...")
+                windowToManage = getCurrentActiveWindow()
+                if windowToManage != nil {
+                    previousActiveWindow = windowToManage
+                }
+            }
+        }
+        
+        guard let window = windowToManage else {
+            logger.error("❌ No window available to manage")
+            showSystemNotification("Window Management Error", "No active window found. Try clicking on a window first.")
             return
         }
         
-        logger.info("✅ Previous active window available, proceeding with window management")
+        logger.info("✅ Window available for management")
         
         guard let screen = NSScreen.main else {
             logger.error("Could not get main screen")
-            showToastMessage("Screen not available", type: .error)
+            showSystemNotification("Window Management Error", "Screen not available")
             return
         }
         
@@ -176,9 +196,9 @@ class WindowManager: ObservableObject {
             }
             
             logger.info("Applied window position: \(position.displayName)")
-            showToastMessage("Applied \(position.displayName.lowercased())", type: .success)
+            // No notification for successful operations
         } else {
-            showToastMessage("Failed to resize window", type: .error)
+            showSystemNotification("Window Management Error", "Failed to resize window")
         }
     }
     
@@ -412,6 +432,70 @@ class WindowManager: ObservableObject {
         }
     }
     
+    // MARK: - Improved Window Detection
+    
+    private func getCurrentActiveWindow() -> AXUIElement? {
+        logger.info("🔍 Attempting to find current active window...")
+        
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            logger.error("No frontmost application found")
+            return nil
+        }
+        
+        // Skip Trace itself
+        if frontmostApp.bundleIdentifier == Bundle.main.bundleIdentifier {
+            logger.debug("Skipping Trace app itself")
+            return nil
+        }
+        
+        let appElement = AXUIElementCreateApplication(frontmostApp.processIdentifier)
+        var windows: AnyObject?
+        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
+        
+        guard result == .success, let windowArray = windows as? [AXUIElement], !windowArray.isEmpty else {
+            logger.error("No windows found for app: \(frontmostApp.localizedName ?? "Unknown")")
+            return nil
+        }
+        
+        // Find the focused window, or use the first window
+        for window in windowArray {
+            var focused: AnyObject?
+            if AXUIElementCopyAttributeValue(window, kAXFocusedAttribute as CFString, &focused) == .success,
+               let isFocused = focused as? Bool, isFocused {
+                logger.info("✅ Found focused window for \(frontmostApp.localizedName ?? "Unknown")")
+                return window
+            }
+        }
+        
+        // Fallback to first window
+        let window = windowArray[0]
+        logger.info("✅ Using first window for \(frontmostApp.localizedName ?? "Unknown")")
+        return window
+    }
+    
+    private func isWindowValid(_ window: AXUIElement) -> Bool {
+        var role: AnyObject?
+        let result = AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &role)
+        return result == .success && role != nil
+    }
+    
+    private func showSystemNotification(_ title: String, _ body: String) {
+        logger.info("📢 System notification: \(title) - \(body)")
+        
+        let notification = UNMutableNotificationContent()
+        notification.title = title
+        notification.body = body
+        notification.sound = nil // Silent notifications
+        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: notification, trigger: nil)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                self.logger.error("Failed to show notification: \(error)")
+            }
+        }
+    }
+    
     // MARK: - Accessibility Permissions
     
     func hasAccessibilityPermissions() -> Bool {
@@ -421,5 +505,17 @@ class WindowManager: ObservableObject {
     func requestAccessibilityPermissions() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+    
+    private func requestNotificationPermissions() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge]) { granted, error in
+            if let error = error {
+                self.logger.error("Failed to request notification permissions: \(error)")
+            } else if granted {
+                self.logger.info("Notification permissions granted")
+            } else {
+                self.logger.info("Notification permissions denied")
+            }
+        }
     }
 }
