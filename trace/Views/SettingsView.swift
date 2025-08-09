@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var isRecording = false
     @State private var currentKeyCombo = "⌥Space"
     @State private var selectedTab = 0
+    @State private var showRestartAlert = false
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
@@ -87,6 +88,22 @@ struct SettingsView: View {
         .onAppear {
             currentKeyCombo = formatKeyCombo(keyCode: UInt32(savedKeyCode), modifiers: UInt32(savedModifiers))
             checkLaunchAtLoginStatus()
+            
+            // Initialize previous values on first launch
+            if UserDefaults.standard.object(forKey: "previous_hotkey_keyCode") == nil {
+                UserDefaults.standard.set(savedKeyCode, forKey: "previous_hotkey_keyCode")
+                UserDefaults.standard.set(savedModifiers, forKey: "previous_hotkey_modifiers")
+            }
+        }
+        .alert("Restart Required", isPresented: $showRestartAlert) {
+            Button("Restart Now") {
+                restartApp()
+            }
+            Button("Restart Later", role: .cancel) {
+                // User dismissed, do nothing
+            }
+        } message: {
+            Text("The new global hotkey will take effect after restarting the application.")
         }
     }
     
@@ -109,9 +126,24 @@ struct SettingsView: View {
     }
     
     func updateHotkey() {
+        // Check if hotkey actually changed
+        let previousKeyCode = UserDefaults.standard.object(forKey: "previous_hotkey_keyCode") as? Int
+        let previousModifiers = UserDefaults.standard.object(forKey: "previous_hotkey_modifiers") as? Int
+        
+        let hotkeyChanged = previousKeyCode != savedKeyCode || previousModifiers != savedModifiers
+        
         if let appDelegate = NSApp.delegate as? AppDelegate {
             do {
                 try appDelegate.updateHotkey(keyCode: UInt32(savedKeyCode), modifiers: UInt32(savedModifiers))
+                
+                // Store current values as previous for next comparison
+                UserDefaults.standard.set(savedKeyCode, forKey: "previous_hotkey_keyCode")
+                UserDefaults.standard.set(savedModifiers, forKey: "previous_hotkey_modifiers")
+                
+                // Show restart alert if hotkey changed (but not on first launch)
+                if hotkeyChanged && previousKeyCode != nil {
+                    showRestartAlert = true
+                }
             } catch {
                 logger.error("Failed to update hotkey: \(error.localizedDescription)")
             }
@@ -121,6 +153,30 @@ struct SettingsView: View {
     func formatKeyCombo(keyCode: UInt32, modifiers: UInt32) -> String {
         let keyView = KeyBindingView(keyCode: keyCode, modifiers: modifiers)
         return keyView.keys.joined(separator: "")
+    }
+    
+    func restartApp() {
+        let bundlePath = Bundle.main.bundlePath
+        
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = [bundlePath]
+        
+        do {
+            try task.run()
+            logger.info("Restarting Trace from: \(bundlePath)")
+            
+            // Give the new instance a moment to start before terminating
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                if let appDelegate = NSApp.delegate as? AppDelegate {
+                    appDelegate.terminateWithoutConfirmation()
+                } else {
+                    NSApp.terminate(nil)
+                }
+            }
+        } catch {
+            logger.error("Failed to restart Trace: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -233,11 +289,15 @@ struct AboutSettingsView: View {
                             .foregroundColor(.secondary)
                         
                         HStack(spacing: 20) {
-                            Link("GitHub", destination: URL(string: "https://github.com/arjunkomath")!)
-                                .font(.system(size: 12))
+                            if let githubURL = URL(string: "https://github.com/arjunkomath") {
+                                Link("GitHub", destination: githubURL)
+                                    .font(.system(size: 12))
+                            }
                             
-                            Link("Twitter", destination: URL(string: "https://twitter.com/arjunz")!)
-                                .font(.system(size: 12))
+                            if let twitterURL = URL(string: "https://twitter.com/arjunz") {
+                                Link("Twitter", destination: twitterURL)
+                                    .font(.system(size: 12))
+                            }
                         }
                     }
                 }

@@ -43,6 +43,7 @@ struct SearchResult: Identifiable {
     let category: String?
     let shortcut: KeyboardShortcut?
     let lastUsed: Date?
+    let commandId: String? // Semantic identifier for tracking
     let action: () -> Void
 }
 
@@ -101,6 +102,8 @@ struct Application: Identifiable, Hashable, Sendable {
     let url: URL
     let bundleIdentifier: String
     let lastModified: Date
+    let description: String?
+    let keywords: [String]
     var icon: NSImage?
     
     func hash(into hasher: inout Hasher) {

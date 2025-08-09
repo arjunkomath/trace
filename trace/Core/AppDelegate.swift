@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var launcherWindow: LauncherWindow?
     private var hotkeyManager: HotkeyManager?
     private var globalEventMonitor: Any?
+    private var skipQuitConfirmation = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize unified hotkey registry first
@@ -69,12 +70,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let accessEnabled = AXIsProcessTrusted()
         
         if !accessEnabled {
-            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-            let hasPermissions = AXIsProcessTrustedWithOptions(options)
+            logger.warning("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
             
-            if !hasPermissions {
-                logger.warning("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
+            // Only prompt once per session to avoid repeated dialogs
+            let hasPromptedKey = "HasPromptedForAccessibility"
+            let hasPrompted = UserDefaults.standard.bool(forKey: hasPromptedKey)
+            
+            if !hasPrompted {
+                let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+                AXIsProcessTrustedWithOptions(options)
+                UserDefaults.standard.set(true, forKey: hasPromptedKey)
+                logger.info("Showed accessibility permissions dialog")
             }
+        } else {
+            // Reset the prompt flag when permissions are granted
+            UserDefaults.standard.removeObject(forKey: "HasPromptedForAccessibility")
         }
     }
     
@@ -89,7 +99,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // First check if settings window is already open
         if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
             settingsWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
             return
         }
         
@@ -101,7 +110,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     for subMenuItem in submenu.items {
                         if subMenuItem.title.contains("Settings") || subMenuItem.title.contains("Preferences") {
                             NSApp.sendAction(subMenuItem.action!, to: subMenuItem.target, from: nil)
-                            NSApp.activate(ignoringOtherApps: true)
                             return
                         }
                     }
@@ -111,7 +119,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Fallback: try the standard preferences action
         NSApp.orderFrontStandardAboutPanel(nil)
-        NSApp.activate(ignoringOtherApps: true)
     }
     
     private func toggleLauncher() {
@@ -152,9 +159,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
     
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Allow bypass for app restart
+        if skipQuitConfirmation {
+            skipQuitConfirmation = false // Reset flag
+            return .terminateNow
+        }
+        
+        // Show confirmation dialog for quit attempts (like ⌘Q)
+        let alert = NSAlert()
+        alert.messageText = "Quit Trace?"
+        alert.informativeText = "Are you sure you want to quit Trace? This will close the application."
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+        
+        // Get the first button (Quit) and make it destructive
+        if let quitButton = alert.buttons.first {
+            quitButton.hasDestructiveAction = true
+        }
+        
+        let response = alert.runModal()
+        return response == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+    
     // MARK: - Public API
     
     func updateHotkey(keyCode: UInt32, modifiers: UInt32) throws {
         try hotkeyManager?.registerHotkey(keyCode: keyCode, modifiers: modifiers)
+    }
+    
+    func terminateWithoutConfirmation() {
+        skipQuitConfirmation = true
+        NSApp.terminate(nil)
     }
 }

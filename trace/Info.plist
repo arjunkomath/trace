@@ -4,5 +4,11 @@
 <dict>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Trace needs permission to control system settings like appearance through Apple Events.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Trace needs accessibility permission to control system appearance and other system settings.</string>
+    <key>NSSystemAdministrationUsageDescription</key>
+    <string>Trace needs permission to control system settings like appearance mode.</string>
 </dict>
 </plist>

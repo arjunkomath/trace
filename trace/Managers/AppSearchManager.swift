@@ -53,9 +53,7 @@ class AppSearchManager: ObservableObject {
                 if let app = apps[bundleId] {
                     let matchScore = 1.0
                     let usageScore = usageScores[bundleId] ?? 0.0
-                    // Normalize usage score better - use square root to give high-usage items more weight
-                    let normalizedUsage = min(sqrt(usageScore) / 10.0, 1.0)
-                    // Use 60% match, 40% usage like LauncherView for better usage prioritization
+                    let normalizedUsage = normalizeUsageScore(usageScore)
                     let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
                     scoredResults.append((app, combinedScore))
                     processedBundleIds.insert(bundleId)
@@ -71,7 +69,7 @@ class AppSearchManager: ObservableObject {
                 .map { $0.0 })
         }
         
-        // Fuzzy matching for partial matches - improved algorithm
+        // Enhanced fuzzy matching with keyword and description support
         for (name, bundleIds) in appsByName {
             let matchScore = calculateMatchScore(query: queryLower, text: name)
             
@@ -79,11 +77,12 @@ class AppSearchManager: ObservableObject {
             if matchScore > 0.1 {
                 for bundleId in bundleIds where !processedBundleIds.contains(bundleId) {
                     if let app = apps[bundleId] {
+                        // Calculate enhanced match score considering all searchable content
+                        let enhancedMatchScore = calculateEnhancedMatchScore(query: queryLower, app: app, baseScore: matchScore)
+                        
                         let usageScore = usageScores[bundleId] ?? 0.0
-                        // Normalize usage score better - use square root to give high-usage items more weight
-                        let normalizedUsage = min(sqrt(usageScore) / 10.0, 1.0)
-                        // Use 60% match, 40% usage like LauncherView for better usage prioritization
-                        let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+                        let normalizedUsage = normalizeUsageScore(usageScore)
+                        let combinedScore = (enhancedMatchScore * 0.6) + (normalizedUsage * 0.4)
                         scoredResults.append((app, combinedScore))
                         processedBundleIds.insert(bundleId)
                         
@@ -217,6 +216,10 @@ class AppSearchManager: ObservableObject {
         
         let name = url.deletingPathExtension().lastPathComponent
         
+        // Extract description and keywords for better search
+        let description = extractAppDescription(from: bundle)
+        let keywords = extractAppKeywords(from: bundle, name: name, displayName: displayName)
+        
         let lastModified: Date
         do {
             let resourceValues = try url.resourceValues(forKeys: [.contentModificationDateKey])
@@ -233,8 +236,70 @@ class AppSearchManager: ObservableObject {
             url: url,
             bundleIdentifier: bundleId,
             lastModified: lastModified,
+            description: description,
+            keywords: keywords,
             icon: nil
         )
+    }
+    
+    private func extractAppDescription(from bundle: Bundle) -> String? {
+        // Try various description keys from Info.plist
+        let description = bundle.object(forInfoDictionaryKey: "CFBundleGetInfoString") as? String
+            ?? bundle.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as? String
+            ?? bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        
+        // Clean up the description if found
+        return description?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func extractAppKeywords(from bundle: Bundle, name: String, displayName: String) -> [String] {
+        var keywords: Set<String> = []
+        
+        // Add basic names
+        keywords.insert(name.lowercased())
+        keywords.insert(displayName.lowercased())
+        
+        // Add bundle identifier components once
+        if let bundleId = bundle.bundleIdentifier {
+            let components = bundleId.components(separatedBy: ".").compactMap { component -> String? in
+                let lowercased = component.lowercased()
+                return (!lowercased.isEmpty && lowercased != "com" && lowercased != "app") ? lowercased : nil
+            }
+            keywords.formUnion(components)
+        }
+        
+        // Add category-based keywords
+        if let category = bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String {
+            keywords.formUnion(categoryToKeywords(category))
+        }
+        
+        return Array(keywords).filter { !$0.isEmpty }
+    }
+    
+    private func categoryToKeywords(_ category: String) -> [String] {
+        let categoryKeywords: [String: [String]] = [
+            "public.app-category.utilities": ["utility", "utilities", "tool", "tools"],
+            "public.app-category.productivity": ["productivity", "work", "office"],
+            "public.app-category.graphics-design": ["design", "graphics", "art", "creative"],
+            "public.app-category.developer-tools": ["developer", "development", "code", "programming"],
+            "public.app-category.entertainment": ["entertainment", "fun", "media"],
+            "public.app-category.lifestyle": ["lifestyle", "personal"],
+            "public.app-category.business": ["business", "enterprise", "work"],
+            "public.app-category.education": ["education", "learning", "study"],
+            "public.app-category.finance": ["finance", "money", "banking"],
+            "public.app-category.games": ["games", "gaming", "play"],
+            "public.app-category.music": ["music", "audio", "sound"],
+            "public.app-category.photo-video": ["photo", "video", "media", "camera"],
+            "public.app-category.social-networking": ["social", "network", "communication"],
+            "public.app-category.travel": ["travel", "maps", "navigation"]
+        ]
+        
+        return categoryKeywords[category] ?? []
+    }
+    
+    private func normalizeUsageScore(_ score: Double) -> Double {
+        return min(sqrt(score) / 10.0, 1.0)
     }
     
     private func updateAppsCache(_ newApps: [String: Application]) {
@@ -248,16 +313,35 @@ class AppSearchManager: ObservableObject {
         appsByName.removeAll()
         
         for (bundleId, app) in apps {
-            let names = [
-                app.name.lowercased(),
-                app.displayName.lowercased()
-            ]
+            var searchableTerms = Set<String>()
             
-            for name in Set(names) {
-                if appsByName[name] == nil {
-                    appsByName[name] = Set<String>()
+            // Add basic names
+            searchableTerms.insert(app.name.lowercased())
+            searchableTerms.insert(app.displayName.lowercased())
+            
+            // Add keywords to searchable terms
+            searchableTerms.formUnion(app.keywords)
+            
+            // Add description words if available (limit to prevent index explosion)
+            if let description = app.description {
+                let descriptionWords = description.lowercased()
+                    .components(separatedBy: .whitespacesAndNewlines)
+                    .filter { $0.count > 2 }
+                    .prefix(5) // Limit to first 5 meaningful words
+                searchableTerms.formUnion(descriptionWords)
+            }
+            
+            // Create index entries for all searchable terms
+            for term in searchableTerms.filter({ !$0.isEmpty }) {
+                appsByName[term, default: Set<String>()].insert(bundleId)
+                
+                // Limited prefix indexing to reduce memory usage
+                if term.count > 3 && term.count <= 8 {
+                    for i in 3...min(term.count, 6) { // Reduced from 10 to 6
+                        let prefix = String(term.prefix(i))
+                        appsByName[prefix, default: Set<String>()].insert(bundleId)
+                    }
                 }
-                appsByName[name]?.insert(bundleId)
             }
         }
     }
@@ -283,6 +367,28 @@ class AppSearchManager: ObservableObject {
     }
     
     // MARK: - Search Scoring
+    
+    private func calculateEnhancedMatchScore(query: String, app: Application, baseScore: Double) -> Double {
+        var bestScore = baseScore
+        
+        // Check direct name matches (highest priority)
+        let nameScore = max(
+            calculateMatchScore(query: query, text: app.name.lowercased()),
+            calculateMatchScore(query: query, text: app.displayName.lowercased())
+        )
+        bestScore = max(bestScore, nameScore)
+        
+        // Check keyword matches (high priority)
+        for keyword in app.keywords {
+            let keywordScore = calculateMatchScore(query: query, text: keyword) * 0.8 // Slightly lower than name
+            bestScore = max(bestScore, keywordScore)
+        }
+        
+        // Check description matches (medium priority) - already indexed, so skip expensive reprocessing
+        // Description words are already included in the search index for better performance
+        
+        return bestScore
+    }
     
     private func calculateMatchScore(query: String, text: String) -> Double {
         guard !query.isEmpty && !text.isEmpty else { return 0 }

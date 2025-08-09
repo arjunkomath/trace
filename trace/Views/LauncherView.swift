@@ -14,6 +14,7 @@ struct LauncherView: View {
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @FocusState private var isSearchFocused: Bool
+    @State private var showQuitConfirmation = false
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var windowManager = WindowManager.shared
@@ -135,6 +136,16 @@ struct LauncherView: View {
             }
             return .handled
         }
+        .alert("Quit Trace?", isPresented: $showQuitConfirmation) {
+            Button("Quit", role: .destructive) {
+                NSApp.terminate(nil)
+            }
+            Button("Cancel", role: .cancel) {
+                // User cancelled, do nothing
+            }
+        } message: {
+            Text("Are you sure you want to quit Trace? This will close the application.")
+        }
     }
     
     // MARK: - Data
@@ -169,6 +180,7 @@ struct LauncherView: View {
                 category: "Applications",
                 shortcut: nil,
                 lastUsed: nil,
+                commandId: app.bundleIdentifier,
                 action: {
                     AppSearchManager.shared.launchApp(app)
                 }
@@ -188,7 +200,7 @@ struct LauncherView: View {
         // Settings command - use same scoring as apps for fairness
         let settingsMatchScore = matchesSearchTerms(query: searchLower, terms: [
             "trace settings", "settings", "preferences", "config", "configuration", 
-            "trace", "setup", "options", "prefs"
+            "trace", "setup", "options", "prefs", "configure", "hotkeys"
         ])
         if settingsMatchScore > 0.3 {
             let settingsId = "com.trace.command.settings"
@@ -205,6 +217,7 @@ struct LauncherView: View {
                 category: nil,
                 shortcut: KeyboardShortcut(key: ",", modifiers: ["⌘"]),
                 lastUsed: nil,
+                commandId: settingsId,
                 action: {
                     openSettings()
                 }
@@ -213,7 +226,7 @@ struct LauncherView: View {
         
         // Quit command - use same scoring as apps for fairness
         let quitMatchScore = matchesSearchTerms(query: searchLower, terms: [
-            "quit trace", "quit", "exit", "close", "terminate", "stop", "end"
+            "quit trace", "quit", "exit", "close", "terminate", "stop", "end", "application"
         ])
         if quitMatchScore > 0.3 {
             let quitId = "com.trace.command.quit"
@@ -230,8 +243,9 @@ struct LauncherView: View {
                 category: nil,
                 shortcut: KeyboardShortcut(key: "Q", modifiers: ["⌘"]),
                 lastUsed: nil,
+                commandId: quitId,
                 action: {
-                    NSApp.terminate(nil)
+                    showQuitConfirmation = true
                 }
             ), combinedScore))
         }
@@ -239,11 +253,44 @@ struct LauncherView: View {
         // Add system commands to scored results
         scoredResults.append(contentsOf: systemCommands)
         
+        // Add Control Center commands with consistent scoring
+        let controlCenterCommands = getControlCenterCommands(query: searchLower)
+        for command in controlCenterCommands {
+            // Calculate match score for control center command (check both title and subtitle)
+            var matchScore = fuzzyMatch(query: searchLower, text: command.title.lowercased())
+            let subtitleScore = fuzzyMatch(query: searchLower, text: command.subtitle.lowercased())
+            matchScore = max(matchScore, subtitleScore)
+            if matchScore > 0.3 {
+                let commandId = "com.trace.controlcenter.\(command.id)"
+                let usageScore = usageScores[commandId] ?? 0.0
+                let normalizedUsage = min(usageScore / 50.0, 1.0)
+                let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+                
+                let searchResult = SearchResult(
+                    title: command.title,
+                    subtitle: command.subtitle,
+                    icon: .system(command.icon),
+                    type: .command,
+                    category: command.category,
+                    shortcut: nil,
+                    lastUsed: nil,
+                    commandId: commandId,
+                    action: command.action
+                )
+                
+                scoredResults.append((searchResult, combinedScore))
+            }
+        }
+        
         // Add window management commands with consistent scoring
         let windowCommands = getWindowManagementCommands(query: searchLower)
         for command in windowCommands {
-            // Calculate match score for window command
-            let matchScore = fuzzyMatch(query: searchLower, text: command.title.lowercased())
+            // Calculate match score for window command (check both title and subtitle)
+            var matchScore = fuzzyMatch(query: searchLower, text: command.title.lowercased())
+            if let subtitle = command.subtitle {
+                let subtitleScore = fuzzyMatch(query: searchLower, text: subtitle.lowercased())
+                matchScore = max(matchScore, subtitleScore)
+            }
             if matchScore > 0.3 {
                 let commandId = getCommandIdentifier(for: command.title)
                 let usageScore = usageScores[commandId] ?? 0.0
@@ -270,6 +317,7 @@ struct LauncherView: View {
             category: "Web",
             shortcut: nil,
             lastUsed: nil,
+            commandId: "com.trace.search.google",
             action: {
                 if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                    let url = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
@@ -295,8 +343,8 @@ struct LauncherView: View {
                 UsageTracker.shared.recordUsage(for: bundleId, type: .application)
             }
         case .command:
-            // Use a consistent identifier for commands instead of title
-            let commandId = getCommandIdentifier(for: result.title)
+            // Use the command's semantic identifier for tracking
+            let commandId = result.commandId ?? getCommandIdentifier(for: result.title)
             UsageTracker.shared.recordUsage(for: commandId, type: .command)
         case .suggestion:
             UsageTracker.shared.recordUsage(for: "com.trace.search.google", type: .webSearch)
@@ -313,21 +361,13 @@ struct LauncherView: View {
     
     // MARK: - Helper Functions
     
+    private func getControlCenterCommands(query: String) -> [ControlCenterCommand] {
+        return ControlCenterManager.shared.getControlCenterCommands(matching: query)
+    }
+    
     private func getCommandIdentifier(for title: String) -> String {
-        // Map command titles to consistent identifiers
-        switch title {
-        case "Trace Settings":
-            return "com.trace.command.settings"
-        case "Quit Trace":
-            return "com.trace.command.quit"
-        default:
-            // For window management commands, use the position as identifier
-            if let position = WindowPosition.allCases.first(where: { $0.displayName == title }) {
-                return "com.trace.window.\(position.rawValue)"
-            }
-            // Fallback to sanitized title
-            return "com.trace.command.\(title.lowercased().replacingOccurrences(of: " ", with: "_"))"
-        }
+        // Fallback identifier for commands without explicit commandId
+        return "com.trace.command.\(title.lowercased().replacingOccurrences(of: " ", with: "_"))"
     }
     
     // MARK: - Fuzzy Search Helper
@@ -456,6 +496,7 @@ struct LauncherView: View {
                         category: "Window",
                         shortcut: shortcut,
                         lastUsed: nil,
+                        commandId: "com.trace.window.\(position.rawValue)",
                         action: {
                             WindowManager.shared.applyWindowPosition(position)
                         }

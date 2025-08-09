@@ -45,8 +45,8 @@ class LauncherWindow: NSPanel {
         standardWindowButton(.miniaturizeButton)?.isHidden = true
         standardWindowButton(.zoomButton)?.isHidden = true
         
-        // Request accessibility permissions if not already granted
-        requestAccessibilityPermissions()
+        // Accessibility permissions are only needed for window management features
+        // The launcher and overlay work fine without them
     }
     
     private func setupContent() {
@@ -70,8 +70,6 @@ class LauncherWindow: NSPanel {
     
     override func becomeKey() {
         super.becomeKey()
-        // Ensure app is activated when panel becomes key
-        NSApp.activate(ignoringOtherApps: true)
         // Post notification when window becomes key so LauncherView can focus
         NotificationCenter.default.post(name: .launcherWindowDidBecomeKey, object: self)
     }
@@ -116,18 +114,6 @@ class LauncherWindow: NSPanel {
         setFrameOrigin(NSPoint(x: x, y: y))
     }
     
-    // MARK: - Accessibility Permissions
-    
-    private func requestAccessibilityPermissions() {
-        // Check if accessibility is already enabled
-        let trusted = AXIsProcessTrusted()
-        
-        if !trusted {
-            // Request accessibility permissions
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-            AXIsProcessTrustedWithOptions(options)
-        }
-    }
 }
 
 // MARK: - Notifications

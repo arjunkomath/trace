@@ -562,12 +562,31 @@ class WindowManager: ObservableObject {
     // MARK: - Accessibility Permissions
     
     func hasAccessibilityPermissions() -> Bool {
-        return AXIsProcessTrusted()
+        let hasPermissions = AXIsProcessTrusted()
+        
+        // Reset prompt flags when permissions are granted
+        if hasPermissions {
+            UserDefaults.standard.removeObject(forKey: "WindowManager_HasPromptedForAccessibility")
+            UserDefaults.standard.removeObject(forKey: "HasPromptedForAccessibility")
+        }
+        
+        return hasPermissions
     }
     
     func requestAccessibilityPermissions() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
+        // Only show prompt if permissions aren't already granted
+        guard !hasAccessibilityPermissions() else { return }
+        
+        // Only prompt once per session to avoid repeated dialogs
+        let hasPromptedKey = "WindowManager_HasPromptedForAccessibility"
+        let hasPrompted = UserDefaults.standard.bool(forKey: hasPromptedKey)
+        
+        if !hasPrompted {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            AXIsProcessTrustedWithOptions(options as CFDictionary)
+            UserDefaults.standard.set(true, forKey: hasPromptedKey)
+            logger.info("Showed accessibility permissions dialog from WindowManager")
+        }
     }
     
     private func requestNotificationPermissions() {
