@@ -1,0 +1,232 @@
+//
+//  AboutSettingsView.swift
+//  trace
+//
+//  Created by Arjun on 7/8/2025.
+//
+
+import SwiftUI
+
+struct AboutSettingsView: View {
+    @State private var dataPath: String = ""
+    @State private var fileSize: String = "Unknown"
+    @State private var entryCount: Int = 0
+    @State private var showingClearConfirmation = false
+    @State private var showingClearedAlert = false
+    
+    var body: some View {
+        Form {
+            Section {
+                VStack(spacing: 6) {
+                    // App Icon and Info
+                    VStack(spacing: 6) {
+                        if let appIcon = NSApp.applicationIconImage {
+                            Image(nsImage: appIcon)
+                                .resizable()
+                                .frame(width: 64, height: 64)
+                        } else {
+                            Image(systemName: "magnifyingglass.circle.fill")
+                                .font(.system(size: 64))
+                                .foregroundStyle(.blue.gradient)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Text("Trace")
+                                .font(.system(size: 24, weight: .semibold))
+                            
+                            Text("Version 1.0.0")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                            
+                            Text("System-wide search and launcher for macOS")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                    }
+                    
+                    // Developer Info and Links
+                    VStack(spacing: 8) {
+                        Text("Created by Arjun Komath & Claude")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 20) {
+                            if let githubURL = URL(string: "https://github.com/arjunkomath") {
+                                Link("GitHub", destination: githubURL)
+                                    .font(.system(size: 12))
+                            }
+                            
+                            if let twitterURL = URL(string: "https://twitter.com/arjunz") {
+                                Link("Twitter", destination: twitterURL)
+                                    .font(.system(size: 12))
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
+            
+            // Data Storage Section
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Storage Path
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Data Location")
+                                .font(.system(size: 13, weight: .medium))
+                            Text(dataPath)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: openDataFolder) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "folder")
+                                Text("Open")
+                            }
+                            .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    
+                    Divider()
+                    
+                    // Usage Statistics
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Usage Data")
+                                .font(.system(size: 13, weight: .medium))
+                            HStack(spacing: 16) {
+                                Label("\(entryCount) entries", systemImage: "list.bullet")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                Label(fileSize, systemImage: "doc")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: { showingClearConfirmation = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("Clear")
+                            }
+                            .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                        .foregroundColor(.red)
+                    }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Local Storage")
+            }
+            
+            // App Cache Section
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Application Cache")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Discovered apps and icons")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: refreshAppCache) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Refresh")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Cache")
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            loadDebugInfo()
+        }
+        .confirmationDialog("Clear Usage Data", isPresented: $showingClearConfirmation) {
+            Button("Clear All Data", role: .destructive) {
+                clearUsageData()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete all usage tracking data. This action cannot be undone.")
+        }
+        .alert("Data Cleared", isPresented: $showingClearedAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Usage data has been cleared successfully.")
+        }
+    }
+    
+    private func loadDebugInfo() {
+        // Get data path
+        let fileManager = FileManager.default
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
+            dataPath = traceDirectory.path
+            
+            // Check usage database
+            let dbPath = traceDirectory.appendingPathComponent("usage.sqlite")
+            if fileManager.fileExists(atPath: dbPath.path) {
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: dbPath.path)
+                    if let size = attributes[.size] as? Int64 {
+                        fileSize = ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+                    }
+                } catch {
+                    fileSize = "Error reading file"
+                }
+                
+                // Get entry count
+                entryCount = UsageTracker.shared.getAllUsageScores().count
+            } else {
+                fileSize = "0 bytes"
+                entryCount = 0
+            }
+        }
+    }
+    
+    private func clearUsageData() {
+        UsageTracker.shared.clearUsageData()
+        loadDebugInfo()
+        showingClearedAlert = true
+    }
+    
+    private func refreshAppCache() {
+        // Trigger app cache refresh by accessing the singleton
+        // The singleton will automatically reload apps when needed
+        _ = AppSearchManager.shared
+    }
+    
+    private func openDataFolder() {
+        let fileManager = FileManager.default
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
+            
+            // Create directory if it doesn't exist
+            if !fileManager.fileExists(atPath: traceDirectory.path) {
+                try? fileManager.createDirectory(at: traceDirectory, withIntermediateDirectories: true)
+            }
+            
+            NSWorkspace.shared.open(traceDirectory)
+        }
+    }
+}

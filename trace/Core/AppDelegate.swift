@@ -98,7 +98,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func showPreferences() {
         // First check if settings window is already open
         if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
+            // Force the app to activate and bring the window to front
+            NSApp.activate(ignoringOtherApps: true)
             settingsWindow.makeKeyAndOrderFront(nil)
+            settingsWindow.orderFrontRegardless()
             return
         }
         
@@ -109,7 +112,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if let submenu = menuItem.submenu {
                     for subMenuItem in submenu.items {
                         if subMenuItem.title.contains("Settings") || subMenuItem.title.contains("Preferences") {
+                            // Activate the app first
+                            NSApp.activate(ignoringOtherApps: true)
                             NSApp.sendAction(subMenuItem.action!, to: subMenuItem.target, from: nil)
+                            
+                            // After a brief delay, ensure the window is at front
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
+                                    settingsWindow.orderFrontRegardless()
+                                }
+                            }
                             return
                         }
                     }

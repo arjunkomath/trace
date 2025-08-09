@@ -190,13 +190,21 @@ struct LauncherView: View {
             // Skip if match score is too low
             if matchScore < 0.3 { continue }
             
+            // Check if there's a hotkey assigned for this app
+            let shortcut: KeyboardShortcut? = {
+                if let hotkeyString = AppHotkeyManager.shared.getHotkey(for: app.bundleIdentifier), !hotkeyString.isEmpty {
+                    return KeyboardShortcut(keyCombo: hotkeyString)
+                }
+                return nil
+            }()
+            
             let result = SearchResult(
                 title: app.displayName,
                 subtitle: nil,
                 icon: .app(app.bundleIdentifier),
                 type: .application,
                 category: "Applications",
-                shortcut: nil,
+                shortcut: shortcut,
                 lastUsed: nil,
                 commandId: app.bundleIdentifier,
                 action: {
@@ -719,10 +727,12 @@ struct CompactResultRowView: View {
                     )
             }
             
-            // Result type
-            Text(result.type.displayName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+            // Result type (only show if no category badge is shown)
+            if result.category == nil || result.category == "Web" {
+                Text(result.type.displayName)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+            }
             
             // Shortcut
             if let shortcut = result.shortcut {
