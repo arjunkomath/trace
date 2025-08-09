@@ -17,6 +17,7 @@ class ServiceContainer: ObservableObject {
     private var _appHotkeyManager: AppHotkeyManager?
     private var _windowHotkeyManager: WindowHotkeyManager?
     private var _settingsService: SettingsService?
+    private var _folderManager: FolderManager?
     
     // MARK: - Service Accessors
     
@@ -83,6 +84,15 @@ class ServiceContainer: ObservableObject {
         return service
     }
     
+    var folderManager: FolderManager {
+        if let manager = _folderManager {
+            return manager
+        }
+        let manager = FolderManager()
+        _folderManager = manager
+        return manager
+    }
+    
     // MARK: - Lifecycle
     
     func shutdown() {
@@ -93,6 +103,7 @@ class ServiceContainer: ObservableObject {
         _appHotkeyManager = nil
         _windowHotkeyManager = nil
         _settingsService = nil
+        _folderManager = nil
     }
 }
 

@@ -333,6 +333,42 @@ struct LauncherView: View {
             }
         }
         
+        // Add folder shortcuts with consistent scoring
+        let folderResults = services.folderManager.searchFolders(query: searchLower)
+        for folder in folderResults {
+            let matchScore = FuzzyMatcher.match(query: searchLower, text: folder.name.lowercased())
+            if matchScore > 0.3 {
+                let commandId = "com.trace.folder.\(folder.id)"
+                let usageScore = usageScores[commandId] ?? 0.0
+                let normalizedUsage = min(usageScore / 50.0, 1.0)
+                let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+                
+                // Get hotkey for this folder
+                let shortcut: KeyboardShortcut? = {
+                    if let hotkeyString = folder.hotkey, !hotkeyString.isEmpty {
+                        return KeyboardShortcut(keyCombo: hotkeyString)
+                    }
+                    return nil
+                }()
+                
+                let result = SearchResult(
+                    title: folder.name,
+                    subtitle: folder.path,
+                    icon: .system(folder.iconName),
+                    type: .file,
+                    category: folder.isDefault ? nil : "Custom Folder",
+                    shortcut: shortcut,
+                    lastUsed: nil,
+                    commandId: commandId,
+                    action: { [services] in
+                        services.folderManager.openFolder(folder)
+                    }
+                )
+                
+                scoredResults.append((result, combinedScore))
+            }
+        }
+        
         // Sort all results by score
         let sortedResults = scoredResults
             .sorted { $0.1 > $1.1 }

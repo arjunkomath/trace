@@ -53,12 +53,19 @@ struct SettingsView: View {
                 }
                 .tag(3)
             
+            FolderSettingsView()
+                .tabItem {
+                    Image(systemName: "folder")
+                    Text("Folders")
+                }
+                .tag(4)
+            
             AboutSettingsView()
                 .tabItem {
                     Image(systemName: "info.circle")
                     Text("About")
                 }
-                .tag(4)
+                .tag(5)
         }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
         .onAppear {
