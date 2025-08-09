@@ -18,9 +18,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalEventMonitor: Any?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Initialize unified hotkey registry first
+        _ = HotkeyRegistry.shared
+        logger.info("✅ HotkeyRegistry initialized")
+        
         setupLauncherWindow()
         setupHotkey()
         requestAccessibilityPermissions()
+        
+        // Initialize window hotkey manager to register saved hotkeys
+        _ = WindowHotkeyManager.shared
     }
     
     deinit {
@@ -59,15 +66,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let accessEnabled = AXIsProcessTrusted()
         
         if !accessEnabled {
-            do {
-                let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-                let hasPermissions = AXIsProcessTrustedWithOptions(options)
-                
-                if !hasPermissions {
-                    logger.warning("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
-                }
-            } catch {
-                logger.error("Failed to request accessibility permissions: \(error.localizedDescription)")
+            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            let hasPermissions = AXIsProcessTrustedWithOptions(options)
+            
+            if !hasPermissions {
+                logger.warning("Accessibility permissions needed for global hotkey - please check System Preferences > Security & Privacy > Accessibility")
             }
         }
     }

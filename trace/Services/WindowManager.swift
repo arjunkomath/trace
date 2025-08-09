@@ -91,6 +91,10 @@ class WindowManager: ObservableObject {
     private var previousActiveWindow: AXUIElement?
     private var previousActiveApp: NSRunningApplication?
     
+    @Published var showToast = false
+    @Published var toastMessage = ""
+    @Published var toastType: ToastView.ToastType = .error
+    
     private init() {}
     
     // MARK: - Window Tracking
@@ -144,27 +148,38 @@ class WindowManager: ObservableObject {
     // MARK: - Window Management
     
     func applyWindowPosition(_ position: WindowPosition) {
+        logger.info("🪟 applyWindowPosition called with position: \(position.rawValue)")
+        
         guard let window = previousActiveWindow else {
             logger.error("No previous active window to manage - ensure accessibility permissions are granted and try activating another app first")
+            showToastMessage("No window to manage", type: .error)
             return
         }
         
+        logger.info("✅ Previous active window available, proceeding with window management")
+        
         guard let screen = NSScreen.main else {
             logger.error("Could not get main screen")
+            showToastMessage("Screen not available", type: .error)
             return
         }
         
         let screenFrame = screen.visibleFrame
         let newFrame = calculateFrame(for: position, screenFrame: screenFrame, window: window)
         
-        setWindowFrame(window, frame: newFrame)
+        let success = setWindowFrame(window, frame: newFrame)
         
-        // Bring the window's app to front
-        if let app = previousActiveApp {
-            app.activate()
+        if success {
+            // Bring the window's app to front
+            if let app = previousActiveApp {
+                app.activate()
+            }
+            
+            logger.info("Applied window position: \(position.displayName)")
+            showToastMessage("Applied \(position.displayName.lowercased())", type: .success)
+        } else {
+            showToastMessage("Failed to resize window", type: .error)
         }
-        
-        logger.info("Applied window position: \(position.displayName)")
     }
     
     private func calculateFrame(for position: WindowPosition, screenFrame: CGRect, window: AXUIElement) -> CGRect {
@@ -374,15 +389,27 @@ class WindowManager: ObservableObject {
         return CGRect(origin: point, size: cgSize)
     }
     
-    private func setWindowFrame(_ window: AXUIElement, frame: CGRect) {
+    private func setWindowFrame(_ window: AXUIElement, frame: CGRect) -> Bool {
         var origin = frame.origin
         var size = frame.size
         
-        let positionValue = AXValueCreate(.cgPoint, &origin)!
-        let sizeValue = AXValueCreate(.cgSize, &size)!
+        guard let positionValue = AXValueCreate(.cgPoint, &origin),
+              let sizeValue = AXValueCreate(.cgSize, &size) else {
+            return false
+        }
         
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
-        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
+        let sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        
+        return positionResult == .success && sizeResult == .success
+    }
+    
+    private func showToastMessage(_ message: String, type: ToastView.ToastType) {
+        DispatchQueue.main.async { [weak self] in
+            self?.toastMessage = message
+            self?.toastType = type
+            self?.showToast = true
+        }
     }
     
     // MARK: - Accessibility Permissions

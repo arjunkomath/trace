@@ -16,6 +16,7 @@ struct LauncherView: View {
     @FocusState private var isSearchFocused: Bool
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
+    @ObservedObject private var windowManager = WindowManager.shared
     
     let onClose: () -> Void
     
@@ -123,6 +124,11 @@ struct LauncherView: View {
             }
             return .handled
         }
+        .toast(
+            isShowing: $windowManager.showToast,
+            message: windowManager.toastMessage,
+            type: windowManager.toastType
+        )
     }
     
     // MARK: - Data
@@ -135,12 +141,21 @@ struct LauncherView: View {
         guard !searchText.isEmpty else { return [] }
         
         let searchLower = searchText.lowercased()
-        var allResults: [SearchResult] = []
+        var scoredResults: [(SearchResult, Double)] = []
         
-        // Add app results first (most common use case)
-        let apps = AppSearchManager.shared.searchApps(query: searchText, limit: 8)
-        let appResults = apps.map { app in
-            SearchResult(
+        // Get usage scores for all items
+        let usageScores = UsageTracker.shared.getAllUsageScores()
+        
+        // Get apps but calculate our own scores for fair comparison
+        let apps = AppSearchManager.shared.searchApps(query: searchText, limit: 30)
+        for app in apps {
+            // Calculate match score ourselves for consistency
+            let matchScore = fuzzyMatch(query: searchLower, text: app.displayName.lowercased())
+            
+            // Skip if match score is too low
+            if matchScore < 0.3 { continue }
+            
+            let result = SearchResult(
                 title: app.displayName,
                 subtitle: nil,
                 icon: .app(app.bundleIdentifier),
@@ -152,18 +167,30 @@ struct LauncherView: View {
                     AppSearchManager.shared.launchApp(app)
                 }
             )
+            
+            // Calculate combined score: 60% match, 40% usage (increased usage weight)
+            let usageScore = usageScores[app.bundleIdentifier] ?? 0.0
+            let normalizedUsage = min(usageScore / 50.0, 1.0) // Normalize to 0-1, reaching 1.0 at 50 uses
+            let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+            
+            scoredResults.append((result, combinedScore))
         }
-        allResults.append(contentsOf: appResults)
         
-        // Add system commands with fuzzy matching
+        // Add system commands with fuzzy matching and usage scores
         var systemCommands: [(SearchResult, Double)] = []
         
-        // Settings command
-        let settingsScore = matchesSearchTerms(query: searchLower, terms: [
+        // Settings command - use same scoring as apps for fairness
+        let settingsMatchScore = matchesSearchTerms(query: searchLower, terms: [
             "trace settings", "settings", "preferences", "config", "configuration", 
             "trace", "setup", "options", "prefs"
         ])
-        if settingsScore > 0 {
+        if settingsMatchScore > 0.3 {
+            let settingsId = "com.trace.command.settings"
+            let usageScore = usageScores[settingsId] ?? 0.0
+            let normalizedUsage = min(usageScore / 50.0, 1.0) // Same normalization as apps
+            // Use same formula: 60% match, 40% usage
+            let combinedScore = (settingsMatchScore * 0.6) + (normalizedUsage * 0.4)
+            
             systemCommands.append((SearchResult(
                 title: "Trace Settings",
                 subtitle: "Configure hotkeys and preferences",
@@ -175,14 +202,20 @@ struct LauncherView: View {
                 action: {
                     openSettings()
                 }
-            ), settingsScore))
+            ), combinedScore))
         }
         
-        // Quit command
-        let quitScore = matchesSearchTerms(query: searchLower, terms: [
+        // Quit command - use same scoring as apps for fairness
+        let quitMatchScore = matchesSearchTerms(query: searchLower, terms: [
             "quit trace", "quit", "exit", "close", "terminate", "stop", "end"
         ])
-        if quitScore > 0 {
+        if quitMatchScore > 0.3 {
+            let quitId = "com.trace.command.quit"
+            let usageScore = usageScores[quitId] ?? 0.0
+            let normalizedUsage = min(usageScore / 50.0, 1.0) // Same normalization as apps
+            // Use same formula: 60% match, 40% usage
+            let combinedScore = (quitMatchScore * 0.6) + (normalizedUsage * 0.4)
+            
             systemCommands.append((SearchResult(
                 title: "Quit Trace",
                 subtitle: "Exit the application",
@@ -194,18 +227,33 @@ struct LauncherView: View {
                 action: {
                     NSApp.terminate(nil)
                 }
-            ), quitScore))
+            ), combinedScore))
         }
         
-        // Sort system commands by score and add to results
-        let sortedSystemCommands = systemCommands
-            .sorted { $0.1 > $1.1 }
-            .map { $0.0 }
-        allResults.append(contentsOf: sortedSystemCommands)
+        // Add system commands to scored results
+        scoredResults.append(contentsOf: systemCommands)
         
-        // Add window management commands
+        // Add window management commands with consistent scoring
         let windowCommands = getWindowManagementCommands(query: searchLower)
-        allResults.append(contentsOf: windowCommands)
+        for command in windowCommands {
+            // Calculate match score for window command
+            let matchScore = fuzzyMatch(query: searchLower, text: command.title.lowercased())
+            if matchScore > 0.3 {
+                let commandId = getCommandIdentifier(for: command.title)
+                let usageScore = usageScores[commandId] ?? 0.0
+                let normalizedUsage = min(usageScore / 50.0, 1.0)
+                let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+                scoredResults.append((command, combinedScore))
+            }
+        }
+        
+        // Sort all results by score
+        let sortedResults = scoredResults
+            .sorted { $0.1 > $1.1 }
+            .prefix(10) // Limit to top 10 results
+            .map { $0.0 }
+        
+        var finalResults = Array(sortedResults)
         
         // Always add Google search as last option
         let googleSearchResult = SearchResult(
@@ -223,19 +271,57 @@ struct LauncherView: View {
                 }
             }
         )
-        allResults.append(googleSearchResult)
+        finalResults.append(googleSearchResult)
         
-        return allResults
+        return finalResults
     }
     
     // MARK: - Actions
     
     func executeSelectedResult() {
         guard selectedIndex < results.count else { return }
-        results[selectedIndex].action()
+        let result = results[selectedIndex]
+        
+        // Track usage based on result type
+        switch result.type {
+        case .application:
+            if case .app(let bundleId) = result.icon {
+                UsageTracker.shared.recordUsage(for: bundleId, type: .application)
+            }
+        case .command:
+            // Use a consistent identifier for commands instead of title
+            let commandId = getCommandIdentifier(for: result.title)
+            UsageTracker.shared.recordUsage(for: commandId, type: .command)
+        case .suggestion:
+            UsageTracker.shared.recordUsage(for: "com.trace.search.google", type: .webSearch)
+        case .file, .person, .recent:
+            // These types aren't implemented yet, so no tracking for now
+            break
+        }
+        
+        result.action()
         searchText = ""
         selectedIndex = 0
         onClose()
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func getCommandIdentifier(for title: String) -> String {
+        // Map command titles to consistent identifiers
+        switch title {
+        case "Trace Settings":
+            return "com.trace.command.settings"
+        case "Quit Trace":
+            return "com.trace.command.quit"
+        default:
+            // For window management commands, use the position as identifier
+            if let position = WindowPosition.allCases.first(where: { $0.displayName == title }) {
+                return "com.trace.window.\(position.rawValue)"
+            }
+            // Fallback to sanitized title
+            return "com.trace.command.\(title.lowercased().replacingOccurrences(of: " ", with: "_"))"
+        }
     }
     
     // MARK: - Fuzzy Search Helper

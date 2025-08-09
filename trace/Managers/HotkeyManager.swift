@@ -5,123 +5,65 @@
 //  Created by Arjun on 7/8/2025.
 //
 
-import Carbon
-import Cocoa
+import Foundation
 
-enum HotkeyError: Error {
-    case registrationFailed(OSStatus)
-    case eventHandlerInstallFailed(OSStatus)
-    case invalidParameters
-}
-
+/// Simplified HotkeyManager that uses the unified HotkeyRegistry
 class HotkeyManager {
     private let logger = AppLogger.hotkeyManager
-    
-    private var hotKeyRef: EventHotKeyRef?
-    private var eventHandler: EventHandlerRef?
-    private let signature = OSType("TRAC".fourCharCodeValue)
-    private let hotKeyID = EventHotKeyID(signature: OSType("TRAC".fourCharCodeValue), id: 1)
+    private var registeredHotkeyId: UInt32?
     
     var onHotkeyPressed: (() -> Void)?
     
     init() {
-        setupEventHandler()
+        logger.info("🚀 HotkeyManager initializing with unified registry...")
     }
     
     deinit {
         unregisterHotkey()
-        if let handler = eventHandler {
-            let status = RemoveEventHandler(handler)
-            if status != noErr {
-                logger.error("Failed to remove event handler: \(status)")
-            }
-            eventHandler = nil
-        }
-    }
-    
-    private func setupEventHandler() {
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        
-        let callback: EventHandlerUPP = { _, event, userData in
-            guard let event = event,
-                  let userData = userData else { 
-                return OSStatus(eventNotHandledErr) 
-            }
-            
-            var hotKeyID = EventHotKeyID()
-            let status = GetEventParameter(
-                event,
-                EventParamName(kEventParamDirectObject),
-                EventParamType(typeEventHotKeyID),
-                nil,
-                MemoryLayout<EventHotKeyID>.size,
-                nil,
-                &hotKeyID
-            )
-            
-            if status == noErr {
-                let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
-                DispatchQueue.main.async {
-                    manager.onHotkeyPressed?()
-                }
-            }
-            
-            return noErr
-        }
-        
-        let status = InstallEventHandler(
-            GetApplicationEventTarget(),
-            callback,
-            1,
-            &eventType,
-            Unmanaged.passUnretained(self).toOpaque(),
-            &eventHandler
-        )
-        
-        if status != noErr {
-            logger.error("Failed to install event handler: \(status)")
-        }
+        logger.info("🧹 HotkeyManager deinitialized")
     }
     
     func registerHotkey(keyCode: UInt32, modifiers: UInt32) throws {
+        logger.info("📝 Registering main app hotkey: keyCode=\(keyCode), modifiers=\(modifiers)")
+        
+        // Unregister existing hotkey if any
         unregisterHotkey()
         
         guard keyCode > 0 else {
+            logger.error("❌ Invalid keyCode: \(keyCode)")
             throw HotkeyError.invalidParameters
         }
         
-        let status = RegisterEventHotKey(
-            keyCode,
-            modifiers,
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-        
-        if status != noErr {
-            logger.error("Failed to register hotkey (keyCode: \(keyCode), modifiers: \(modifiers)): \(status)")
-            throw HotkeyError.registrationFailed(status)
+        // Register through the unified registry
+        guard let hotkeyId = HotkeyRegistry.shared.registerHotkey(
+            keyCode: keyCode,
+            modifiers: modifiers,
+            type: .appLauncher,
+            action: { [weak self] in
+                self?.logger.debug("🎯 Main app hotkey pressed!")
+                self?.onHotkeyPressed?()
+            }
+        ) else {
+            logger.error("❌ Failed to register hotkey through registry")
+            throw HotkeyError.registrationFailed(-1)
         }
+        
+        registeredHotkeyId = hotkeyId
+        logger.info("✅ Main app hotkey registered with ID: \(hotkeyId)")
     }
     
     func unregisterHotkey() {
-        if let ref = hotKeyRef {
-            let status = UnregisterEventHotKey(ref)
-            if status != noErr {
-                logger.error("Failed to unregister hotkey: \(status)")
-            }
-            hotKeyRef = nil
+        if let hotkeyId = registeredHotkeyId {
+            logger.info("🗑️ Unregistering main app hotkey ID: \(hotkeyId)")
+            HotkeyRegistry.shared.unregisterHotkey(id: hotkeyId)
+            registeredHotkeyId = nil
         }
     }
 }
 
-extension String {
-    var fourCharCodeValue: UInt32 {
-        var result: UInt32 = 0
-        for char in self.utf8 {
-            result = (result << 8) + UInt32(char)
-        }
-        return result
-    }
+// Keep the existing error types for compatibility
+enum HotkeyError: Error {
+    case registrationFailed(OSStatus)
+    case eventHandlerInstallFailed(OSStatus)
+    case invalidParameters
 }

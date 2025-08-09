@@ -60,6 +60,13 @@ struct SettingsView: View {
                     Text("About")
                 }
                 .tag(2)
+            
+            DebugSettingsView()
+                .tabItem {
+                    Image(systemName: "wrench.and.screwdriver")
+                    Text("Debug")
+                }
+                .tag(3)
         }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
         .onAppear {
@@ -173,58 +180,58 @@ struct GeneralSettingsView: View {
 
 struct AboutSettingsView: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
-            // App Icon and Info
-            VStack(spacing: 16) {
-                if let appIcon = NSApp.applicationIconImage {
-                    Image(nsImage: appIcon)
-                        .resizable()
-                        .frame(width: 64, height: 64)
-                } else {
-                    Image(systemName: "magnifyingglass.circle.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.blue.gradient)
-                }
-                
-                VStack(spacing: 8) {
-                    Text("Trace")
-                        .font(.system(size: 24, weight: .semibold))
+        Form {
+            Section {
+                VStack(spacing: 20) {
+                    // App Icon and Info
+                    VStack(spacing: 16) {
+                        if let appIcon = NSApp.applicationIconImage {
+                            Image(nsImage: appIcon)
+                                .resizable()
+                                .frame(width: 64, height: 64)
+                        } else {
+                            Image(systemName: "magnifyingglass.circle.fill")
+                                .font(.system(size: 64))
+                                .foregroundStyle(.blue.gradient)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Text("Trace")
+                                .font(.system(size: 24, weight: .semibold))
+                            
+                            Text("Version 1.0.0")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                            
+                            Text("System-wide search and app launcher for macOS")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                    }
                     
-                    Text("Version 1.0.0")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                    
-                    Text("System-wide search and app launcher for macOS")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                    // Developer Info and Links
+                    VStack(spacing: 16) {
+                        Text("Created by Arjun Komath")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 20) {
+                            Link("GitHub", destination: URL(string: "https://github.com/arjunkomath/trace")!)
+                                .font(.system(size: 12))
+                            
+                            Link("Twitter", destination: URL(string: "https://twitter.com/arjunz")!)
+                                .font(.system(size: 12))
+                        }
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
             }
-            
-            Spacer()
-            
-            // Developer Info and Links
-            VStack(spacing: 16) {
-                Text("Created by Arjun Komath")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 20) {
-                    Link("GitHub", destination: URL(string: "https://github.com/arjunkomath/trace")!)
-                        .font(.system(size: 12))
-                    
-                    Link("Twitter", destination: URL(string: "https://twitter.com/arjunz")!)
-                        .font(.system(size: 12))
-                }
-            }
-            
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.controlBackgroundColor))
+        .formStyle(.grouped)
+        .scrollDisabled(true)
     }
 }
 
@@ -233,50 +240,50 @@ struct WindowManagementSettingsView: View {
     @State private var showingAccessibilityAlert = false
     
     var body: some View {
-        VStack(spacing: 20) {
+        Group {
             if !accessibilityEnabled {
                 // Accessibility Permission Warning
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.orange)
-                    
-                    Text("Accessibility Permissions Required")
-                        .font(.system(size: 16, weight: .semibold))
-                    
-                    Text("Window management requires accessibility permissions to control other applications' windows.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-                    
-                    Button("Grant Permissions") {
-                        WindowManager.shared.requestAccessibilityPermissions()
-                        showingAccessibilityAlert = true
+                Form {
+                    Section {
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(.orange)
+                            
+                            Text("Accessibility Permissions Required")
+                                .font(.system(size: 16, weight: .semibold))
+                            
+                            Text("Window management requires accessibility permissions to control other applications' windows.")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                            
+                            Button("Grant Permissions") {
+                                WindowManager.shared.requestAccessibilityPermissions()
+                                showingAccessibilityAlert = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
-                .padding()
-                .background(Color.orange.opacity(0.1))
-                .cornerRadius(10)
-                .padding()
-                
-                Spacer()
+                .formStyle(.grouped)
+                .scrollDisabled(true)
             } else {
                 // Window Management Commands List
-                ScrollView {
-                    LazyVStack(spacing: 8) {
+                Form {
+                    Section {
                         ForEach(Array(WindowPosition.allCases.enumerated()), id: \.offset) { index, position in
                             WindowCommandRow(position: position)
+                                .padding(.vertical, 2)
                         }
                     }
-                    .padding()
                 }
-                .background(Color(NSColor.controlBackgroundColor))
+                .formStyle(.grouped)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.controlBackgroundColor))
         .onAppear {
             checkAccessibilityPermissions()
         }
@@ -294,10 +301,188 @@ struct WindowManagementSettingsView: View {
     }
 }
 
+struct DebugSettingsView: View {
+    @State private var dataPath: String = ""
+    @State private var fileSize: String = "Unknown"
+    @State private var entryCount: Int = 0
+    @State private var showingClearConfirmation = false
+    @State private var showingClearedAlert = false
+    
+    var body: some View {
+        Form {
+                // Data Storage Section
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Storage Path
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Data Location")
+                                    .font(.system(size: 13, weight: .medium))
+                                Text(dataPath)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(action: openDataFolder) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "folder")
+                                    Text("Open")
+                                }
+                                .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        
+                        Divider()
+                        
+                        // Usage Statistics
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Usage Data")
+                                    .font(.system(size: 13, weight: .medium))
+                                HStack(spacing: 16) {
+                                    Label("\(entryCount) entries", systemImage: "list.bullet")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                    Label(fileSize, systemImage: "doc")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            Button(action: { showingClearConfirmation = true }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                    Text("Clear")
+                                }
+                                .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
+                            .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Local Storage")
+                        .font(.system(size: 11, weight: .medium))
+                        .textCase(.uppercase)
+                }
+                
+                // App Cache Section
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Application Cache")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Discovered apps and icons")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: refreshAppCache) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Refresh")
+                            }
+                            .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Cache")
+                        .font(.system(size: 11, weight: .medium))
+                        .textCase(.uppercase)
+                }
+            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+        .onAppear {
+            loadDebugInfo()
+        }
+        .confirmationDialog("Clear Usage Data", isPresented: $showingClearConfirmation) {
+            Button("Clear All Data", role: .destructive) {
+                clearUsageData()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all usage history. Your frequently used apps will no longer be prioritized in search results.")
+        }
+        .alert("Data Cleared", isPresented: $showingClearedAlert) {
+            Button("OK") {}
+        } message: {
+            Text("Usage data has been cleared successfully.")
+        }
+    }
+    
+    private func loadDebugInfo() {
+        // Get data path
+        let fileManager = FileManager.default
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
+            dataPath = traceDirectory.path
+            
+            // Get file size and entry count
+            let dataFileURL = traceDirectory.appendingPathComponent("usage_data.json")
+            if fileManager.fileExists(atPath: dataFileURL.path) {
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: dataFileURL.path)
+                    if let fileSize = attributes[.size] as? Int64 {
+                        self.fileSize = formatFileSize(fileSize)
+                    }
+                    
+                    // Load entry count
+                    if let data = try? Data(contentsOf: dataFileURL),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        entryCount = json.count
+                    }
+                } catch {
+                    fileSize = "Error reading file"
+                }
+            } else {
+                fileSize = "No data file"
+            }
+        }
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    
+    private func openDataFolder() {
+        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
+            NSWorkspace.shared.open(traceDirectory)
+        }
+    }
+    
+    private func clearUsageData() {
+        UsageTracker.shared.clearUsageData()
+        loadDebugInfo()
+        showingClearedAlert = true
+    }
+    
+    private func refreshAppCache() {
+        // Trigger app cache refresh
+        _ = AppSearchManager.shared
+        // The singleton will automatically reload apps
+    }
+}
+
 struct WindowCommandRow: View {
     let position: WindowPosition
     @State private var isRecordingHotkey = false
     @State private var assignedHotkey: String = ""
+    @State private var eventMonitor: Any?
     
     var body: some View {
         HStack {
@@ -305,7 +490,7 @@ struct WindowCommandRow: View {
             HStack(spacing: 12) {
                 Image(systemName: getWindowIcon(for: position))
                     .font(.system(size: 16))
-                    .foregroundColor(.primary)
+                    .foregroundColor(.secondary)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -323,13 +508,16 @@ struct WindowCommandRow: View {
             
             // Hotkey assignment
             Button(action: {
-                if assignedHotkey.isEmpty {
-                    // Start recording hotkey
-                    isRecordingHotkey = true
-                } else {
-                    // Clear hotkey
-                    assignedHotkey = ""
-                    // TODO: Save to UserDefaults
+                if assignedHotkey.isEmpty || !isRecordingHotkey {
+                    if assignedHotkey.isEmpty {
+                        // Start recording hotkey
+                        isRecordingHotkey = true
+                        startRecording()
+                    } else {
+                        // Clear hotkey
+                        assignedHotkey = ""
+                        saveHotkey("", keyCode: 0, modifiers: 0)
+                    }
                 }
             }) {
                 HStack(spacing: 8) {
@@ -358,18 +546,79 @@ struct WindowCommandRow: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(6)
+        .padding(.vertical, 4)
         .onAppear {
             loadHotkey()
+        }
+        .onDisappear {
+            stopRecording()
         }
     }
     
     private func loadHotkey() {
-        // TODO: Load from UserDefaults
         assignedHotkey = UserDefaults.standard.string(forKey: "window_\(position.rawValue)_hotkey") ?? ""
+    }
+    
+    private func saveHotkey(_ hotkey: String, keyCode: UInt32, modifiers: UInt32) {
+        print("🔧 saveHotkey called for \(position.rawValue): '\(hotkey)', keyCode: \(keyCode), modifiers: \(modifiers)")
+        
+        if hotkey.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "window_\(position.rawValue)_hotkey")
+            UserDefaults.standard.removeObject(forKey: "window_\(position.rawValue)_keycode")
+            UserDefaults.standard.removeObject(forKey: "window_\(position.rawValue)_modifiers")
+            print("🗑️ Cleared hotkey for \(position.rawValue)")
+            // Update the hotkey manager
+            WindowHotkeyManager.shared.updateHotkey(for: position, keyCombo: nil, keyCode: 0, modifiers: 0)
+        } else {
+            UserDefaults.standard.set(hotkey, forKey: "window_\(position.rawValue)_hotkey")
+            UserDefaults.standard.set(Int(keyCode), forKey: "window_\(position.rawValue)_keycode")
+            UserDefaults.standard.set(Int(modifiers), forKey: "window_\(position.rawValue)_modifiers")
+            print("💾 Saved hotkey for \(position.rawValue): keyCode=\(keyCode), modifiers=\(modifiers)")
+            // Update the hotkey manager
+            WindowHotkeyManager.shared.updateHotkey(for: position, keyCombo: hotkey, keyCode: keyCode, modifiers: modifiers)
+        }
+    }
+    
+    private func startRecording() {
+        stopRecording()
+        
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if self.isRecordingHotkey {
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                var modifierValue: UInt32 = 0
+                
+                if modifiers.contains(.command) { modifierValue |= UInt32(cmdKey) }
+                if modifiers.contains(.option) { modifierValue |= UInt32(optionKey) }
+                if modifiers.contains(.control) { modifierValue |= UInt32(controlKey) }
+                if modifiers.contains(.shift) { modifierValue |= UInt32(shiftKey) }
+                
+                // Only accept if at least one modifier is pressed (except for Escape)
+                if modifierValue != 0 && event.keyCode != 53 {
+                    // Format the key combination
+                    let keyBinding = KeyBindingView(keyCode: UInt32(event.keyCode), modifiers: modifierValue)
+                    self.assignedHotkey = keyBinding.keys.joined(separator: "")
+                    self.saveHotkey(self.assignedHotkey, keyCode: UInt32(event.keyCode), modifiers: modifierValue)
+                    self.isRecordingHotkey = false
+                    self.stopRecording()
+                    return nil
+                }
+                
+                // Cancel on Escape
+                if event.keyCode == 53 {
+                    self.isRecordingHotkey = false
+                    self.stopRecording()
+                    return nil
+                }
+            }
+            return event
+        }
+    }
+    
+    private func stopRecording() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
     }
     
     private func getWindowIcon(for position: WindowPosition) -> String {

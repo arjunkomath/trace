@@ -44,11 +44,18 @@ class AppSearchManager: ObservableObject {
         var scoredResults: [(Application, Double)] = []
         var processedBundleIds = Set<String>()
         
+        // Get usage scores for all apps
+        let usageScores = UsageTracker.shared.getAllUsageScores()
+        
         // Fast path: exact name matches
         if let bundleIds = appsByName[queryLower] {
             for bundleId in bundleIds {
                 if let app = apps[bundleId] {
-                    scoredResults.append((app, 1.0))
+                    let matchScore = 1.0
+                    let usageScore = usageScores[bundleId] ?? 0.0
+                    // Combine match score with usage score (70% match, 30% usage)
+                    let combinedScore = (matchScore * 0.7) + (min(usageScore / 100.0, 1.0) * 0.3)
+                    scoredResults.append((app, combinedScore))
                     processedBundleIds.insert(bundleId)
                 }
             }
@@ -56,18 +63,24 @@ class AppSearchManager: ObservableObject {
         
         // Early return if we have enough exact matches
         if scoredResults.count >= limit {
-            return Array(scoredResults.prefix(limit).map { $0.0 })
+            return Array(scoredResults
+                .sorted { $0.1 > $1.1 }
+                .prefix(limit)
+                .map { $0.0 })
         }
         
         // Fuzzy matching for partial matches - improved algorithm
         for (name, bundleIds) in appsByName {
-            let score = calculateMatchScore(query: queryLower, text: name)
+            let matchScore = calculateMatchScore(query: queryLower, text: name)
             
             // Only include results with meaningful scores
-            if score > 0.1 {
+            if matchScore > 0.1 {
                 for bundleId in bundleIds where !processedBundleIds.contains(bundleId) {
                     if let app = apps[bundleId] {
-                        scoredResults.append((app, score))
+                        let usageScore = usageScores[bundleId] ?? 0.0
+                        // Combine match score with usage score (70% match, 30% usage)
+                        let combinedScore = (matchScore * 0.7) + (min(usageScore / 100.0, 1.0) * 0.3)
+                        scoredResults.append((app, combinedScore))
                         processedBundleIds.insert(bundleId)
                         
                         if scoredResults.count >= limit * 3 { // Get more for better sorting
@@ -82,7 +95,7 @@ class AppSearchManager: ObservableObject {
             }
         }
         
-        // Sort by relevance score and return top results
+        // Sort by combined score (match + usage) and return top results
         return scoredResults
             .sorted { $0.1 > $1.1 || ($0.1 == $1.1 && $0.0.displayName.localizedCaseInsensitiveCompare($1.0.displayName) == .orderedAscending) }
             .prefix(limit)
