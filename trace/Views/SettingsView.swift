@@ -76,13 +76,6 @@ struct SettingsView: View {
                     Text("About")
                 }
                 .tag(4)
-            
-            DebugSettingsView()
-                .tabItem {
-                    Image(systemName: "wrench.and.screwdriver")
-                    Text("Debug")
-                }
-                .tag(5)
         }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
         .onAppear {
@@ -186,12 +179,14 @@ struct GeneralSettingsView: View {
     @Binding var launchAtLogin: Bool
     @Binding var currentKeyCombo: String
     @Binding var isRecording: Bool
+    @AppStorage("resultsLayout") private var resultsLayout: ResultsLayout = .compact
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
     
     var body: some View {
         Form {
+            // Startup section
             Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -212,36 +207,71 @@ struct GeneralSettingsView: View {
                         }
                 }
                 .padding(.vertical, 4)
-                
+            } header: {
+                Text("Startup")
+            }
+            
+            // Hotkey section
+            Section {
+                VStack(spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Quick Launch")
+                                .font(.system(size: 13))
+                            Text("Keyboard shortcut to open Trace")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        HotkeyRecorderView(
+                            keyCombo: $currentKeyCombo,
+                            isRecording: $isRecording,
+                            onRecord: onHotkeyRecord
+                        )
+                    }
+                    .padding(.vertical, 4)
+                    
+                    if currentKeyCombo != "⌥Space" {
+                        HStack {
+                            Spacer()
+                            Button("Reset to Default") {
+                                onHotkeyReset()
+                            }
+                            .buttonStyle(.link)
+                            .font(.system(size: 11))
+                        }
+                    }
+                }
+            } header: {
+                Text("Hotkey")
+            }
+            
+            // Interface section
+            Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Quick Launch")
+                        Text("Results Layout")
                             .font(.system(size: 13))
-                        Text("Keyboard shortcut to open Trace")
+                        Text("Choose how search results are displayed")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
                     
                     Spacer()
                     
-                    HotkeyRecorderView(
-                        keyCombo: $currentKeyCombo,
-                        isRecording: $isRecording,
-                        onRecord: onHotkeyRecord
-                    )
+                    Picker("", selection: $resultsLayout) {
+                        ForEach(ResultsLayout.allCases, id: \.self) { layout in
+                            Text(layout.displayName).tag(layout)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 100)
                 }
                 .padding(.vertical, 4)
-                
-                if currentKeyCombo != "⌥Space" {
-                    HStack {
-                        Spacer()
-                        Button("Reset to Default") {
-                            onHotkeyReset()
-                        }
-                        .buttonStyle(.link)
-                        .font(.system(size: 11))
-                    }
-                }
+            } header: {
+                Text("Interface")
             }
         }
         .formStyle(.grouped)
@@ -250,12 +280,18 @@ struct GeneralSettingsView: View {
 }
 
 struct AboutSettingsView: View {
+    @State private var dataPath: String = ""
+    @State private var fileSize: String = "Unknown"
+    @State private var entryCount: Int = 0
+    @State private var showingClearConfirmation = false
+    @State private var showingClearedAlert = false
+    
     var body: some View {
         Form {
             Section {
-                VStack(spacing: 20) {
+                VStack(spacing: 6) {
                     // App Icon and Info
-                    VStack(spacing: 16) {
+                    VStack(spacing: 6) {
                         if let appIcon = NSApp.applicationIconImage {
                             Image(nsImage: appIcon)
                                 .resizable()
@@ -283,7 +319,7 @@ struct AboutSettingsView: View {
                     }
                     
                     // Developer Info and Links
-                    VStack(spacing: 16) {
+                    VStack(spacing: 8) {
                         Text("Created by Arjun Komath & Claude")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
@@ -302,11 +338,172 @@ struct AboutSettingsView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 30)
+                .padding(.vertical, 16)
+            }
+            
+            // Data Storage Section
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Storage Path
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Data Location")
+                                .font(.system(size: 13, weight: .medium))
+                            Text(dataPath)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: openDataFolder) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "folder")
+                                Text("Open")
+                            }
+                            .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    
+                    Divider()
+                    
+                    // Usage Statistics
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Usage Data")
+                                .font(.system(size: 13, weight: .medium))
+                            HStack(spacing: 16) {
+                                Label("\(entryCount) entries", systemImage: "list.bullet")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                Label(fileSize, systemImage: "doc")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: { showingClearConfirmation = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("Clear")
+                            }
+                            .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                        .foregroundColor(.red)
+                    }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Local Storage")
+                    .font(.system(size: 11, weight: .medium))
+                    .textCase(.uppercase)
+            }
+            
+            // App Cache Section
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Application Cache")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Discovered apps and icons")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: refreshAppCache) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Refresh")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Cache")
+                    .font(.system(size: 11, weight: .medium))
+                    .textCase(.uppercase)
             }
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
+        .onAppear {
+            loadDebugInfo()
+        }
+        .confirmationDialog("Clear Usage Data", isPresented: $showingClearConfirmation) {
+            Button("Clear All Data", role: .destructive) {
+                clearUsageData()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete all usage tracking data. This action cannot be undone.")
+        }
+        .alert("Data Cleared", isPresented: $showingClearedAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Usage data has been cleared successfully.")
+        }
+    }
+    
+    private func loadDebugInfo() {
+        // Get data path
+        let fileManager = FileManager.default
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
+            dataPath = traceDirectory.path
+            
+            // Check usage database
+            let dbPath = traceDirectory.appendingPathComponent("usage.sqlite")
+            if fileManager.fileExists(atPath: dbPath.path) {
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: dbPath.path)
+                    if let size = attributes[.size] as? Int64 {
+                        fileSize = ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+                    }
+                } catch {
+                    fileSize = "Error reading file"
+                }
+                
+                // Get entry count
+                entryCount = UsageTracker.shared.getAllUsageScores().count
+            } else {
+                fileSize = "0 bytes"
+                entryCount = 0
+            }
+        }
+    }
+    
+    private func clearUsageData() {
+        UsageTracker.shared.clearUsageData()
+        loadDebugInfo()
+        showingClearedAlert = true
+    }
+    
+    private func refreshAppCache() {
+        // Trigger app cache refresh by accessing the singleton
+        // The singleton will automatically reload apps when needed
+        _ = AppSearchManager.shared
+    }
+    
+    private func openDataFolder() {
+        let fileManager = FileManager.default
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
+            
+            // Create directory if it doesn't exist
+            if !fileManager.fileExists(atPath: traceDirectory.path) {
+                try? fileManager.createDirectory(at: traceDirectory, withIntermediateDirectories: true)
+            }
+            
+            NSWorkspace.shared.open(traceDirectory)
+        }
     }
 }
 
@@ -380,20 +577,50 @@ struct PermissionsSettingsView: View {
     @State private var accessibilityEnabled = false
     @State private var notificationEnabled = false
     @State private var checkingPermissions = false
+    @State private var refreshingAccessibility = false
     
     var body: some View {
         Form {
             Section {
                 // Accessibility Permission
-                PermissionRow(
-                    title: "Accessibility Access",
-                    subtitle: "Required for window management and global hotkeys",
-                    icon: "accessibility",
-                    status: accessibilityEnabled ? .granted : .denied,
-                    action: {
-                        openAccessibilitySettings()
+                VStack(spacing: 8) {
+                    PermissionRow(
+                        title: "Accessibility Access",
+                        subtitle: "Required for window management and global hotkeys",
+                        icon: "accessibility",
+                        status: accessibilityEnabled ? .granted : .denied,
+                        action: {
+                            openAccessibilitySettings()
+                        }
+                    )
+                    
+                    // Add refresh button for accessibility issues in release builds
+                    if !accessibilityEnabled && !checkingPermissions {
+                        HStack {
+                            Button(action: {
+                                refreshingAccessibility = true
+                                checkAccessibilityPermissions()
+                            }) {
+                                HStack(spacing: 4) {
+                                    if refreshingAccessibility {
+                                        ProgressView()
+                                            .scaleEffect(0.6)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 10))
+                                    }
+                                    Text("Refresh Permissions")
+                                }
+                            }
+                            .font(.system(size: 11))
+                            .buttonStyle(.link)
+                            .disabled(refreshingAccessibility)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal)
                     }
-                )
+                }
                 
                 // Notification Permission
                 PermissionRow(
@@ -449,8 +676,8 @@ struct PermissionsSettingsView: View {
     private func checkPermissions() {
         checkingPermissions = true
         
-        // Check accessibility permissions
-        accessibilityEnabled = AXIsProcessTrusted()
+        // Check accessibility permissions with retry mechanism for release builds
+        checkAccessibilityPermissions()
         
         // Check notification permissions
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -458,6 +685,58 @@ struct PermissionsSettingsView: View {
                 self.notificationEnabled = settings.authorizationStatus == .authorized
                 self.checkingPermissions = false
             }
+        }
+    }
+    
+    private func checkAccessibilityPermissions() {
+        // Initial check
+        let isGranted = AXIsProcessTrusted()
+        accessibilityEnabled = isGranted
+        
+        // If false, try again with multiple attempts (helps with release builds)
+        if !isGranted {
+            // Try to perform an actual accessibility operation to trigger proper permission check
+            let frontmostApp = NSWorkspace.shared.frontmostApplication
+            let pid = frontmostApp?.processIdentifier ?? 0
+            
+            if pid > 0 {
+                let appRef = AXUIElementCreateApplication(pid)
+                var value: CFTypeRef?
+                let result = AXUIElementCopyAttributeValue(appRef, kAXTitleAttribute as CFString, &value)
+                
+                // If we can access the title, permissions are actually granted
+                if result == .success {
+                    accessibilityEnabled = true
+                    refreshingAccessibility = false
+                    return
+                }
+            }
+            
+            // Fallback: multiple checks with delays
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.accessibilityEnabled = AXIsProcessTrusted()
+                
+                if !self.accessibilityEnabled {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.accessibilityEnabled = AXIsProcessTrusted()
+                        
+                        // Final attempt after 1 second
+                        if !self.accessibilityEnabled {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                self.accessibilityEnabled = AXIsProcessTrusted()
+                                self.refreshingAccessibility = false
+                            }
+                        } else {
+                            self.refreshingAccessibility = false
+                        }
+                    }
+                } else {
+                    self.refreshingAccessibility = false
+                }
+            }
+        } else {
+            // Permissions are granted, reset refreshing state
+            refreshingAccessibility = false
         }
     }
     
@@ -550,182 +829,6 @@ struct PermissionRow: View {
     }
 }
 
-struct DebugSettingsView: View {
-    @State private var dataPath: String = ""
-    @State private var fileSize: String = "Unknown"
-    @State private var entryCount: Int = 0
-    @State private var showingClearConfirmation = false
-    @State private var showingClearedAlert = false
-    
-    var body: some View {
-        Form {
-                // Data Storage Section
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Storage Path
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Data Location")
-                                    .font(.system(size: 13, weight: .medium))
-                                Text(dataPath)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                    .textSelection(.enabled)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: openDataFolder) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "folder")
-                                    Text("Open")
-                                }
-                                .font(.system(size: 11))
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        
-                        Divider()
-                        
-                        // Usage Statistics
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Usage Data")
-                                    .font(.system(size: 13, weight: .medium))
-                                HStack(spacing: 16) {
-                                    Label("\(entryCount) entries", systemImage: "list.bullet")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                    Label(fileSize, systemImage: "doc")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: { showingClearConfirmation = true }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "trash")
-                                    Text("Clear")
-                                }
-                                .font(.system(size: 11))
-                            }
-                            .buttonStyle(.bordered)
-                            .foregroundColor(.red)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    Text("Local Storage")
-                        .font(.system(size: 11, weight: .medium))
-                        .textCase(.uppercase)
-                }
-                
-                // App Cache Section
-                Section {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Application Cache")
-                                .font(.system(size: 13, weight: .medium))
-                            Text("Discovered apps and icons")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: refreshAppCache) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Refresh")
-                            }
-                            .font(.system(size: 11))
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    Text("Cache")
-                        .font(.system(size: 11, weight: .medium))
-                        .textCase(.uppercase)
-                }
-            }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
-        .onAppear {
-            loadDebugInfo()
-        }
-        .confirmationDialog("Clear Usage Data", isPresented: $showingClearConfirmation) {
-            Button("Clear All Data", role: .destructive) {
-                clearUsageData()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will permanently delete all usage history. Your frequently used apps will no longer be prioritized in search results.")
-        }
-        .alert("Data Cleared", isPresented: $showingClearedAlert) {
-            Button("OK") {}
-        } message: {
-            Text("Usage data has been cleared successfully.")
-        }
-    }
-    
-    private func loadDebugInfo() {
-        // Get data path
-        let fileManager = FileManager.default
-        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
-            dataPath = traceDirectory.path
-            
-            // Get file size and entry count
-            let dataFileURL = traceDirectory.appendingPathComponent("usage_data.json")
-            if fileManager.fileExists(atPath: dataFileURL.path) {
-                do {
-                    let attributes = try fileManager.attributesOfItem(atPath: dataFileURL.path)
-                    if let fileSize = attributes[.size] as? Int64 {
-                        self.fileSize = formatFileSize(fileSize)
-                    }
-                    
-                    // Load entry count
-                    if let data = try? Data(contentsOf: dataFileURL),
-                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        entryCount = json.count
-                    }
-                } catch {
-                    fileSize = "Error reading file"
-                }
-            } else {
-                fileSize = "No data file"
-            }
-        }
-    }
-    
-    private func formatFileSize(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
-    }
-    
-    private func openDataFolder() {
-        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
-            NSWorkspace.shared.open(traceDirectory)
-        }
-    }
-    
-    private func clearUsageData() {
-        UsageTracker.shared.clearUsageData()
-        loadDebugInfo()
-        showingClearedAlert = true
-    }
-    
-    private func refreshAppCache() {
-        // Trigger app cache refresh
-        _ = AppSearchManager.shared
-        // The singleton will automatically reload apps
-    }
-}
 
 struct AppHotkeysSettingsView: View {
     @State private var searchQuery = ""

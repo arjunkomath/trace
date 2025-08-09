@@ -8,6 +8,29 @@
 import SwiftUI
 import Foundation
 
+enum ResultsLayout: String, CaseIterable {
+    case compact = "compact"
+    case normal = "normal"
+    
+    var displayName: String {
+        switch self {
+        case .compact:
+            return "Compact"
+        case .normal:
+            return "Normal"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .compact:
+            return "Single line layout with more results visible"
+        case .normal:
+            return "Two line layout with subtitles below titles"
+        }
+    }
+}
+
 enum SearchResultType {
     case application
     case command
@@ -95,7 +118,7 @@ struct SearchCategory {
 
 // MARK: - Application Model
 
-struct Application: Identifiable, Hashable, Sendable {
+struct Application: Identifiable, Hashable {
     let id: String // bundle identifier
     let name: String
     let displayName: String

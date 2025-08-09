@@ -11,6 +11,7 @@ import ApplicationServices
 
 class LauncherWindow: NSPanel {
     private var hostingView: NSHostingView<LauncherView>?
+    private var preventAutoClose = false
     
     init() {
         super.init(
@@ -61,10 +62,11 @@ class LauncherWindow: NSPanel {
     override var canBecomeMain: Bool { true }
     
     override func resignKey() {
-        // Close panel when it loses key status for launcher behavior
+        // Close panel when it loses key status for launcher behavior, unless we're showing a dialog
         super.resignKey()
         DispatchQueue.main.async { [weak self] in
-            self?.hide()
+            guard let self = self, !self.preventAutoClose else { return }
+            self.hide()
         }
     }
     
@@ -99,7 +101,12 @@ class LauncherWindow: NSPanel {
     }
     
     func hide() {
+        preventAutoClose = false // Reset flag when hiding
         orderOut(nil)
+    }
+    
+    func setPreventAutoClose(_ prevent: Bool) {
+        preventAutoClose = prevent
     }
     
     private func centerOnScreen() {
@@ -109,7 +116,7 @@ class LauncherWindow: NSPanel {
         let windowFrame = frame
         
         let x = screenFrame.midX - windowFrame.width / 2
-        let y = screenFrame.midY - windowFrame.height / 2 + 200 // Position higher for better visual balance with results
+        let y = screenFrame.midY - windowFrame.height / 2 + 300 // Position even higher for better accessibility
         
         setFrameOrigin(NSPoint(x: x, y: y))
     }

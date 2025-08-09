@@ -14,7 +14,7 @@ struct LauncherView: View {
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @FocusState private var isSearchFocused: Bool
-    @State private var showQuitConfirmation = false
+    @AppStorage("resultsLayout") private var resultsLayout: ResultsLayout = .compact
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var windowManager = WindowManager.shared
@@ -63,17 +63,45 @@ struct LauncherView: View {
                     Divider()
                         .opacity(0.2)
                     
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(Array(results.enumerated()), id: \.offset) { index, result in
-                                ResultRowView(
-                                    result: result,
-                                    isSelected: index == selectedIndex
-                                )
-                                .onTapGesture {
-                                    selectedIndex = index
-                                    executeSelectedResult()
+                    // Results header
+                    HStack {
+                        Text("Results")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                        Spacer()
+                    }
+                    .background(Color.primary.opacity(0.02))
+                    
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(Array(results.enumerated()), id: \.offset) { index, result in
+                                    Group {
+                                        if resultsLayout == .compact {
+                                            CompactResultRowView(
+                                                result: result,
+                                                isSelected: index == selectedIndex
+                                            )
+                                        } else {
+                                            ResultRowView(
+                                                result: result,
+                                                isSelected: index == selectedIndex
+                                            )
+                                        }
+                                    }
+                                    .id(index)
+                                    .onTapGesture {
+                                        selectedIndex = index
+                                        executeSelectedResult()
+                                    }
                                 }
+                            }
+                        }
+                        .onChange(of: selectedIndex) { _, newIndex in
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo(newIndex, anchor: .center)
                             }
                         }
                     }
@@ -135,16 +163,6 @@ struct LauncherView: View {
                 selectedIndex += 1
             }
             return .handled
-        }
-        .alert("Quit Trace?", isPresented: $showQuitConfirmation) {
-            Button("Quit", role: .destructive) {
-                NSApp.terminate(nil)
-            }
-            Button("Cancel", role: .cancel) {
-                // User cancelled, do nothing
-            }
-        } message: {
-            Text("Are you sure you want to quit Trace? This will close the application.")
         }
     }
     
@@ -245,7 +263,12 @@ struct LauncherView: View {
                 lastUsed: nil,
                 commandId: quitId,
                 action: {
-                    showQuitConfirmation = true
+                    // Close launcher first, then let AppDelegate handle the quit confirmation
+                    searchText = ""
+                    selectedIndex = 0
+                    onClose()
+                    // Just call terminate directly - AppDelegate will show the confirmation
+                    NSApp.terminate(nil)
                 }
             ), combinedScore))
         }
@@ -308,24 +331,59 @@ struct LauncherView: View {
         
         var finalResults = Array(sortedResults)
         
-        // Always add Google search as last option
-        let googleSearchResult = SearchResult(
-            title: "Search Google for '\(searchText)'",
-            subtitle: "Open in browser",
-            icon: .system("globe"),
-            type: .suggestion,
-            category: "Web",
-            shortcut: nil,
-            lastUsed: nil,
-            commandId: "com.trace.search.google",
-            action: {
-                if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                   let url = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
-                    NSWorkspace.shared.open(url)
+        // Add search engine options
+        let searchEngines = [
+            SearchResult(
+                title: "Search Google for '\(searchText)'",
+                subtitle: "Open in browser",
+                icon: .system("globe"),
+                type: .suggestion,
+                category: "Web",
+                shortcut: nil,
+                lastUsed: nil,
+                commandId: "com.trace.search.google",
+                action: {
+                    if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                       let url = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
+                        NSWorkspace.shared.open(url)
+                    }
                 }
-            }
-        )
-        finalResults.append(googleSearchResult)
+            ),
+            SearchResult(
+                title: "Search DuckDuckGo for '\(searchText)'",
+                subtitle: "Privacy-focused search",
+                icon: .system("shield"),
+                type: .suggestion,
+                category: "Web",
+                shortcut: nil,
+                lastUsed: nil,
+                commandId: "com.trace.search.duckduckgo",
+                action: {
+                    if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                       let url = URL(string: "https://duckduckgo.com/?q=\(encodedQuery)") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            ),
+            SearchResult(
+                title: "Search Perplexity for '\(searchText)'",
+                subtitle: "AI-powered search",
+                icon: .system("brain.head.profile"),
+                type: .suggestion,
+                category: "Web",
+                shortcut: nil,
+                lastUsed: nil,
+                commandId: "com.trace.search.perplexity",
+                action: {
+                    if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                       let url = URL(string: "https://www.perplexity.ai/search?q=\(encodedQuery)") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            )
+        ]
+        
+        finalResults.append(contentsOf: searchEngines)
         
         return finalResults
     }
@@ -347,10 +405,18 @@ struct LauncherView: View {
             let commandId = result.commandId ?? getCommandIdentifier(for: result.title)
             UsageTracker.shared.recordUsage(for: commandId, type: .command)
         case .suggestion:
-            UsageTracker.shared.recordUsage(for: "com.trace.search.google", type: .webSearch)
+            let commandId = result.commandId ?? "com.trace.search.unknown"
+            UsageTracker.shared.recordUsage(for: commandId, type: .webSearch)
         case .file, .person, .recent:
             // These types aren't implemented yet, so no tracking for now
             break
+        }
+        
+        // Special handling for quit command - let the action handle everything
+        if result.title == "Quit Trace" {
+            result.action()
+            // Don't call onClose() here - action already handles it
+            return
         }
         
         result.action()
@@ -528,6 +594,7 @@ struct LauncherView: View {
         case .centerProminently: return "viewfinder"
         }
     }
+    
 }
 
 // MARK: - Result Row
@@ -587,6 +654,83 @@ struct ResultRowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .background(
+            isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : Color.clear
+        )
+    }
+}
+
+// MARK: - Compact Result Row
+
+struct CompactResultRowView: View {
+    let result: SearchResult
+    let isSelected: Bool
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Icon
+            Group {
+                switch result.icon {
+                case .system(let name):
+                    Image(systemName: name)
+                        .font(.system(size: 18))
+                case .emoji(let emoji):
+                    Text(emoji)
+                        .font(.system(size: 20))
+                case .image(let image):
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                case .app(let bundleIdentifier):
+                    AppIconView(bundleIdentifier: bundleIdentifier)
+                        .frame(width: 20, height: 20)
+                }
+            }
+            .foregroundColor(isSelected ? .white : .secondary)
+            .frame(width: 24, height: 24)
+            
+            // Title
+            Text(result.title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(isSelected ? .white : .primary)
+                .lineLimit(1)
+            
+            // Subtitle (inline)
+            if let subtitle = result.subtitle {
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            // Category badge (like Pro, Command, etc.)
+            if let category = result.category, category != "Web" {
+                Text(category)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.2))
+                    )
+            }
+            
+            // Result type
+            Text(result.type.displayName)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+            
+            // Shortcut
+            if let shortcut = result.shortcut {
+                KeyBindingView(shortcut: shortcut, isSelected: isSelected, size: .small)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8) // Reduced from 12 to make it more compact
         .background(
             isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : Color.clear
         )
