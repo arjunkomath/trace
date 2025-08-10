@@ -383,30 +383,6 @@ struct LauncherView: View {
             systemCommands.append((settingsResult, settingsScore))
         }
         
-        // Check for Updates command
-        let updateMatchScore = matchesSearchTerms(query: searchLower, terms: [
-            "check for updates", "updates", "update", "upgrade", "version", "new version", 
-            "check update", "software update", "app update"
-        ])
-        let updateId = "com.trace.command.checkForUpdates"
-        let updateUsageScore = usageScores[updateId] ?? 0.0
-        let (includeUpdate, updateScore) = shouldIncludeCommand(matchScore: updateMatchScore, usageScore: updateUsageScore)
-        
-        if includeUpdate {
-            let updateResult = createSystemCommand(
-                commandId: updateId,
-                title: "Check for Updates",
-                subtitle: "Check for new version of Trace",
-                icon: "arrow.down.circle",
-                shortcut: nil,
-                action: createStandardAction(commandId: updateId) {
-                    if let appDelegate = NSApp.delegate as? AppDelegate {
-                        appDelegate.checkForUpdates()
-                    }
-                }
-            )
-            systemCommands.append((updateResult, updateScore))
-        }
         
         // Quit command
         let quitMatchScore = matchesSearchTerms(query: searchLower, terms: [

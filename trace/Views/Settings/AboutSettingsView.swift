@@ -41,16 +41,6 @@ struct AboutSettingsView: View {
                         }
                     }
                     
-                    // Check for Updates Button
-                    Button(action: checkForUpdates) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.down.circle")
-                            Text("Check for Updates")
-                        }
-                        .font(.system(size: 12))
-                    }
-                    .buttonStyle(.bordered)
-                    .padding(.top, 4)
                     
                     // Developer Info and Links
                     VStack(spacing: 8) {
@@ -170,9 +160,4 @@ struct AboutSettingsView: View {
         }
     }
     
-    private func checkForUpdates() {
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            appDelegate.checkForUpdates()
-        }
-    }
 }

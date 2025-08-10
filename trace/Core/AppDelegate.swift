@@ -39,6 +39,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalEventMonitor: Any?
     private var skipQuitConfirmation = false
     private var statusItem: NSStatusItem?
+    private var onboardingWindow: OnboardingWindow?
     private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -65,6 +66,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize app hotkey manager to register saved app hotkeys
         _ = AppHotkeyManager.shared
         
+        // Show onboarding if first time user
+        if !settingsService.hasCompletedOnboarding {
+            showOnboarding()
+        }
+        
         // Observe changes to settings file
         NotificationCenter.default.addObserver(
             self,
@@ -77,6 +83,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     deinit {
         hotkeyManager?.unregisterHotkey()
         stopGlobalEventMonitoring()
+        onboardingWindow?.hide()
+        onboardingWindow = nil
         NotificationCenter.default.removeObserver(self)
         logger.debug("AppDelegate deinitialized")
     }
@@ -131,6 +139,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
+        
+        // Check for Updates - Connect directly to Sparkle as per documentation
+        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = updaterController
+        menu.addItem(updateItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -345,6 +358,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return response == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
     
+    // MARK: - Onboarding
+    
+    private func showOnboarding() {
+        onboardingWindow = OnboardingWindow { [weak self] in
+            self?.completeOnboarding()
+        }
+        onboardingWindow?.show()
+        logger.info("✅ Onboarding window shown for first-time user")
+    }
+    
+    private func completeOnboarding() {
+        settingsService.hasCompletedOnboarding = true
+        onboardingWindow?.hide()
+        onboardingWindow = nil
+        logger.info("✅ Onboarding completed")
+        
+        // Optionally show the launcher after onboarding
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.showLauncher()
+        }
+    }
+    
     // MARK: - Public API
     
     func updateHotkey(keyCode: UInt32, modifiers: UInt32) throws {
@@ -364,7 +399,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
     
-    func checkForUpdates() {
-        updaterController.checkForUpdates(nil)
-    }
 }
