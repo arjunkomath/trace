@@ -25,7 +25,7 @@ struct AboutSettingsView: View {
                                 .resizable()
                                 .frame(width: 64, height: 64)
                         } else {
-                            Image(systemName: "magnifyingglass.circle.fill")
+                            Image(systemName: "filemenu.and.selection")
                                 .font(.system(size: 64))
                                 .foregroundStyle(.blue.gradient)
                         }

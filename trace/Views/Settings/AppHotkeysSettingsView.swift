@@ -37,7 +37,7 @@ struct AppHotkeysSettingsView: View {
             Section {
                 // Search Field
                 HStack {
-                    Image(systemName: "magnifyingglass")
+                    Image(systemName: "filemenu.and.selection")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                     

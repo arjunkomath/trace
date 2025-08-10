@@ -25,7 +25,7 @@ struct LauncherView: View {
         VStack(spacing: 0) {
             // Search Input - Fixed height section
             HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
+                Image(systemName: "filemenu.and.selection")
                     .font(.system(size: 16))
                     .foregroundColor(.secondary.opacity(0.6))
                 

@@ -83,7 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Trace")
+            button.image = NSImage(systemSymbolName: "filemenu.and.selection", accessibilityDescription: "Trace")
             button.image?.size = NSSize(width: 18, height: 18)
             button.image?.isTemplate = true
             button.toolTip = "Trace - Click to open launcher"
