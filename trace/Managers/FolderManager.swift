@@ -11,8 +11,7 @@ import os
 
 class FolderManager: ObservableObject {
     private let logger = Logger(subsystem: "com.trace.app", category: "FolderManager")
-    private let customFoldersKey = "com.trace.customFolders"
-    private let folderHotkeysKey = "com.trace.folderHotkeys"
+    private let settingsManager = SettingsManager.shared
     
     @Published var customFolders: [FolderShortcut] = []
     @Published var allFolders: [FolderShortcut] = []
@@ -24,20 +23,22 @@ class FolderManager: ObservableObject {
     // MARK: - Public Methods
     
     func loadFolders() {
-        // Load custom folders from UserDefaults
-        if let data = UserDefaults.standard.data(forKey: customFoldersKey),
-           let decoded = try? JSONDecoder().decode([FolderShortcut].self, from: data) {
-            customFolders = decoded
+        // Load custom folders from settings
+        customFolders = settingsManager.settings.customFolders.map { folderData in
+            FolderShortcut(
+                id: folderData.id,
+                name: folderData.name,
+                path: folderData.path,
+                isDefault: folderData.isDefault,
+                hotkey: settingsManager.getFolderHotkey(for: folderData.id)
+            )
         }
         
-        // Load hotkeys for default folders
+        // Load default folders with hotkeys from settings
         var defaultFoldersWithHotkeys = FolderShortcut.defaultFolders
-        if let hotkeyData = UserDefaults.standard.data(forKey: folderHotkeysKey),
-           let hotkeys = try? JSONDecoder().decode([String: String].self, from: hotkeyData) {
-            for i in 0..<defaultFoldersWithHotkeys.count {
-                if let hotkey = hotkeys[defaultFoldersWithHotkeys[i].id] {
-                    defaultFoldersWithHotkeys[i].hotkey = hotkey
-                }
+        for i in 0..<defaultFoldersWithHotkeys.count {
+            if let hotkey = settingsManager.getFolderHotkey(for: defaultFoldersWithHotkeys[i].id) {
+                defaultFoldersWithHotkeys[i].hotkey = hotkey
             }
         }
         
@@ -46,18 +47,22 @@ class FolderManager: ObservableObject {
     }
     
     func saveFolders() {
-        // Save custom folders
-        if let encoded = try? JSONEncoder().encode(customFolders) {
-            UserDefaults.standard.set(encoded, forKey: customFoldersKey)
+        // Save custom folders to settings
+        let customFolderData = customFolders.map { folder in
+            TraceSettings.CustomFolderData(
+                id: folder.id,
+                name: folder.name,
+                path: folder.path,
+                isDefault: folder.isDefault
+            )
         }
         
-        // Save hotkeys for default folders
-        var hotkeys: [String: String] = [:]
-        for folder in allFolders where folder.isDefault && folder.hotkey != nil {
-            hotkeys[folder.id] = folder.hotkey
-        }
-        if let encoded = try? JSONEncoder().encode(hotkeys) {
-            UserDefaults.standard.set(encoded, forKey: folderHotkeysKey)
+        // Clear existing custom folders and add new ones
+        settingsManager.settings.customFolders = customFolderData
+        
+        // Save folder hotkeys to settings
+        for folder in allFolders where folder.hotkey != nil {
+            settingsManager.updateFolderHotkey(for: folder.id, hotkey: folder.hotkey)
         }
         
         // Reload to update allFolders
@@ -66,7 +71,19 @@ class FolderManager: ObservableObject {
     
     func addCustomFolder(_ folder: FolderShortcut) {
         customFolders.append(folder)
-        saveFolders()
+        let folderData = TraceSettings.CustomFolderData(
+            id: folder.id,
+            name: folder.name,
+            path: folder.path,
+            isDefault: folder.isDefault
+        )
+        settingsManager.addCustomFolder(folderData)
+        
+        if let hotkey = folder.hotkey {
+            settingsManager.updateFolderHotkey(for: folder.id, hotkey: hotkey)
+        }
+        
+        loadFolders() // Reload instead of saveFolders to avoid double-save
     }
     
     func updateFolder(_ folder: FolderShortcut) {
@@ -75,19 +92,33 @@ class FolderManager: ObservableObject {
             if let index = allFolders.firstIndex(where: { $0.id == folder.id }) {
                 allFolders[index].hotkey = folder.hotkey
             }
+            settingsManager.updateFolderHotkey(for: folder.id, hotkey: folder.hotkey)
         } else {
             // Update custom folder
             if let index = customFolders.firstIndex(where: { $0.id == folder.id }) {
                 customFolders[index] = folder
             }
+            let folderData = TraceSettings.CustomFolderData(
+                id: folder.id,
+                name: folder.name,
+                path: folder.path,
+                isDefault: folder.isDefault
+            )
+            settingsManager.updateCustomFolder(folderData)
+            
+            if let hotkey = folder.hotkey {
+                settingsManager.updateFolderHotkey(for: folder.id, hotkey: hotkey)
+            }
         }
-        saveFolders()
+        loadFolders()
     }
     
     func removeCustomFolder(_ folder: FolderShortcut) {
         guard !folder.isDefault else { return }
         customFolders.removeAll { $0.id == folder.id }
-        saveFolders()
+        settingsManager.removeCustomFolder(withId: folder.id)
+        settingsManager.updateFolderHotkey(for: folder.id, hotkey: nil) // Remove hotkey
+        loadFolders()
     }
     
     func openFolder(_ folder: FolderShortcut) {
@@ -141,23 +172,19 @@ class FolderManager: ObservableObject {
     }
     
     func getHotkey(for folderId: String) -> String? {
-        return allFolders.first { $0.id == folderId }?.hotkey
+        return settingsManager.getFolderHotkey(for: folderId)
     }
     
     func setHotkey(_ hotkey: String?, for folderId: String) {
+        settingsManager.updateFolderHotkey(for: folderId, hotkey: hotkey)
+        
+        // Update local state
         if let index = allFolders.firstIndex(where: { $0.id == folderId }) {
             allFolders[index].hotkey = hotkey
-            
-            if allFolders[index].isDefault {
-                // Save default folder hotkey
-                saveFolders()
-            } else {
-                // Update custom folder
-                if let customIndex = customFolders.firstIndex(where: { $0.id == folderId }) {
-                    customFolders[customIndex].hotkey = hotkey
-                    saveFolders()
-                }
-            }
+        }
+        
+        if let customIndex = customFolders.firstIndex(where: { $0.id == folderId }) {
+            customFolders[customIndex].hotkey = hotkey
         }
     }
     

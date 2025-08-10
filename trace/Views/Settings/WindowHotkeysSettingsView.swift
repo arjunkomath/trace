@@ -183,26 +183,19 @@ struct WindowCommandRow: View {
     }
     
     private func loadHotkey() {
-        assignedHotkey = UserDefaults.standard.string(forKey: "window_\(position.rawValue)_hotkey") ?? ""
+        assignedHotkey = WindowHotkeyManager.shared.getHotkey(for: position) ?? ""
     }
     
     private func saveHotkey(_ hotkey: String, keyCode: UInt32, modifiers: UInt32) {
         print("🔧 saveHotkey called for \(position.rawValue): '\(hotkey)', keyCode: \(keyCode), modifiers: \(modifiers)")
         
+        // Use WindowHotkeyManager which now saves to SettingsManager
+        WindowHotkeyManager.shared.updateHotkey(for: position, keyCombo: hotkey.isEmpty ? nil : hotkey, keyCode: keyCode, modifiers: modifiers)
+        
         if hotkey.isEmpty {
-            UserDefaults.standard.removeObject(forKey: "window_\(position.rawValue)_hotkey")
-            UserDefaults.standard.removeObject(forKey: "window_\(position.rawValue)_keycode")
-            UserDefaults.standard.removeObject(forKey: "window_\(position.rawValue)_modifiers")
             print("🗑️ Cleared hotkey for \(position.rawValue)")
-            // Update the hotkey manager
-            WindowHotkeyManager.shared.updateHotkey(for: position, keyCombo: nil, keyCode: 0, modifiers: 0)
         } else {
-            UserDefaults.standard.set(hotkey, forKey: "window_\(position.rawValue)_hotkey")
-            UserDefaults.standard.set(Int(keyCode), forKey: "window_\(position.rawValue)_keycode")
-            UserDefaults.standard.set(Int(modifiers), forKey: "window_\(position.rawValue)_modifiers")
             print("💾 Saved hotkey for \(position.rawValue): keyCode=\(keyCode), modifiers=\(modifiers)")
-            // Update the hotkey manager
-            WindowHotkeyManager.shared.updateHotkey(for: position, keyCombo: hotkey, keyCode: keyCode, modifiers: modifiers)
         }
     }
     

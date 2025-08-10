@@ -31,18 +31,22 @@ extension NSEvent.ModifierFlags {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = AppLogger.appDelegate
     private let settingsService = SettingsService()
+    private let settingsManager = SettingsManager.shared
     
     private var launcherWindow: LauncherWindow?
     private var hotkeyManager: HotkeyManager?
     private var globalEventMonitor: Any?
     private var skipQuitConfirmation = false
     private var statusItem: NSStatusItem?
-    @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure the app is truly a background app without dock icon
         NSApp.setActivationPolicy(.accessory)
         logger.info("✅ Set app activation policy to .accessory (background app)")
+        
+        // Migrate from UserDefaults if needed
+        settingsManager.migrateFromUserDefaults()
+        logger.info("✅ Settings migration completed")
         
         // Initialize unified hotkey registry first
         _ = HotkeyRegistry.shared
@@ -59,11 +63,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize app hotkey manager to register saved app hotkeys
         _ = AppHotkeyManager.shared
         
-        // Observe changes to menu bar preference
+        // Observe changes to settings file
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(menuBarPreferenceChanged),
-            name: UserDefaults.didChangeNotification,
+            selector: #selector(settingsChanged),
+            name: .NSManagedObjectContextDidSave,
             object: nil
         )
     }
@@ -78,7 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Menu Bar Setup
     
     private func setupMenuBar() {
-        guard showMenuBarIcon else { return }
+        guard settingsManager.settings.showMenuBarIcon else { return }
         
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
@@ -147,8 +151,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    @objc private func menuBarPreferenceChanged() {
-        if showMenuBarIcon {
+    @objc private func settingsChanged() {
+        // Check if menu bar preference changed
+        if settingsManager.settings.showMenuBarIcon {
             if statusItem == nil {
                 setupMenuBar()
             } else {
@@ -216,13 +221,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.toggleLauncher()
         }
         
-        let keyCode = settingsService.hotkeyKeyCode
-        let modifiers = settingsService.hotkeyModifiers
+        let keyCode = UInt32(settingsManager.settings.mainHotkeyKeyCode)
+        let modifiers = UInt32(settingsManager.settings.mainHotkeyModifiers)
+        
+        logger.info("🚀 Setting up main hotkey from settings: keyCode=\(keyCode), modifiers=\(modifiers)")
         
         do {
             try hotkeyManager?.registerHotkey(keyCode: keyCode, modifiers: modifiers)
+            logger.info("✅ Main hotkey registered successfully")
         } catch {
-            logger.error("Failed to register hotkey: \(error.localizedDescription)")
+            logger.error("❌ Failed to register hotkey: \(error.localizedDescription)")
         }
     }
     
@@ -339,6 +347,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func updateHotkey(keyCode: UInt32, modifiers: UInt32) throws {
         try hotkeyManager?.registerHotkey(keyCode: keyCode, modifiers: modifiers)
+        
+        // Save to SettingsManager for persistence
+        settingsManager.updateMainHotkey(keyCode: Int(keyCode), modifiers: Int(modifiers))
+        
         // Update menu bar to show new hotkey
         if statusItem != nil {
             setupMenuBarMenu()

@@ -5,6 +5,7 @@ import os.log
 class WindowHotkeyManager {
     static let shared = WindowHotkeyManager()
     private let logger = Logger(subsystem: "com.trace.app", category: "WindowHotkeyManager")
+    private let settingsManager = SettingsManager.shared
     
     // Track registered hotkey IDs for each position
     private var positionToHotkeyId: [WindowPosition: UInt32] = [:]
@@ -22,13 +23,15 @@ class WindowHotkeyManager {
     func setupHotkeys() {
         logger.info("📋 Loading saved window management hotkeys...")
         
-        // Load and register all saved window management hotkeys
+        // Load and register all saved window management hotkeys from SettingsManager
+        let windowHotkeys = settingsManager.settings.windowHotkeys
+        
         for position in WindowPosition.allCases {
-            if let savedHotkey = UserDefaults.standard.string(forKey: "window_\(position.rawValue)_hotkey"),
-               !savedHotkey.isEmpty {
-                let keyCode = UInt32(UserDefaults.standard.integer(forKey: "window_\(position.rawValue)_keycode"))
-                let modifiers = UInt32(UserDefaults.standard.integer(forKey: "window_\(position.rawValue)_modifiers"))
-                logger.info("📖 Found saved hotkey for \(position.rawValue): '\(savedHotkey)' (keyCode: \(keyCode), modifiers: \(modifiers))")
+            if let hotkeyData = windowHotkeys[position.rawValue],
+               !hotkeyData.hotkey.isEmpty {
+                let keyCode = UInt32(hotkeyData.keyCode)
+                let modifiers = UInt32(hotkeyData.modifiers)
+                logger.info("📖 Found saved hotkey for \(position.rawValue): '\(hotkeyData.hotkey)' (keyCode: \(keyCode), modifiers: \(modifiers))")
                 
                 if keyCode != 0 {
                     registerHotkey(for: position, keyCode: keyCode, modifiers: modifiers)
@@ -52,6 +55,18 @@ class WindowHotkeyManager {
         // Register new hotkey if provided
         if let keyCombo = keyCombo, !keyCombo.isEmpty && keyCode != 0 {
             registerHotkey(for: position, keyCode: keyCode, modifiers: modifiers)
+            // Save to SettingsManager
+            settingsManager.updateWindowHotkey(
+                for: position.rawValue,
+                hotkey: keyCombo,
+                keyCode: Int(keyCode),
+                modifiers: Int(modifiers)
+            )
+            logger.info("💾 Saved window hotkey for \(position.rawValue): \(keyCombo)")
+        } else {
+            // Remove from SettingsManager if no hotkey
+            settingsManager.removeWindowHotkey(for: position.rawValue)
+            logger.info("🗑️ Removed window hotkey for \(position.rawValue)")
         }
     }
     
@@ -80,5 +95,38 @@ class WindowHotkeyManager {
             HotkeyRegistry.shared.unregisterHotkey(id: hotkeyId)
             positionToHotkeyId.removeValue(forKey: position)
         }
+    }
+    
+    // MARK: - Settings Management
+    
+    func getHotkey(for position: WindowPosition) -> String? {
+        return settingsManager.getWindowHotkey(for: position.rawValue)?.hotkey
+    }
+    
+    func saveHotkey(for position: WindowPosition, hotkey: String?, keyCode: UInt32, modifiers: UInt32) {
+        if let hotkey = hotkey, !hotkey.isEmpty {
+            settingsManager.updateWindowHotkey(
+                for: position.rawValue,
+                hotkey: hotkey,
+                keyCode: Int(keyCode),
+                modifiers: Int(modifiers)
+            )
+            logger.info("💾 Saved window hotkey for \(position.rawValue): \(hotkey)")
+        } else {
+            settingsManager.removeWindowHotkey(for: position.rawValue)
+            logger.info("🗑️ Cleared window hotkey for \(position.rawValue)")
+        }
+    }
+    
+    func getAllConfiguredWindowHotkeys() -> [WindowPosition: String] {
+        var result: [WindowPosition: String] = [:]
+        
+        for position in WindowPosition.allCases {
+            if let hotkeyData = settingsManager.getWindowHotkey(for: position.rawValue) {
+                result[position] = hotkeyData.hotkey
+            }
+        }
+        
+        return result
     }
 }

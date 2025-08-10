@@ -14,7 +14,7 @@ struct LauncherView: View {
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @FocusState private var isSearchFocused: Bool
-    @AppStorage("resultsLayout") private var resultsLayout: ResultsLayout = .compact
+    @State private var resultsLayout: ResultsLayout = .compact
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var services = ServiceContainer.shared
@@ -130,6 +130,8 @@ struct LauncherView: View {
         .onAppear {
             searchText = ""
             selectedIndex = 0
+            // Load results layout from SettingsManager
+            resultsLayout = ResultsLayout(rawValue: SettingsManager.shared.settings.resultsLayout) ?? .compact
             
             // Set focus immediately
             isSearchFocused = true

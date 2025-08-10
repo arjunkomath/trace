@@ -7,15 +7,24 @@
 
 import SwiftUI
 import Carbon
+import UniformTypeIdentifiers
 
 struct GeneralSettingsView: View {
     @Binding var launchAtLogin: Bool
     @Binding var currentKeyCombo: String
     @Binding var isRecording: Bool
-    @AppStorage("resultsLayout") private var resultsLayout: ResultsLayout = .compact
-    @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
+    @State private var resultsLayout: ResultsLayout = .compact
+    @State private var showMenuBarIcon: Bool = true
     @State private var eventMonitor: Any?
     @State private var showingRestartAlert = false
+    @State private var showingExportSuccessAlert = false
+    @State private var showingImportAlert = false
+    @State private var showingImportFileImporter = false
+    @State private var showingExportFileExporter = false
+    @State private var exportedFileURL: URL?
+    @State private var importOverwriteExisting = false
+    @State private var importError: String?
+    @ObservedObject private var settingsManager = SettingsManager.shared
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
@@ -123,6 +132,9 @@ struct GeneralSettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .frame(width: 140)
+                    .onChange(of: resultsLayout) { _, newValue in
+                        settingsManager.updateResultsLayout(newValue.rawValue)
+                    }
                 }
                 .padding(.vertical, 4)
                 
@@ -140,13 +152,68 @@ struct GeneralSettingsView: View {
                     Toggle("", isOn: $showMenuBarIcon)
                         .toggleStyle(.switch)
                         .labelsHidden()
+                        .onChange(of: showMenuBarIcon) { _, newValue in
+                            settingsManager.updateShowMenuBarIcon(newValue)
+                        }
                 }
                 .padding(.vertical, 4)
             } header: {
                 Text("Interface")
             }
+            
+            // Settings Import/Export section
+            Section {
+                VStack(spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Export Settings")
+                                .font(.system(size: 13))
+                            Text("Save all your Trace settings to a file")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Export...") {
+                            exportSettings()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Import Settings")
+                                .font(.system(size: 13))
+                            Text("Restore settings from a previously exported file")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Import...") {
+                            showingImportAlert = true
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.vertical, 4)
+                }
+            } header: {
+                Text("Settings Backup")
+            } footer: {
+                Text("Export includes hotkeys, custom folders, app preferences, and usage statistics.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onAppear {
+            // Load settings from SettingsManager
+            resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
+            showMenuBarIcon = settingsManager.settings.showMenuBarIcon
+        }
         .onDisappear {
             stopRecording()
         }
@@ -157,6 +224,109 @@ struct GeneralSettingsView: View {
             Button("Later", role: .cancel) { }
         } message: {
             Text("The global hotkey change requires restarting Trace to take effect.")
+        }
+        .alert("Export Successful", isPresented: $showingExportSuccessAlert) {
+            Button("Open in Finder") {
+                if let url = exportedFileURL {
+                    NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+                }
+            }
+            Button("OK") { }
+        } message: {
+            if let url = exportedFileURL {
+                Text("Settings exported to:\n\(url.lastPathComponent)")
+            }
+        }
+        .alert("Import Settings", isPresented: $showingImportAlert) {
+            Button("Replace All Settings") {
+                importOverwriteExisting = true
+                showingImportFileImporter = true
+            }
+            Button("Keep Existing (Add Missing)") {
+                importOverwriteExisting = false
+                showingImportFileImporter = true
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Choose how to handle existing settings when importing.")
+        }
+        .fileImporter(
+            isPresented: $showingImportFileImporter,
+            allowedContentTypes: [UTType.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportFileSelection(result)
+        }
+    }
+    
+    // MARK: - Settings Import/Export
+    
+    private func exportSettings() {
+        do {
+            let fileURL = try settingsManager.exportToFile()
+            exportedFileURL = fileURL
+            showingExportSuccessAlert = true
+        } catch {
+            showAlert(title: "Export Failed", message: error.localizedDescription)
+        }
+    }
+    
+    private func handleImportFileSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            importSettings(from: url)
+        case .failure(let error):
+            showAlert(title: "File Selection Failed", message: error.localizedDescription)
+        }
+    }
+    
+    private func importSettings(from url: URL) {
+        do {
+            try settingsManager.importFromFile(url, overwriteExisting: importOverwriteExisting)
+            
+            // Reload all managers after import
+            reloadManagersAfterImport()
+            
+            showAlert(title: "Import Successful", 
+                     message: "Settings have been imported and all managers have been reloaded. All imported hotkeys should now work immediately.")
+        } catch {
+            showAlert(title: "Import Failed", message: error.localizedDescription)
+        }
+    }
+    
+    private func reloadManagersAfterImport() {
+        // Reload app hotkeys
+        AppHotkeyManager.shared.setupHotkeys()
+        
+        // Reload window hotkeys
+        let windowHotkeyManager = WindowHotkeyManager.shared
+        for (position, hotkeyData) in settingsManager.settings.windowHotkeys {
+            if let windowPosition = WindowPosition(rawValue: position) {
+                windowHotkeyManager.updateHotkey(
+                    for: windowPosition,
+                    keyCombo: hotkeyData.hotkey,
+                    keyCode: UInt32(hotkeyData.keyCode),
+                    modifiers: UInt32(hotkeyData.modifiers)
+                )
+            }
+        }
+        
+        // Reload folder manager
+        DispatchQueue.main.async {
+            let serviceContainer = ServiceContainer.shared
+            serviceContainer.folderManager.loadFolders()
+        }
+    }
+    
+    private func showAlert(title: String, message: String) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         }
     }
     

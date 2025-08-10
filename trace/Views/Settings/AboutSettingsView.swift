@@ -9,10 +9,6 @@ import SwiftUI
 
 struct AboutSettingsView: View {
     @State private var dataPath: String = ""
-    @State private var fileSize: String = "Unknown"
-    @State private var entryCount: Int = 0
-    @State private var showingClearConfirmation = false
-    @State private var showingClearedAlert = false
     
     var body: some View {
         Form {
@@ -95,35 +91,6 @@ struct AboutSettingsView: View {
                         .buttonStyle(.bordered)
                     }
                     
-                    Divider()
-                    
-                    // Usage Statistics
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Usage Data")
-                                .font(.system(size: 13, weight: .medium))
-                            HStack(spacing: 16) {
-                                Label("\(entryCount) entries", systemImage: "list.bullet")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                                Label(fileSize, systemImage: "doc")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: { showingClearConfirmation = true }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                Text("Clear")
-                            }
-                            .font(.system(size: 11))
-                        }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.red)
-                    }
                 }
                 .padding(.vertical, 4)
             } header: {
@@ -161,19 +128,6 @@ struct AboutSettingsView: View {
         .onAppear {
             loadDebugInfo()
         }
-        .confirmationDialog("Clear Usage Data", isPresented: $showingClearConfirmation) {
-            Button("Clear All Data", role: .destructive) {
-                clearUsageData()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This will permanently delete all usage tracking data. This action cannot be undone.")
-        }
-        .alert("Data Cleared", isPresented: $showingClearedAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Usage data has been cleared successfully.")
-        }
     }
     
     private func loadDebugInfo() {
@@ -182,32 +136,7 @@ struct AboutSettingsView: View {
         if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
             dataPath = traceDirectory.path
-            
-            // Check usage database
-            let dbPath = traceDirectory.appendingPathComponent("usage.sqlite")
-            if fileManager.fileExists(atPath: dbPath.path) {
-                do {
-                    let attributes = try fileManager.attributesOfItem(atPath: dbPath.path)
-                    if let size = attributes[.size] as? Int64 {
-                        fileSize = ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
-                    }
-                } catch {
-                    fileSize = "Error reading file"
-                }
-                
-                // Get entry count
-                entryCount = UsageTracker.shared.getAllUsageScores().count
-            } else {
-                fileSize = "0 bytes"
-                entryCount = 0
-            }
         }
-    }
-    
-    private func clearUsageData() {
-        UsageTracker.shared.clearUsageData()
-        loadDebugInfo()
-        showingClearedAlert = true
     }
     
     private func refreshAppCache() {

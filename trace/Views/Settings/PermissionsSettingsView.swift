@@ -88,8 +88,6 @@ struct PermissionsSettingsView: View {
                         HStack(spacing: 4) {
                             Image(systemName: checkingPermissions ? "arrow.clockwise" : "arrow.clockwise")
                                 .font(.system(size: 11))
-                                .rotationEffect(checkingPermissions ? .degrees(360) : .degrees(0))
-                                .animation(checkingPermissions ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: checkingPermissions)
                             Text("Refresh")
                                 .font(.system(size: 11))
                         }

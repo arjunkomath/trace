@@ -87,9 +87,10 @@ struct SettingsView: View {
         // Load launch at login status
         launchAtLogin = SMAppService.mainApp.status == .enabled
         
-        // Load current hotkey combo
-        let keyCode = UserDefaults.standard.integer(forKey: "hotkey_keyCode")
-        let modifiers = UserDefaults.standard.integer(forKey: "hotkey_modifiers")
+        // Load current hotkey combo from SettingsManager
+        let settingsManager = SettingsManager.shared
+        let keyCode = settingsManager.settings.mainHotkeyKeyCode
+        let modifiers = settingsManager.settings.mainHotkeyModifiers
         
         if keyCode != 0 {
             let keyBinding = KeyBindingView(keyCode: UInt32(keyCode), modifiers: UInt32(modifiers))
@@ -115,9 +116,9 @@ struct SettingsView: View {
     private func handleHotkeyRecord(_ keyCode: UInt32, _ modifiers: UInt32) {
         logger.info("Recording hotkey: keyCode=\(keyCode), modifiers=\(modifiers)")
         
-        // Save to UserDefaults
-        UserDefaults.standard.set(Int(keyCode), forKey: "hotkey_keyCode")
-        UserDefaults.standard.set(Int(modifiers), forKey: "hotkey_modifiers")
+        // Save to SettingsManager
+        let settingsManager = SettingsManager.shared
+        settingsManager.updateMainHotkey(keyCode: Int(keyCode), modifiers: Int(modifiers))
         
         // Update the hotkey manager
         if let appDelegate = NSApp.delegate as? AppDelegate {
@@ -138,8 +139,9 @@ struct SettingsView: View {
         let defaultKeyCode: UInt32 = 49 // Space key
         let defaultModifiers: UInt32 = UInt32(optionKey)
         
-        UserDefaults.standard.set(Int(defaultKeyCode), forKey: "hotkey_keyCode")
-        UserDefaults.standard.set(Int(defaultModifiers), forKey: "hotkey_modifiers")
+        // Save to SettingsManager
+        let settingsManager = SettingsManager.shared
+        settingsManager.updateMainHotkey(keyCode: Int(defaultKeyCode), modifiers: Int(defaultModifiers))
         
         currentKeyCombo = "⌥Space"
         

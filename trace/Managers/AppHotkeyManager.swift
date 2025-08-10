@@ -11,6 +11,7 @@ import os.log
 class AppHotkeyManager {
     static let shared = AppHotkeyManager()
     private let logger = Logger(subsystem: "com.trace.app", category: "AppHotkeyManager")
+    private let settingsManager = SettingsManager.shared
     
     private var bundleIdToHotkeyId: [String: UInt32] = [:]
     
@@ -26,10 +27,10 @@ class AppHotkeyManager {
     func setupHotkeys() {
         logger.info("📋 Loading saved app hotkeys...")
         
-        let savedHotkeys = getAllSavedAppHotkeys()
+        let savedHotkeys = settingsManager.settings.appHotkeys
         for (bundleId, hotkeyData) in savedHotkeys {
             if hotkeyData.keyCode != 0 {
-                registerHotkey(for: bundleId, keyCode: hotkeyData.keyCode, modifiers: hotkeyData.modifiers)
+                registerHotkey(for: bundleId, keyCode: UInt32(hotkeyData.keyCode), modifiers: UInt32(hotkeyData.modifiers))
             }
         }
         
@@ -43,6 +44,11 @@ class AppHotkeyManager {
         
         if let keyCombo = keyCombo, !keyCombo.isEmpty && keyCode != 0 {
             registerHotkey(for: bundleId, keyCode: keyCode, modifiers: modifiers)
+            // Save to settings
+            settingsManager.updateAppHotkey(for: bundleId, hotkey: keyCombo, keyCode: Int(keyCode), modifiers: Int(modifiers))
+        } else {
+            // Remove from settings
+            settingsManager.removeAppHotkey(for: bundleId)
         }
     }
     
@@ -88,58 +94,23 @@ class AppHotkeyManager {
         }
     }
     
-    // MARK: - UserDefaults Management
-    
-    private func getAllSavedAppHotkeys() -> [String: (keyCode: UInt32, modifiers: UInt32, hotkey: String)] {
-        var result: [String: (keyCode: UInt32, modifiers: UInt32, hotkey: String)] = [:]
-        
-        let userDefaults = UserDefaults.standard
-        let allKeys = userDefaults.dictionaryRepresentation().keys
-        
-        for key in allKeys {
-            if key.hasPrefix("app_") && key.hasSuffix("_hotkey") {
-                let bundleId = String(key.dropFirst(4).dropLast(7)) // Remove "app_" and "_hotkey"
-                
-                if let hotkeyString = userDefaults.string(forKey: key), !hotkeyString.isEmpty {
-                    let keyCode = UInt32(userDefaults.integer(forKey: "app_\(bundleId)_keycode"))
-                    let modifiers = UInt32(userDefaults.integer(forKey: "app_\(bundleId)_modifiers"))
-                    
-                    result[bundleId] = (keyCode: keyCode, modifiers: modifiers, hotkey: hotkeyString)
-                }
-            }
-        }
-        
-        return result
-    }
+    // MARK: - Settings Management
     
     func getHotkey(for bundleId: String) -> String? {
-        return UserDefaults.standard.string(forKey: "app_\(bundleId)_hotkey")
+        return settingsManager.getAppHotkey(for: bundleId)?.hotkey
     }
     
     func saveHotkey(for bundleId: String, hotkey: String?, keyCode: UInt32, modifiers: UInt32) {
-        let userDefaults = UserDefaults.standard
-        
         if let hotkey = hotkey, !hotkey.isEmpty {
-            userDefaults.set(hotkey, forKey: "app_\(bundleId)_hotkey")
-            userDefaults.set(Int(keyCode), forKey: "app_\(bundleId)_keycode")
-            userDefaults.set(Int(modifiers), forKey: "app_\(bundleId)_modifiers")
+            settingsManager.updateAppHotkey(for: bundleId, hotkey: hotkey, keyCode: Int(keyCode), modifiers: Int(modifiers))
             logger.info("💾 Saved app hotkey for \(bundleId): \(hotkey)")
         } else {
-            userDefaults.removeObject(forKey: "app_\(bundleId)_hotkey")
-            userDefaults.removeObject(forKey: "app_\(bundleId)_keycode")
-            userDefaults.removeObject(forKey: "app_\(bundleId)_modifiers")
+            settingsManager.removeAppHotkey(for: bundleId)
             logger.info("🗑️ Cleared app hotkey for \(bundleId)")
         }
     }
     
     func getAllConfiguredAppHotkeys() -> [String: String] {
-        var result: [String: String] = [:]
-        let savedHotkeys = getAllSavedAppHotkeys()
-        
-        for (bundleId, hotkeyData) in savedHotkeys {
-            result[bundleId] = hotkeyData.hotkey
-        }
-        
-        return result
+        return settingsManager.getAllAppHotkeys()
     }
 }
