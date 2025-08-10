@@ -57,7 +57,7 @@ Contributions welcome! Fork, create a feature branch, and submit a PR.
 
 ## 🔗 Links
 
-- **Website**: [trace.techulus.xyz](https://trace.techulus.xyz
+- **Website**: [trace.techulus.xyz](https://trace.techulus.xyz)
 - **GitHub**: [arjunkomath/trace](https://github.com/arjunkomath/trace)  
 - **Twitter**: [@arjunkomath](https://twitter.com/arjunkomath)
 
