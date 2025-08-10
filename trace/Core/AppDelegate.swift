@@ -208,11 +208,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         hotkeyManager = HotkeyManager()
         hotkeyManager?.onHotkeyPressed = { [weak self] in
-            // Only track window if we have permissions (for window management features)
-            // Don't request permissions here - just silently skip if not granted
-            if WindowManager.shared.hasAccessibilityPermissions() {
-                WindowManager.shared.trackCurrentActiveWindow()
-            }
+            // Track the current active window (for window management features)
+            // The new permission system handles permissions on-demand
+            WindowManager.shared.trackCurrentActiveWindow()
             
             // Show launcher immediately
             self?.toggleLauncher()

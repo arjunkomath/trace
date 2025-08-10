@@ -18,6 +18,7 @@ class ServiceContainer: ObservableObject {
     private var _windowHotkeyManager: WindowHotkeyManager?
     private var _settingsService: SettingsService?
     private var _folderManager: FolderManager?
+    private var _permissionManager: PermissionManager?
     
     // MARK: - Service Accessors
     
@@ -93,6 +94,15 @@ class ServiceContainer: ObservableObject {
         return manager
     }
     
+    var permissionManager: PermissionManager {
+        if let manager = _permissionManager {
+            return manager
+        }
+        let manager = PermissionManager.shared // Use existing singleton
+        _permissionManager = manager
+        return manager
+    }
+    
     // MARK: - Lifecycle
     
     func shutdown() {
@@ -104,6 +114,7 @@ class ServiceContainer: ObservableObject {
         _windowHotkeyManager = nil
         _settingsService = nil
         _folderManager = nil
+        _permissionManager = nil
     }
 }
 

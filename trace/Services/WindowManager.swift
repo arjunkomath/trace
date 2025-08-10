@@ -7,9 +7,9 @@
 
 import AppKit
 import CoreGraphics
-import UserNotifications
 import SwiftUI
 import os.log
+import Carbon
 
 enum WindowPosition: String, CaseIterable {
     case leftHalf = "left-half"
@@ -93,136 +93,49 @@ enum WindowPosition: String, CaseIterable {
 class WindowManager: ObservableObject {
     static let shared = WindowManager()
     private let logger = AppLogger.windowManager
+    private let permissionManager = PermissionManager.shared
     
-    private var previousActiveWindow: AXUIElement?
-    private var previousActiveApp: NSRunningApplication?
-    
-    
-    private init() {
-        requestNotificationPermissions()
-    }
-    
-    // MARK: - Window Tracking
-    
-    func trackCurrentActiveWindow() {
-        // Check accessibility permissions first
-        guard hasAccessibilityPermissions() else {
-            logger.error("Accessibility permissions required for window management")
-            return
-        }
-        
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            logger.warning("Could not get frontmost application")
-            return
-        }
-        
-        logger.info("Frontmost app: \(frontmostApp.localizedName ?? "Unknown") (\(frontmostApp.bundleIdentifier ?? "Unknown ID"))")
-        
-        // Don't track Trace itself
-        guard frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier else {
-            logger.info("Skipping Trace app itself")
-            return
-        }
-        
-        let appRef = AXUIElementCreateApplication(frontmostApp.processIdentifier)
-        
-        var frontmostWindow: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &frontmostWindow)
-        
-        if result == .success, let window = frontmostWindow {
-            previousActiveWindow = (window as! AXUIElement)
-            previousActiveApp = frontmostApp
-            logger.info("Successfully tracked active window for app: \(frontmostApp.localizedName ?? "Unknown")")
-        } else {
-            logger.warning("Could not get focused window from frontmost app. Result: \(result.rawValue)")
-            // Try to get the first window instead
-            var windows: CFTypeRef?
-            let windowsResult = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windows)
-            if windowsResult == .success, 
-               let windowArray = windows as? [AXUIElement],
-               let firstWindow = windowArray.first {
-                previousActiveWindow = firstWindow
-                previousActiveApp = frontmostApp
-                logger.info("Tracked first window for app: \(frontmostApp.localizedName ?? "Unknown")")
-            } else {
-                logger.error("Could not get any windows from app")
-            }
-        }
-    }
+    private init() {}
     
     // MARK: - Window Management
     
+    /// Simplified window tracking - no longer needed with new permission system
+    func trackCurrentActiveWindow() {
+        // This method is kept for compatibility but is no longer needed
+        // The new permission system tests capabilities on-demand
+        logger.debug("Window tracking called - using on-demand capability testing instead")
+    }
+    
     func applyWindowPosition(_ position: WindowPosition) {
-        logger.info("🪟 applyWindowPosition called with position: \(position.rawValue)")
+        logger.info("Applying window position: \(position.rawValue)")
         
-        // Check and request accessibility permissions when user actually tries to use window management
-        if !hasAccessibilityPermissions() {
-            logger.info("📋 Requesting accessibility permissions for window management")
-            requestAccessibilityPermissions()
-            return
-        }
-        
-        // Try to get the current active window if we don't have one tracked, or if the tracked one is stale
-        var windowToManage = previousActiveWindow
-        
-        if windowToManage == nil {
-            logger.info("🔍 No tracked window, attempting to find current active window...")
-            windowToManage = getCurrentActiveWindow()
-        } else {
-            // Verify the tracked window is still valid
-            if !isWindowValid(windowToManage!) {
-                logger.warning("⚠️ Tracked window is no longer valid, finding current active window...")
-                windowToManage = getCurrentActiveWindow()
-                if windowToManage != nil {
-                    previousActiveWindow = windowToManage
+        permissionManager.performWindowOperation(
+            { window in
+                if position == .fullScreen {
+                    return self.toggleFullScreen(window)
+                } else {
+                    return self.repositionWindow(window, to: position)
                 }
+            },
+            onSuccess: {
+                self.logger.info("Successfully applied window position: \(position.displayName)")
+            },
+            onFailure: { error in
+                self.permissionManager.showWindowManagementError(error)
             }
-        }
-        
-        guard let window = windowToManage else {
-            logger.error("❌ No window available to manage")
-            showSystemNotification("Window Management Error", "No active window found. Try clicking on a window first.")
-            return
-        }
-        
-        logger.info("✅ Window available for management")
-        
-        // Handle full screen mode separately using accessibility action
-        if position == .fullScreen {
-            let success = toggleFullScreen(window)
-            if success {
-                if let app = previousActiveApp {
-                    app.activate()
-                }
-                logger.info("Toggled full screen mode")
-            } else {
-                showSystemNotification("Window Management Error", "Failed to toggle full screen mode")
-            }
-            return
-        }
-        
+        )
+    }
+    
+    private func repositionWindow(_ window: AXUIElement, to position: WindowPosition) -> Bool {
         guard let screen = NSScreen.main else {
             logger.error("Could not get main screen")
-            showSystemNotification("Window Management Error", "Screen not available")
-            return
+            return false
         }
         
         let screenFrame = screen.visibleFrame
         let newFrame = calculateFrame(for: position, screenFrame: screenFrame, window: window)
         
-        let success = setWindowFrame(window, frame: newFrame)
-        
-        if success {
-            // Bring the window's app to front
-            if let app = previousActiveApp {
-                app.activate()
-            }
-            
-            logger.info("Applied window position: \(position.displayName)")
-            // No notification for successful operations
-        } else {
-            showSystemNotification("Window Management Error", "Failed to resize window")
-        }
+        return setWindowFrame(window, frame: newFrame)
     }
     
     private func calculateFrame(for position: WindowPosition, screenFrame: CGRect, window: AXUIElement) -> CGRect {
@@ -452,185 +365,91 @@ class WindowManager: ObservableObject {
     }
     
     private func toggleFullScreen(_ window: AXUIElement) -> Bool {
-        // Method 1: Use the standard AXZoomButton action (most reliable)
-        let zoomResult = AXUIElementPerformAction(window, kAXZoomButtonAttribute as CFString)
-        if zoomResult == .success {
-            return true
-        }
-        
-        // Method 2: Try the fullscreen attribute directly
+        // Method 1: Try the fullscreen attribute directly (most reliable)
         var isFullScreen: CFTypeRef?
-        if AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &isFullScreen) == .success {
-            let newValue = !(isFullScreen as? Bool ?? false)
+        let fullScreenResult = AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &isFullScreen)
+        
+        if fullScreenResult == .success {
+            let currentValue = isFullScreen as? Bool ?? false
+            let newValue = !currentValue
             let fullScreenValue = newValue as CFBoolean
             let result = AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString, fullScreenValue)
             if result == .success {
+                logger.info("Successfully toggled fullscreen: \(currentValue) -> \(newValue)")
                 return true
+            } else {
+                logger.warning("Failed to set AXFullScreen attribute. Error: \(result.rawValue)")
             }
+        } else {
+            logger.debug("Window does not support AXFullScreen attribute. Error: \(fullScreenResult.rawValue)")
         }
         
-        // Method 3: Send keyboard shortcut (Cmd+Ctrl+F) - most universal fallback
-        return sendFullScreenKeyboardShortcut()
-    }
-    
-    private func sendFullScreenKeyboardShortcut() -> Bool {
-        // Send Cmd+Ctrl+F keyboard shortcut (standard macOS full screen)
-        let source = CGEventSource(stateID: .hidSystemState)
+        // Method 2: Use the zoom button (fallback)
+        var zoomButton: CFTypeRef?
+        let zoomButtonResult = AXUIElementCopyAttributeValue(window, kAXZoomButtonAttribute as CFString, &zoomButton)
         
-        // Key down events
-        guard let cmdCtrlFDown = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: true) else { return false }
-        cmdCtrlFDown.flags = [.maskCommand, .maskControl]
-        
-        // Key up events  
-        guard let cmdCtrlFUp = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: false) else { return false }
-        cmdCtrlFUp.flags = [.maskCommand, .maskControl]
-        
-        // Post the events
-        cmdCtrlFDown.post(tap: .cghidEventTap)
-        cmdCtrlFUp.post(tap: .cghidEventTap)
-        
-        return true
-    }
-    
-    private func isWindowInFullScreen(_ window: AXUIElement) -> Bool {
-        var isFullScreen: CFTypeRef?
-        if AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &isFullScreen) == .success,
-           let fullScreenValue = isFullScreen as? Bool {
-            return fullScreenValue
-        }
-        return false
-    }
-    
-    
-    // MARK: - Improved Window Detection
-    
-    private func getCurrentActiveWindow() -> AXUIElement? {
-        logger.info("🔍 Attempting to find current active window...")
-        
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            logger.error("No frontmost application found")
-            return nil
-        }
-        
-        // Skip Trace itself
-        if frontmostApp.bundleIdentifier == Bundle.main.bundleIdentifier {
-            logger.debug("Skipping Trace app itself")
-            return nil
-        }
-        
-        let appElement = AXUIElementCreateApplication(frontmostApp.processIdentifier)
-        var windows: AnyObject?
-        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
-        
-        guard result == .success, let windowArray = windows as? [AXUIElement], !windowArray.isEmpty else {
-            logger.error("No windows found for app: \(frontmostApp.localizedName ?? "Unknown")")
-            return nil
-        }
-        
-        // Find the focused window, or use the first window
-        for window in windowArray {
-            var focused: AnyObject?
-            if AXUIElementCopyAttributeValue(window, kAXFocusedAttribute as CFString, &focused) == .success,
-               let isFocused = focused as? Bool, isFocused {
-                logger.info("✅ Found focused window for \(frontmostApp.localizedName ?? "Unknown")")
-                return window
+        if zoomButtonResult == .success, let button = zoomButton {
+            let zoomResult = AXUIElementPerformAction(button as! AXUIElement, kAXPressAction as CFString)
+            if zoomResult == .success {
+                logger.info("Successfully toggled fullscreen using zoom button")
+                return true
+            } else {
+                logger.warning("Failed to press zoom button. Error: \(zoomResult.rawValue)")
             }
+        } else {
+            logger.debug("Window does not have zoom button. Error: \(zoomButtonResult.rawValue)")
         }
         
-        // Fallback to first window
-        let window = windowArray[0]
-        logger.info("✅ Using first window for \(frontmostApp.localizedName ?? "Unknown")")
-        return window
-    }
-    
-    private func isWindowValid(_ window: AXUIElement) -> Bool {
-        var role: AnyObject?
-        let result = AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &role)
-        return result == .success && role != nil
-    }
-    
-    private func showSystemNotification(_ title: String, _ body: String) {
-        logger.info("📢 System notification: \(title) - \(body)")
+        // Method 3: Fallback - try using keyboard shortcut simulation
+        logger.info("Attempting fullscreen toggle via keyboard shortcut")
         
-        let notification = UNMutableNotificationContent()
-        notification.title = title
-        notification.body = body
-        notification.sound = nil // Silent notifications
+        // Get the application element to send the keyboard shortcut to
+        var appPid: pid_t = 0
+        let pidResult = AXUIElementGetPid(window, &appPid)
         
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: notification, trigger: nil)
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                self.logger.error("Failed to show notification: \(error)")
-            }
-        }
-    }
-    
-    private func showPermissionAlert() {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Accessibility Permission Required"
-            alert.informativeText = """
-            Trace needs accessibility permission to:
-            • Resize and position windows
-            • Use window management hotkeys
-            • Track active windows
+        if pidResult == .success {
+            // Send Cmd+Ctrl+F (common fullscreen toggle shortcut)
+            let source = CGEventSource(stateID: .hidSystemState)
+            let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: true) // F key
+            let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: false)
             
-            After granting permission, please try your action again.
-            """
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Not Now")
+            keyDownEvent?.flags = [.maskCommand, .maskControl]
+            keyUpEvent?.flags = [.maskCommand, .maskControl]
             
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                // Open System Settings directly to Privacy & Security > Accessibility
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-        }
-    }
-    
-    // MARK: - Accessibility Permissions
-    
-    func hasAccessibilityPermissions() -> Bool {
-        // Primary check - this works fine in debug builds
-        if AXIsProcessTrusted() {
+            keyDownEvent?.postToPid(appPid)
+            keyUpEvent?.postToPid(appPid)
+            
+            logger.info("Sent Cmd+Ctrl+F to toggle fullscreen")
             return true
         }
         
-        // Release build fallback - actually test if we can use accessibility APIs
-        // This addresses the false negative issue in release builds
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            return false
-        }
-        
-        let pid = frontmostApp.processIdentifier
-        let appRef = AXUIElementCreateApplication(pid)
-        var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appRef, kAXTitleAttribute as CFString, &value)
-        
-        // If we can access accessibility attributes, permissions are granted
-        return result == .success
+        logger.warning("All fullscreen toggle methods failed")
+        return false
     }
     
-    func requestAccessibilityPermissions() {
-        guard !hasAccessibilityPermissions() else { return }
-        
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
-    }
+    // MARK: - System Appearance Toggle
     
-    private func requestNotificationPermissions() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge]) { granted, error in
-            if let error = error {
-                self.logger.error("Failed to request notification permissions: \(error)")
-            } else if granted {
-                self.logger.info("Notification permissions granted")
-            } else {
-                self.logger.info("Notification permissions denied")
+    func toggleSystemAppearance() {
+        let script = """
+            tell application "System Events"
+                tell appearance preferences
+                    set dark mode to not dark mode
+                end tell
+            end tell
+        """
+        
+        permissionManager.executeAppleScript(script,
+            onSuccess: { _ in
+                self.logger.info("Successfully toggled system appearance")
+            },
+            onFailure: { error in
+                self.logger.error("Failed to toggle system appearance: \(error)")
+                self.permissionManager.showNotification(
+                    title: "System Appearance Error", 
+                    body: error
+                )
             }
-        }
+        )
     }
 }
+

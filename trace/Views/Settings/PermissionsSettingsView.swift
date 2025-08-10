@@ -9,6 +9,7 @@ import SwiftUI
 import UserNotifications
 
 struct PermissionsSettingsView: View {
+    @ObservedObject private var permissionManager = PermissionManager.shared
     @State private var accessibilityEnabled = false
     @State private var notificationEnabled = false
     @State private var checkingPermissions = false
@@ -107,23 +108,41 @@ struct PermissionsSettingsView: View {
     }
     
     private func checkPermissions() {
+        guard !checkingPermissions else { return } // Prevent concurrent checks
         checkingPermissions = true
         
         // Check accessibility permissions with retry mechanism for release builds
         checkAccessibilityPermissions()
         
-        // Check notification permissions
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                self.notificationEnabled = settings.authorizationStatus == .authorized
-                self.checkingPermissions = false
-            }
-        }
+        // Check notification permissions using PermissionManager
+        notificationEnabled = permissionManager.notificationPermissionStatus == .authorized
+        
+        // Don't set checkingPermissions to false here - let checkAccessibilityPermissions() handle it
     }
     
     private func checkAccessibilityPermissions() {
-        accessibilityEnabled = WindowManager.shared.hasAccessibilityPermissions()
-        refreshingAccessibility = false
+        refreshingAccessibility = true
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            let capability = self.permissionManager.testWindowManagementCapability()
+            
+            DispatchQueue.main.async {
+                switch capability {
+                case .available:
+                    self.accessibilityEnabled = true
+                    
+                case .permissionDenied:
+                    self.accessibilityEnabled = false
+                    
+                case .noTargetApp, .noWindows:
+                    // These states don't indicate permission problems - use system API as fallback
+                    self.accessibilityEnabled = AXIsProcessTrusted()
+                }
+                
+                self.refreshingAccessibility = false
+                self.checkingPermissions = false // Reset the concurrent check guard
+            }
+        }
     }
     
     

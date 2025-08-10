@@ -10,87 +10,98 @@ import Carbon
 import ApplicationServices
 
 struct WindowManagementSettingsView: View {
-    @State private var accessibilityEnabled = false
-    @State private var showingAccessibilityAlert = false
-    @State private var isRefreshing = false
+    @ObservedObject private var permissionManager = PermissionManager.shared
+    @State private var isTestingCapability = false
     
     var body: some View {
-        Group {
-            if !accessibilityEnabled {
-                // Accessibility Permission Warning
-                Form {
-                    Section {
-                        VStack(spacing: 12) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(.orange)
-                            
-                            Text("Accessibility Permissions Required")
-                                .font(.system(size: 16, weight: .semibold))
-                            
-                            Text("Window management requires accessibility permissions to control other applications' windows.")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 20)
-                            
-                            HStack(spacing: 12) {
-                                Button("Grant Permissions") {
-                                    WindowManager.shared.requestAccessibilityPermissions()
-                                    showingAccessibilityAlert = true
-                                }
-                                .buttonStyle(.borderedProminent)
-                                
-                                Button("Refresh") {
-                                    isRefreshing = true
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        checkAccessibilityPermissions()
-                                        isRefreshing = false
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(isRefreshing)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
+        Form {
+            // Permission Status Section
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Window Management")
+                            .font(.system(size: 13))
+                        Text("Control windows of other applications")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
                     }
-                }
-                .formStyle(.grouped)
-                .scrollDisabled(true)
-            } else {
-                // Window Management Commands List
-                Form {
-                    Section {
-                        ForEach(Array(WindowPosition.allCases.enumerated()), id: \.offset) { index, position in
-                            WindowCommandRow(position: position)
-                                .padding(.vertical, 2)
-                        }
+                    
+                    Spacer()
+                    
+                    Button(permissionManager.windowManagementAvailable ? "Available" : "Test Access") {
+                        testWindowManagementAccess()
                     }
+                    .buttonStyle(.automatic)
+                    .disabled(isTestingCapability)
                 }
-                .formStyle(.grouped)
+                .padding(.vertical, 4)
+            } header: {
+                Text("Permissions")
+            } footer: {
+                Text("Window management will be tested when you first use it. No setup required for most operations.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            
+            // Window Management Commands List
+            Section {
+                ForEach(Array(WindowPosition.allCases.enumerated()), id: \.offset) { index, position in
+                    WindowCommandRow(position: position)
+                        .padding(.vertical, 2)
+                }
+            } header: {
+                Text("Window Hotkeys")
+            } footer: {
+                Text("Assign keyboard shortcuts to window management commands. Permissions will be requested when first used.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
         }
-        .onAppear {
-            checkAccessibilityPermissions()
-        }
+        .formStyle(.grouped)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // Refresh permissions when app becomes active (in case user granted them in System Preferences)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                checkAccessibilityPermissions()
-            }
-        }
-        .alert("Accessibility Permissions", isPresented: $showingAccessibilityAlert) {
-            Button("OK") {
-                checkAccessibilityPermissions()
-            }
-        } message: {
-            Text("Please enable accessibility permissions for Trace in System Preferences > Security & Privacy > Accessibility, then restart the app.")
+            // Refresh capability when app becomes active
+            testWindowManagementAccessSilently()
         }
     }
     
-    private func checkAccessibilityPermissions() {
-        accessibilityEnabled = WindowManager.shared.hasAccessibilityPermissions()
+    private func testWindowManagementAccess() {
+        isTestingCapability = true
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = self.permissionManager.testWindowManagementCapability()
+            
+            DispatchQueue.main.async {
+                self.isTestingCapability = false
+                
+                switch result {
+                case .available:
+                    self.permissionManager.windowManagementAvailable = true
+                    
+                case .permissionDenied:
+                    self.permissionManager.windowManagementAvailable = false
+                    self.permissionManager.requestWindowManagementPermissions()
+                    
+                case .noTargetApp, .noWindows:
+                    // These states mean permissions are granted but no suitable target
+                    self.permissionManager.windowManagementAvailable = true
+                }
+            }
+        }
+    }
+    
+    private func testWindowManagementAccessSilently() {
+        DispatchQueue.global(qos: .background).async {
+            let result = self.permissionManager.testWindowManagementCapability()
+            
+            DispatchQueue.main.async {
+                switch result {
+                case .available, .noTargetApp, .noWindows:
+                    self.permissionManager.windowManagementAvailable = true
+                case .permissionDenied:
+                    self.permissionManager.windowManagementAvailable = false
+                }
+            }
+        }
     }
 }
 
