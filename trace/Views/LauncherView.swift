@@ -18,6 +18,7 @@ struct LauncherView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var services = ServiceContainer.shared
+    @State private var loadingCommands: Set<String> = [] // Track which commands are loading
     
     let onClose: () -> Void
     
@@ -176,6 +177,91 @@ struct LauncherView: View {
         !searchText.isEmpty && !results.isEmpty
     }
     
+    // MARK: - Scoring Utilities
+    
+    /// Calculate combined score from match score and usage
+    private func calculateCombinedScore(matchScore: Double, usageScore: Double, usageNormalizationFactor: Double = 50.0) -> Double {
+        let normalizedUsage = min(usageScore / usageNormalizationFactor, 1.0)
+        return (matchScore * 0.6) + (normalizedUsage * 0.4)
+    }
+    
+    /// Check if match score meets minimum threshold and calculate combined score
+    private func shouldIncludeCommand(matchScore: Double, usageScore: Double, threshold: Double = 0.3) -> (Bool, Double) {
+        guard matchScore > threshold else { return (false, 0.0) }
+        let combinedScore = calculateCombinedScore(matchScore: matchScore, usageScore: usageScore)
+        return (true, combinedScore)
+    }
+    
+    /// Create a system command result with common parameters
+    private func createSystemCommand(
+        commandId: String,
+        title: String,
+        subtitle: String,
+        icon: String,
+        category: String? = nil,
+        shortcut: KeyboardShortcut? = nil,
+        action: @escaping () -> Void
+    ) -> SearchResult {
+        return SearchResult(
+            title: title,
+            subtitle: subtitle,
+            icon: .system(icon),
+            type: .command,
+            category: category,
+            shortcut: shortcut,
+            lastUsed: nil,
+            commandId: commandId,
+            action: action
+        )
+    }
+    
+    /// Standard action wrapper that tracks usage and closes launcher
+    private func createStandardAction(commandId: String, customAction: @escaping () -> Void) -> () -> Void {
+        return { [services, self] in
+            services.usageTracker.recordUsage(for: commandId, type: .command)
+            customAction()
+            searchText = ""
+            selectedIndex = 0
+            onClose()
+        }
+    }
+    
+    /// Create an IP command with dynamic title/subtitle and loading state support
+    private func createIPCommand(
+        commandId: String,
+        matchScore: Double,
+        usageScore: Double,
+        terms: [String],
+        baseTitle: String,
+        baseSubtitle: String,
+        icon: String,
+        cachedValue: String?,
+        onAction: @escaping (String?, @escaping () -> Void) -> Void
+    ) -> (SearchResult, Double)? {
+        let (shouldInclude, score) = shouldIncludeCommand(matchScore: matchScore, usageScore: usageScore)
+        guard shouldInclude else { return nil }
+        
+        // Dynamic title and subtitle based on cached value
+        let displayTitle = cachedValue != nil ? "\(baseTitle): \(cachedValue!)" : baseTitle
+        let displaySubtitle = cachedValue != nil ? "Copy \(cachedValue!) to clipboard" : baseSubtitle
+        
+        var result = createSystemCommand(
+            commandId: commandId,
+            title: displayTitle,
+            subtitle: displaySubtitle,
+            icon: icon,
+            category: "Network",
+            action: createStandardAction(commandId: commandId) {
+                onAction(cachedValue) {
+                    // Callback for additional cleanup if needed
+                }
+            }
+        )
+        
+        result.isLoading = isCommandLoading(commandId)
+        return (result, score)
+    }
+    
     var results: [SearchResult] {
         guard !searchText.isEmpty else { return [] }
         
@@ -216,10 +302,9 @@ struct LauncherView: View {
                 }
             )
             
-            // Calculate combined score: 60% match, 40% usage (increased usage weight)
+            // Calculate combined score using unified scoring
             let usageScore = usageScores[app.bundleIdentifier] ?? 0.0
-            let normalizedUsage = min(usageScore / 50.0, 1.0) // Normalize to 0-1, reaching 1.0 at 50 uses
-            let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+            let combinedScore = calculateCombinedScore(matchScore: matchScore, usageScore: usageScore)
             
             scoredResults.append((result, combinedScore))
         }
@@ -227,62 +312,135 @@ struct LauncherView: View {
         // Add system commands with fuzzy matching and usage scores
         var systemCommands: [(SearchResult, Double)] = []
         
-        // Settings command - use same scoring as apps for fairness
+        // Settings command
         let settingsMatchScore = matchesSearchTerms(query: searchLower, terms: [
             "trace settings", "settings", "preferences", "config", "configuration", 
             "trace", "setup", "options", "prefs", "configure", "hotkeys"
         ])
-        if settingsMatchScore > 0.3 {
-            let settingsId = "com.trace.command.settings"
-            let usageScore = usageScores[settingsId] ?? 0.0
-            let normalizedUsage = min(usageScore / 50.0, 1.0) // Same normalization as apps
-            // Use same formula: 60% match, 40% usage
-            let combinedScore = (settingsMatchScore * 0.6) + (normalizedUsage * 0.4)
-            
-            systemCommands.append((SearchResult(
+        let settingsId = "com.trace.command.settings"
+        let settingsUsageScore = usageScores[settingsId] ?? 0.0
+        let (includeSettings, settingsScore) = shouldIncludeCommand(matchScore: settingsMatchScore, usageScore: settingsUsageScore)
+        
+        if includeSettings {
+            let settingsResult = createSystemCommand(
+                commandId: settingsId,
                 title: "Trace Settings",
                 subtitle: "Configure hotkeys and preferences",
-                icon: .system("gearshape"),
-                type: .command,
-                category: nil,
+                icon: "gearshape",
                 shortcut: KeyboardShortcut(key: ",", modifiers: ["⌘"]),
-                lastUsed: nil,
-                commandId: settingsId,
-                action: {
+                action: createStandardAction(commandId: settingsId) {
                     openSettings()
                 }
-            ), combinedScore))
+            )
+            systemCommands.append((settingsResult, settingsScore))
         }
         
-        // Quit command - use same scoring as apps for fairness
+        // Quit command
         let quitMatchScore = matchesSearchTerms(query: searchLower, terms: [
             "quit trace", "quit", "exit", "close", "terminate", "stop", "end", "application"
         ])
-        if quitMatchScore > 0.3 {
-            let quitId = "com.trace.command.quit"
-            let usageScore = usageScores[quitId] ?? 0.0
-            let normalizedUsage = min(usageScore / 50.0, 1.0) // Same normalization as apps
-            // Use same formula: 60% match, 40% usage
-            let combinedScore = (quitMatchScore * 0.6) + (normalizedUsage * 0.4)
-            
-            systemCommands.append((SearchResult(
+        let quitId = "com.trace.command.quit"
+        let quitUsageScore = usageScores[quitId] ?? 0.0
+        let (includeQuit, quitScore) = shouldIncludeCommand(matchScore: quitMatchScore, usageScore: quitUsageScore)
+        
+        if includeQuit {
+            let quitResult = createSystemCommand(
+                commandId: quitId,
                 title: "Quit Trace",
                 subtitle: "Exit the application",
-                icon: .system("power"),
-                type: .command,
-                category: nil,
+                icon: "power",
                 shortcut: KeyboardShortcut(key: "Q", modifiers: ["⌘"]),
-                lastUsed: nil,
-                commandId: quitId,
-                action: {
-                    // Close launcher first, then let AppDelegate handle the quit confirmation
-                    searchText = ""
-                    selectedIndex = 0
-                    onClose()
-                    // Just call terminate directly - AppDelegate will show the confirmation
+                action: createStandardAction(commandId: quitId) {
                     NSApp.terminate(nil)
                 }
-            ), combinedScore))
+            )
+            systemCommands.append((quitResult, quitScore))
+        }
+        
+        // Public IP Address command
+        let publicIPMatchScore = matchesSearchTerms(query: searchLower, terms: [
+            "public ip", "external ip", "public ip address", "external ip address", "my ip", 
+            "ip address", "public", "external", "internet ip", "wan ip", "outside ip"
+        ])
+        let publicIPId = "com.trace.command.publicip"
+        let publicIPUsageScore = usageScores[publicIPId] ?? 0.0
+        let cachedPublicIP = services.networkUtilities.getCachedPublicIP()
+        
+        // Start fetching public IP if not cached and not already loading
+        if publicIPMatchScore > 0.3 && cachedPublicIP == nil && !isCommandLoading(publicIPId) {
+            setCommandLoading(publicIPId, isLoading: true)
+            Task { @MainActor in
+                _ = await services.networkUtilities.getPublicIPAddress()
+                setCommandLoading(publicIPId, isLoading: false)
+            }
+        }
+        
+        if let publicIPResult = createIPCommand(
+            commandId: publicIPId,
+            matchScore: publicIPMatchScore,
+            usageScore: publicIPUsageScore,
+            terms: ["public ip", "external ip", "my ip"],
+            baseTitle: "Public IP Address",
+            baseSubtitle: "Get your external IP address",
+            icon: "globe",
+            cachedValue: cachedPublicIP
+        ) { cachedIP, cleanup in
+            if let ip = cachedIP {
+                services.networkUtilities.copyToClipboard(ip)
+                let notification = NSUserNotification()
+                notification.title = "Public IP Copied"
+                notification.informativeText = "Your public IP address \(ip) has been copied to the clipboard"
+                NSUserNotificationCenter.default.deliver(notification)
+            } else {
+                let notification = NSUserNotification()
+                notification.title = "Public IP Loading"
+                notification.informativeText = "Please wait while we fetch your public IP address"
+                NSUserNotificationCenter.default.deliver(notification)
+            }
+        } {
+            systemCommands.append(publicIPResult)
+        }
+        
+        // Private IP Address command
+        let privateIPMatchScore = matchesSearchTerms(query: searchLower, terms: [
+            "private ip", "local ip", "private ip address", "local ip address", "internal ip",
+            "lan ip", "network ip", "private", "local", "internal", "wifi ip", "ethernet ip"
+        ])
+        let privateIPId = "com.trace.command.privateip"
+        let privateIPUsageScore = usageScores[privateIPId] ?? 0.0
+        let cachedPrivateIP = services.networkUtilities.getCachedPrivateIP()
+        
+        if let privateIPResult = createIPCommand(
+            commandId: privateIPId,
+            matchScore: privateIPMatchScore,
+            usageScore: privateIPUsageScore,
+            terms: ["private ip", "local ip", "internal ip"],
+            baseTitle: "Private IP Address", 
+            baseSubtitle: "Get your local network IP address",
+            icon: "wifi",
+            cachedValue: cachedPrivateIP
+        ) { cachedIP, cleanup in
+            // Set brief loading state for consistency (private IP is usually instant)
+            self.setCommandLoading(privateIPId, isLoading: true)
+            
+            // Use a small delay to show spinner briefly since private IP is usually instant
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let ip = cachedIP ?? services.networkUtilities.getPrivateIPAddress() {
+                    services.networkUtilities.copyToClipboard(ip)
+                    let notification = NSUserNotification()
+                    notification.title = "Private IP Copied"
+                    notification.informativeText = "Your private IP address \(ip) has been copied to the clipboard"
+                    NSUserNotificationCenter.default.deliver(notification)
+                } else {
+                    let notification = NSUserNotification()
+                    notification.title = "IP Address Not Found"
+                    notification.informativeText = "Could not determine your private IP address"
+                    NSUserNotificationCenter.default.deliver(notification)
+                }
+                self.setCommandLoading(privateIPId, isLoading: false)
+            }
+        } {
+            systemCommands.append(privateIPResult)
         }
         
         // Add system commands to scored results
@@ -584,6 +742,21 @@ struct LauncherView: View {
         }
     }
     
+    // MARK: - Loading State Management
+    
+    private func setCommandLoading(_ commandId: String, isLoading: Bool) {
+        DispatchQueue.main.async {
+            if isLoading {
+                self.loadingCommands.insert(commandId)
+            } else {
+                self.loadingCommands.remove(commandId)
+            }
+        }
+    }
+    
+    private func isCommandLoading(_ commandId: String) -> Bool {
+        return loadingCommands.contains(commandId)
+    }
 }
 
 // MARK: - Result Row
@@ -632,14 +805,20 @@ struct ResultRowView: View {
             
             Spacer()
             
-            // Result type
-            Text(result.type.displayName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
-            
-            // Shortcut
-            if let shortcut = result.shortcut {
-                KeyBindingView(shortcut: shortcut, isSelected: isSelected, size: .small)
+            // Loading spinner or result type
+            if result.isLoading {
+                ProgressView()
+                    .frame(width: 12, height: 12)
+                    .foregroundColor(isSelected ? .white : .secondary)
+            } else {
+                Text(result.type.displayName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                
+                // Shortcut
+                if let shortcut = result.shortcut {
+                    KeyBindingView(shortcut: shortcut, isSelected: isSelected, size: .small)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -701,13 +880,20 @@ struct CompactResultRowView: View {
             
             Spacer()
             
-            Text(result.type.displayName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
-            
-            // Shortcut
-            if let shortcut = result.shortcut {
-                KeyBindingView(shortcut: shortcut, isSelected: isSelected, size: .small)
+            // Loading spinner or result type
+            if result.isLoading {
+                ProgressView()
+                    .frame(width: 10, height: 10)
+                    .foregroundColor(isSelected ? .white : .secondary)
+            } else {
+                Text(result.type.displayName)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                
+                // Shortcut
+                if let shortcut = result.shortcut {
+                    KeyBindingView(shortcut: shortcut, isSelected: isSelected, size: .small)
+                }
             }
         }
         .padding(.horizontal, 16)

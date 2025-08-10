@@ -16,16 +16,6 @@ struct AboutSettingsView: View {
                 VStack(spacing: 6) {
                     // App Icon and Info
                     VStack(spacing: 6) {
-                        if let appIcon = NSApp.applicationIconImage {
-                            Image(nsImage: appIcon)
-                                .resizable()
-                                .frame(width: 64, height: 64)
-                        } else {
-                            Image(systemName: "filemenu.and.selection")
-                                .font(.system(size: 64))
-                                .foregroundStyle(.blue.gradient)
-                        }
-                        
                         VStack(spacing: 8) {
                             Text("Trace")
                                 .font(.system(size: 24, weight: .semibold))

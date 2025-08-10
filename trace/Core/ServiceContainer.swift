@@ -19,6 +19,7 @@ class ServiceContainer: ObservableObject {
     private var _settingsService: SettingsService?
     private var _folderManager: FolderManager?
     private var _permissionManager: PermissionManager?
+    private var _networkUtilities: NetworkUtilities?
     
     // MARK: - Service Accessors
     
@@ -103,6 +104,15 @@ class ServiceContainer: ObservableObject {
         return manager
     }
     
+    var networkUtilities: NetworkUtilities {
+        if let utilities = _networkUtilities {
+            return utilities
+        }
+        let utilities = NetworkUtilities.shared
+        _networkUtilities = utilities
+        return utilities
+    }
+    
     // MARK: - Lifecycle
     
     func shutdown() {
@@ -115,6 +125,7 @@ class ServiceContainer: ObservableObject {
         _settingsService = nil
         _folderManager = nil
         _permissionManager = nil
+        _networkUtilities = nil
     }
 }
 

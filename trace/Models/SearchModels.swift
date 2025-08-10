@@ -67,6 +67,7 @@ struct SearchResult: Identifiable {
     let shortcut: KeyboardShortcut?
     let lastUsed: Date?
     let commandId: String? // Semantic identifier for tracking
+    var isLoading: Bool = false // Indicates if this result is currently processing
     let action: () -> Void
 }
 
