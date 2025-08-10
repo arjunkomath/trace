@@ -101,7 +101,6 @@ struct PermissionsSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
         .onAppear {
             checkPermissions()
         }

@@ -145,36 +145,8 @@ struct GeneralSettingsView: View {
             } header: {
                 Text("Interface")
             }
-            
-            // System section
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Toggle Dark Mode")
-                            .font(.system(size: 13))
-                        Text("Switch between light and dark appearance")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: toggleSystemAppearance) {
-                        HStack {
-                            Image(systemName: "circle.lefthalf.filled")
-                                .font(.system(size: 12))
-                            Text("Toggle")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("System")
-            }
         }
         .formStyle(.grouped)
-        .scrollDisabled(true)
         .onDisappear {
             stopRecording()
         }
@@ -258,9 +230,5 @@ struct GeneralSettingsView: View {
             // If restart fails, just continue running
             print("Failed to restart app: \(error)")
         }
-    }
-    
-    private func toggleSystemAppearance() {
-        WindowManager.shared.toggleSystemAppearance()
     }
 }

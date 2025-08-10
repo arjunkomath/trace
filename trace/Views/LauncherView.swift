@@ -590,6 +590,7 @@ struct ResultRowView: View {
     let result: SearchResult
     let isSelected: Bool
     @Environment(\.colorScheme) var colorScheme
+    @State private var isHovered = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -611,7 +612,7 @@ struct ResultRowView: View {
                         .frame(width: 24, height: 24)
                 }
             }
-            .foregroundColor(isSelected ? .white : .secondary)
+            .foregroundColor(isSelected ? .white : (isHovered ? .primary : .secondary))
             .frame(width: 28, height: 28)
             
             // Text
@@ -642,8 +643,12 @@ struct ResultRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : Color.clear
+            isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : 
+            (isHovered ? Color.primary.opacity(0.05) : Color.clear)
         )
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
@@ -653,6 +658,7 @@ struct CompactResultRowView: View {
     let result: SearchResult
     let isSelected: Bool
     @Environment(\.colorScheme) var colorScheme
+    @State private var isHovered = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -674,7 +680,7 @@ struct CompactResultRowView: View {
                         .frame(width: 20, height: 20)
                 }
             }
-            .foregroundColor(isSelected ? .white : .secondary)
+            .foregroundColor(isSelected ? .white : (isHovered ? .primary : .secondary))
             .frame(width: 24, height: 24)
             
             // Title
@@ -705,8 +711,12 @@ struct CompactResultRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8) // Reduced from 12 to make it more compact
         .background(
-            isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : Color.clear
+            isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : 
+            (isHovered ? Color.primary.opacity(0.05) : Color.clear)
         )
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
