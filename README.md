@@ -28,7 +28,7 @@ cd trace
 xcodebuild -project trace.xcodeproj -scheme trace -configuration Release build
 ```
 
-Grant permissions when prompted: **Accessibility**, **Apple Events**, and **Input Monitoring**.
+Grant permissions when prompted: **Accessibility** and **Apple Events**.
 
 ## 🎯 Usage
 
@@ -57,7 +57,7 @@ Contributions welcome! Fork, create a feature branch, and submit a PR.
 
 ## 🔗 Links
 
-- **Website**: [arjunkomath.github.io/trace](https://arjunkomath.github.io/trace)
+- **Website**: [trace.techulus.xyz](https://trace.techulus.xyz
 - **GitHub**: [arjunkomath/trace](https://github.com/arjunkomath/trace)  
 - **Twitter**: [@arjunkomath](https://twitter.com/arjunkomath)
 
