@@ -116,7 +116,7 @@ class LauncherWindow: NSPanel {
         let windowFrame = frame
         
         let x = screenFrame.midX - windowFrame.width / 2
-        let y = screenFrame.midY - windowFrame.height / 2 + 220 // Position even higher for better accessibility
+        let y = screenFrame.midY - (windowFrame.height / 2) + (windowFrame.height * 2)
         
         setFrameOrigin(NSPoint(x: x, y: y))
     }

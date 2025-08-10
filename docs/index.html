@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trace - Lightning-fast app launcher for macOS</title>
+    <meta name="description" content="A native macOS application launcher. Press ⌥Space, type what you need, and launch instantly.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="trace.png" type="image/png">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="trace.png" alt="Trace" class="logo">
+            <h1>Trace</h1>
+            <p class="subtitle">Lightning-fast app launcher for macOS</p>
+        </header>
+
+        <main>
+            <p class="description">
+                A native macOS application launcher that runs in your background. 
+                Press <code>⌥Space</code>, type what you need, and launch instantly.
+            </p>
+
+            <div class="buttons">
+                <a href="https://github.com/arjunkomath/trace/releases" class="button primary">Download</a>
+                <a href="https://github.com/arjunkomath/trace" class="button">GitHub</a>
+            </div>
+
+            <section>
+                <h2>Features</h2>
+                <ul>
+                    <li>Fuzzy search across all applications</li>
+                    <li>Customizable global hotkey (default: <code>⌥Space</code>)</li>
+                    <li>Native macOS design with system theme support</li>
+                    <li>Invisible background operation</li>
+                    <li>Google search fallback</li>
+                    <li>Custom hotkeys per app</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>Installation</h2>
+                <p><strong>Requirements:</strong> macOS 15.5 or later</p>
+                <div class="code-block">
+                    <code>git clone https://github.com/arjunkomath/trace.git
+cd trace
+xcodebuild -project trace.xcodeproj -scheme trace -configuration Release build</code>
+                </div>
+                <p class="note">Grant permissions when prompted: Accessibility, Apple Events, and Input Monitoring.</p>
+            </section>
+
+            <section>
+                <h2>Usage</h2>
+                <ol>
+                    <li>Launch Trace (runs silently in background)</li>
+                    <li>Press <code>⌥Space</code> to open search</li>
+                    <li>Type to search, press Return to launch</li>
+                    <li>Search "settings" to customize</li>
+                </ol>
+            </section>
+        </main>
+
+        <footer>
+            <p>
+                <a href="https://github.com/arjunkomath/trace">GitHub</a> • 
+                <a href="https://twitter.com/arjunkomath">Twitter</a> • 
+                <a href="https://github.com/arjunkomath/trace/blob/main/ARCHITECTURE.md">Docs</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
