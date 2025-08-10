@@ -197,15 +197,7 @@ class OnboardingWindow: NSWindow {
     }
     
     private func setupContent() {
-        let hostingView = NSHostingView(
-            rootView: OnboardingView(onComplete: onComplete)
-                .environment(\.openSettings, OpenSettingsEnvironmentAction {
-                    if let appDelegate = NSApp.delegate as? AppDelegate {
-                        appDelegate.showPreferences()
-                    }
-                })
-        )
-        
+        let hostingView = NSHostingView(rootView: OnboardingView(onComplete: onComplete))
         contentView = hostingView
     }
     
@@ -219,26 +211,6 @@ class OnboardingWindow: NSWindow {
     }
 }
 
-// MARK: - Environment Actions
-
-struct OpenSettingsEnvironmentAction {
-    let action: () -> Void
-    
-    func callAsFunction() {
-        action()
-    }
-}
-
-extension EnvironmentValues {
-    private struct OpenSettingsKey: EnvironmentKey {
-        static let defaultValue = OpenSettingsEnvironmentAction { }
-    }
-    
-    var openSettings: OpenSettingsEnvironmentAction {
-        get { self[OpenSettingsKey.self] }
-        set { self[OpenSettingsKey.self] = newValue }
-    }
-}
 
 #Preview {
     OnboardingView(onComplete: {})

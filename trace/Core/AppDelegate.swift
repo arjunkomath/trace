@@ -380,6 +380,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    
     // MARK: - Public API
     
     func updateHotkey(keyCode: UInt32, modifiers: UInt32) throws {

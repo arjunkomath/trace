@@ -10,6 +10,7 @@ import Sparkle
 
 struct AboutSettingsView: View {
     @State private var dataPath: String = ""
+    @State private var showingResetAlert = false
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -93,12 +94,7 @@ struct AboutSettingsView: View {
                     
                 }
                 .padding(.vertical, 4)
-            } header: {
-                Text("Local Storage")
-            }
-            
-            // App Cache Section
-            Section {
+                
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Application Cache")
@@ -121,12 +117,44 @@ struct AboutSettingsView: View {
                 }
                 .padding(.vertical, 4)
             } header: {
-                Text("Cache")
+                Text("Storage")
+            }
+            
+            // Reset Section
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Reset Onboarding")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Show welcome tutorial on next app launch")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: resetOnboarding) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "graduationcap")
+                            Text("Reset")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Reset")
             }
         }
         .formStyle(.grouped)
         .onAppear {
             loadDebugInfo()
+        }
+        .alert("Onboarding Reset", isPresented: $showingResetAlert) {
+            Button("OK") { }
+        } message: {
+            Text("The welcome tutorial will be shown when you next launch the app.")
         }
     }
     
@@ -158,6 +186,12 @@ struct AboutSettingsView: View {
             
             NSWorkspace.shared.open(traceDirectory)
         }
+    }
+    
+    private func resetOnboarding() {
+        // Simply reset the UserDefaults flag
+        ServiceContainer.shared.settingsService.hasCompletedOnboarding = false
+        showingResetAlert = true
     }
     
 }
