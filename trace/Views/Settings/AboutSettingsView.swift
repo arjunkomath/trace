@@ -6,9 +6,18 @@
 //
 
 import SwiftUI
+import Sparkle
 
 struct AboutSettingsView: View {
     @State private var dataPath: String = ""
+    
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+    
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    }
     
     var body: some View {
         Form {
@@ -20,7 +29,7 @@ struct AboutSettingsView: View {
                             Text("Trace")
                                 .font(.system(size: 24, weight: .semibold))
                             
-                            Text("Version 1.0.0")
+                            Text("Version \(appVersion) (\(buildNumber))")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                             
@@ -31,6 +40,17 @@ struct AboutSettingsView: View {
                                 .padding(.horizontal, 40)
                         }
                     }
+                    
+                    // Check for Updates Button
+                    Button(action: checkForUpdates) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.circle")
+                            Text("Check for Updates")
+                        }
+                        .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.top, 4)
                     
                     // Developer Info and Links
                     VStack(spacing: 8) {
@@ -147,6 +167,12 @@ struct AboutSettingsView: View {
             }
             
             NSWorkspace.shared.open(traceDirectory)
+        }
+    }
+    
+    private func checkForUpdates() {
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.checkForUpdates()
         }
     }
 }

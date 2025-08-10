@@ -4,6 +4,15 @@
         <title>trace</title>
         <item>
             <title>1.0</title>
+            <pubDate>Sun, 10 Aug 2025 20:18:05 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.0.0.dmg" length="2092640" type="application/octet-stream"/>
+        </item>
+        <item>
+            <title>1.0</title>
             <pubDate>Sun, 10 Aug 2025 20:03:32 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
             <sparkle:version>5</sparkle:version>
