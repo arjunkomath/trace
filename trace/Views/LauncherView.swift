@@ -19,6 +19,9 @@ struct LauncherView: View {
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var services = ServiceContainer.shared
     @State private var loadingCommands: Set<String> = [] // Track which commands are loading
+    @State private var cachedResults: [SearchResult] = [] // Background-computed results
+    @State private var isSearching = false // Track if background search is running
+    @State private var currentSearchTask: Task<Void, Never>? // Track current search task
     
     let onClose: () -> Void
     
@@ -34,14 +37,24 @@ struct LauncherView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 16))
                     .focused($isSearchFocused)
-                    .onChange(of: searchText) { _, _ in
+                    .onChange(of: searchText) { _, newValue in
                         selectedIndex = 0
+                        
+                        // Cancel any existing search task
+                        currentSearchTask?.cancel()
+                        
+                        // Clear results immediately if search is empty
+                        if newValue.isEmpty {
+                            cachedResults = []
+                        } else {
+                            // Start search immediately
+                            performBackgroundSearch(for: newValue)
+                        }
                     }
                 
                 if !searchText.isEmpty {
                     Button(action: { 
-                        searchText = ""
-                        selectedIndex = 0
+                        clearSearch()
                         // Restore focus after clearing search
                         DispatchQueue.main.async {
                             isSearchFocused = true
@@ -129,8 +142,7 @@ struct LauncherView: View {
         )
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
-            searchText = ""
-            selectedIndex = 0
+            clearSearch()
             // Load results layout from SettingsManager
             resultsLayout = ResultsLayout(rawValue: SettingsManager.shared.settings.resultsLayout) ?? .compact
             
@@ -147,9 +159,11 @@ struct LauncherView: View {
                 isSearchFocused = true
             }
         }
+        .onDisappear {
+            currentSearchTask?.cancel()
+        }
         .onKeyPress(.escape) {
-            searchText = ""
-            selectedIndex = 0
+            clearSearch()
             onClose()
             return .handled
         }
@@ -215,13 +229,20 @@ struct LauncherView: View {
         )
     }
     
+    /// Clear search state and reset UI
+    private func clearSearch() {
+        currentSearchTask?.cancel()
+        searchText = ""
+        cachedResults = []
+        selectedIndex = 0
+    }
+    
     /// Standard action wrapper that tracks usage and closes launcher
     private func createStandardAction(commandId: String, customAction: @escaping () -> Void) -> () -> Void {
         return { [services, self] in
             services.usageTracker.recordUsage(for: commandId, type: .command)
             customAction()
-            searchText = ""
-            selectedIndex = 0
+            clearSearch()
             onClose()
         }
     }
@@ -263,16 +284,43 @@ struct LauncherView: View {
     }
     
     var results: [SearchResult] {
-        guard !searchText.isEmpty else { return [] }
+        guard !searchText.isEmpty else { 
+            return []
+        }
+        return cachedResults
+    }
+    
+    /// Perform search calculations in background thread
+    private func performBackgroundSearch(for query: String) {
+        // Cancel any existing search
+        currentSearchTask?.cancel()
         
-        let searchLower = searchText.lowercased()
+        currentSearchTask = Task.detached {
+            guard !Task.isCancelled else { return }
+            
+            let searchResults = await self.calculateSearchResults(query: query)
+            
+            guard !Task.isCancelled else { return }
+            
+            await MainActor.run {
+                // Only update if the query is still current
+                if self.searchText == query {
+                    self.cachedResults = searchResults
+                }
+            }
+        }
+    }
+    
+    /// Calculate search results on background thread
+    private func calculateSearchResults(query: String) async -> [SearchResult] {
+        let searchLower = query.lowercased()
         var scoredResults: [(SearchResult, Double)] = []
         
-        // Get usage scores for all items
+        // Get usage scores for all items (this can be heavy)
         let usageScores = services.usageTracker.getAllUsageScores()
         
         // Get apps but calculate our own scores for fair comparison
-        let apps = services.appSearchManager.searchApps(query: searchText, limit: 30)
+        let apps = services.appSearchManager.searchApps(query: query, limit: 30)
         for app in apps {
             // Calculate match score ourselves for consistency
             let matchScore = FuzzyMatcher.match(query: searchLower, text: app.displayName.lowercased())
@@ -540,7 +588,7 @@ struct LauncherView: View {
         // Add search engine options
         let searchEngines = [
             SearchResult(
-                title: "Search Google for '\(searchText)'",
+                title: "Search Google for '\(query)'",
                 subtitle: "Open in browser",
                 icon: .system("globe"),
                 type: .suggestion,
@@ -549,14 +597,14 @@ struct LauncherView: View {
                 lastUsed: nil,
                 commandId: "com.trace.search.google",
                 action: {
-                    if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                    if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                        let url = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
                         NSWorkspace.shared.open(url)
                     }
                 }
             ),
             SearchResult(
-                title: "Search DuckDuckGo for '\(searchText)'",
+                title: "Search DuckDuckGo for '\(query)'",
                 subtitle: "Privacy-focused search",
                 icon: .system("shield"),
                 type: .suggestion,
@@ -565,14 +613,14 @@ struct LauncherView: View {
                 lastUsed: nil,
                 commandId: "com.trace.search.duckduckgo",
                 action: {
-                    if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                    if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                        let url = URL(string: "https://duckduckgo.com/?q=\(encodedQuery)") {
                         NSWorkspace.shared.open(url)
                     }
                 }
             ),
             SearchResult(
-                title: "Search Perplexity for '\(searchText)'",
+                title: "Search Perplexity for '\(query)'",
                 subtitle: "AI-powered search",
                 icon: .system("brain.head.profile"),
                 type: .suggestion,
@@ -581,7 +629,7 @@ struct LauncherView: View {
                 lastUsed: nil,
                 commandId: "com.trace.search.perplexity",
                 action: {
-                    if let encodedQuery = searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                    if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                        let url = URL(string: "https://www.perplexity.ai/search?q=\(encodedQuery)") {
                         NSWorkspace.shared.open(url)
                     }
