@@ -8,6 +8,7 @@
 import Cocoa
 import SwiftUI
 import Carbon
+import Sparkle
 
 extension NSEvent.ModifierFlags {
     init(carbonModifiers: UInt32) {
@@ -38,6 +39,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalEventMonitor: Any?
     private var skipQuitConfirmation = false
     private var statusItem: NSStatusItem?
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure the app is truly a background app without dock icon
@@ -360,5 +362,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func terminateWithoutConfirmation() {
         skipQuitConfirmation = true
         NSApp.terminate(nil)
+    }
+    
+    func checkForUpdates() {
+        updaterController.checkForUpdates(nil)
     }
 }

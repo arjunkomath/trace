@@ -118,3 +118,6 @@ Temporary Items
 
 # App specific
 *.log
+
+# Sparkle
+generate_appcast

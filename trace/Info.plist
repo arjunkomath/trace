@@ -10,5 +10,11 @@
     <string>Trace needs accessibility permission to manage window positions, resize windows, and provide window management hotkeys. This allows Trace to help you organize and control application windows on your desktop.</string>
     <key>NSSystemAdministrationUsageDescription</key>
     <string>Trace needs permission to control system settings like appearance mode.</string>
+    <key>SUPublicEDKey</key>
+    <string>oB7gQCpdfoZD4FGg8kFZlVUmLK+4tUh9lapdUmT4vpU=</string>
+    <key>SUFeedURL</key>
+    <string>https://trace.techulus.xyz/appcast.xml</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
 </dict>
 </plist>
