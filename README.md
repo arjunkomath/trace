@@ -4,8 +4,6 @@
 
 A beautiful, native macOS application launcher that lives in your background. Press `⌥Space`, type what you need, and launch instantly. Built with SwiftUI for modern macOS.
 
-![Trace App Icon](trace.png)
-
 ## ✨ Features
 
 - **🚀 Instant Search** - Fuzzy search across all your applications with intelligent ranking
