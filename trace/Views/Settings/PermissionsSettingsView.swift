@@ -13,50 +13,20 @@ struct PermissionsSettingsView: View {
     @State private var accessibilityEnabled = false
     @State private var notificationEnabled = false
     @State private var checkingPermissions = false
-    @State private var refreshingAccessibility = false
     
     var body: some View {
         Form {
             Section {
                 // Accessibility Permission
-                VStack(spacing: 8) {
-                    PermissionRow(
-                        title: "Accessibility Access",
-                        subtitle: "Required for window management and global hotkeys",
-                        icon: "accessibility",
-                        status: accessibilityEnabled ? .granted : .denied,
-                        action: {
-                            openAccessibilitySettings()
-                        }
-                    )
-                    
-                    // Add refresh button for accessibility issues in release builds
-                    if !accessibilityEnabled && !checkingPermissions {
-                        HStack {
-                            Button(action: {
-                                refreshingAccessibility = true
-                                checkAccessibilityPermissions()
-                            }) {
-                                HStack(spacing: 4) {
-                                    if refreshingAccessibility {
-                                        ProgressView()
-                                            .scaleEffect(0.6)
-                                    } else {
-                                        Image(systemName: "arrow.clockwise")
-                                            .font(.system(size: 10))
-                                    }
-                                    Text("Refresh Permissions")
-                                }
-                            }
-                            .font(.system(size: 11))
-                            .buttonStyle(.link)
-                            .disabled(refreshingAccessibility)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal)
+                PermissionRow(
+                    title: "Accessibility Access",
+                    subtitle: "Required for window management and global hotkeys",
+                    icon: "accessibility",
+                    status: accessibilityEnabled ? .granted : .denied,
+                    action: {
+                        openAccessibilitySettings()
                     }
-                }
+                )
                 
                 // Notification Permission
                 PermissionRow(
@@ -111,15 +81,13 @@ struct PermissionsSettingsView: View {
         // Check accessibility permissions with retry mechanism for release builds
         checkAccessibilityPermissions()
         
-        // Check notification permissions using PermissionManager
-        notificationEnabled = permissionManager.notificationPermissionStatus == .authorized
+        // Check notification permissions by refreshing the status from system
+        checkNotificationPermissions()
         
         // Don't set checkingPermissions to false here - let checkAccessibilityPermissions() handle it
     }
     
     private func checkAccessibilityPermissions() {
-        refreshingAccessibility = true
-        
         DispatchQueue.global(qos: .userInitiated).async {
             let capability = self.permissionManager.testWindowManagementCapability()
             
@@ -136,8 +104,15 @@ struct PermissionsSettingsView: View {
                     self.accessibilityEnabled = AXIsProcessTrusted()
                 }
                 
-                self.refreshingAccessibility = false
                 self.checkingPermissions = false // Reset the concurrent check guard
+            }
+        }
+    }
+    
+    private func checkNotificationPermissions() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.notificationEnabled = settings.authorizationStatus == .authorized
             }
         }
     }

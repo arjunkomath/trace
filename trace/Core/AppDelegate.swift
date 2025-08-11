@@ -56,6 +56,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         // REMOVED: requestAccessibilityPermissions() - now only requested when needed
         
+        // Request notification permissions on app launch
+        PermissionManager.shared.requestNotificationPermissions()
+        
         // Initialize window hotkey manager to register saved hotkeys
         _ = WindowHotkeyManager.shared
         

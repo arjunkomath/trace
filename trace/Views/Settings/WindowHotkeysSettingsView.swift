@@ -10,39 +10,8 @@ import Carbon
 import ApplicationServices
 
 struct WindowManagementSettingsView: View {
-    @ObservedObject private var permissionManager = PermissionManager.shared
-    @State private var isTestingCapability = false
-    
     var body: some View {
         Form {
-            // Permission Status Section
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Window Management")
-                            .font(.system(size: 13))
-                        Text("Control windows of other applications")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Button(permissionManager.windowManagementAvailable ? "Available" : "Test Access") {
-                        testWindowManagementAccess()
-                    }
-                    .buttonStyle(.automatic)
-                    .disabled(isTestingCapability)
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Permissions")
-            } footer: {
-                Text("Window management will be tested when you first use it. No setup required for most operations.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
-            
             // Window Management Commands List
             Section {
                 ForEach(Array(WindowPosition.allCases.enumerated()), id: \.offset) { index, position in
@@ -58,50 +27,6 @@ struct WindowManagementSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            // Refresh capability when app becomes active
-            testWindowManagementAccessSilently()
-        }
-    }
-    
-    private func testWindowManagementAccess() {
-        isTestingCapability = true
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = self.permissionManager.testWindowManagementCapability()
-            
-            DispatchQueue.main.async {
-                self.isTestingCapability = false
-                
-                switch result {
-                case .available:
-                    self.permissionManager.windowManagementAvailable = true
-                    
-                case .permissionDenied:
-                    self.permissionManager.windowManagementAvailable = false
-                    self.permissionManager.requestWindowManagementPermissions()
-                    
-                case .noTargetApp, .noWindows:
-                    // These states mean permissions are granted but no suitable target
-                    self.permissionManager.windowManagementAvailable = true
-                }
-            }
-        }
-    }
-    
-    private func testWindowManagementAccessSilently() {
-        DispatchQueue.global(qos: .background).async {
-            let result = self.permissionManager.testWindowManagementCapability()
-            
-            DispatchQueue.main.async {
-                switch result {
-                case .available, .noTargetApp, .noWindows:
-                    self.permissionManager.windowManagementAvailable = true
-                case .permissionDenied:
-                    self.permissionManager.windowManagementAvailable = false
-                }
-            }
-        }
     }
 }
 

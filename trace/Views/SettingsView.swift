@@ -32,17 +32,17 @@ struct SettingsView: View {
             }
             .tag(0)
             
-            WindowManagementSettingsView()
-                .tabItem {
-                    Image(systemName: "macwindow")
-                    Text("Window Hotkeys")
-                }
-                .tag(1)
-            
             PermissionsSettingsView()
                 .tabItem {
                     Image(systemName: "lock.shield")
                     Text("Permissions")
+                }
+                .tag(1)
+            
+            WindowManagementSettingsView()
+                .tabItem {
+                    Image(systemName: "macwindow")
+                    Text("Window Hotkeys")
                 }
                 .tag(2)
             

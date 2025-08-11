@@ -23,7 +23,8 @@ class PermissionManager: ObservableObject {
     
     
     private init() {
-        requestNotificationPermissions()
+        // Check current notification permission status without requesting
+        checkNotificationPermissionStatus()
     }
     
     // MARK: - Window Management Permissions
@@ -70,7 +71,9 @@ class PermissionManager: ObservableObject {
         // First check if we might already have permissions
         let testResult = testWindowManagementCapability()
         if case .available = testResult {
-            windowManagementAvailable = true
+            DispatchQueue.main.async {
+                self.windowManagementAvailable = true
+            }
             return
         }
         
@@ -92,14 +95,18 @@ class PermissionManager: ObservableObject {
         case .available(let window):
             let success = operation(window)
             if success {
-                windowManagementAvailable = true
+                DispatchQueue.main.async {
+                    self.windowManagementAvailable = true
+                }
                 onSuccess()
             } else {
                 onFailure(.operationFailed)
             }
             
         case .permissionDenied:
-            windowManagementAvailable = false
+            DispatchQueue.main.async {
+                self.windowManagementAvailable = false
+            }
             onFailure(.permissionDenied)
             
         case .noTargetApp:
@@ -128,12 +135,16 @@ class PermissionManager: ObservableObject {
         
         if error != nil {
             logger.warning("System events test failed: \(error?.description ?? "Unknown error")")
-            systemEventsAvailable = false
+            DispatchQueue.main.async {
+                self.systemEventsAvailable = false
+            }
             return false
         }
         
         logger.info("System events capability test passed!")
-        systemEventsAvailable = true
+        DispatchQueue.main.async {
+            self.systemEventsAvailable = true
+        }
         return true
     }
     
@@ -149,7 +160,9 @@ class PermissionManager: ObservableObject {
         if let error = error {
             let errorMessage = error.description
             logger.error("AppleScript execution failed: \(errorMessage)")
-            systemEventsAvailable = false
+            DispatchQueue.main.async {
+                self.systemEventsAvailable = false
+            }
             
             if errorMessage.contains("not allowed assistive access") || 
                errorMessage.contains("accessibility") {
@@ -158,22 +171,47 @@ class PermissionManager: ObservableObject {
                 onFailure("AppleScript failed: \(errorMessage)")
             }
         } else {
-            systemEventsAvailable = true
+            DispatchQueue.main.async {
+                self.systemEventsAvailable = true
+            }
             onSuccess(result)
         }
     }
     
     // MARK: - Notification Permissions
     
-    private func requestNotificationPermissions() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge]) { [weak self] granted, error in
+    private func checkNotificationPermissionStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             DispatchQueue.main.async {
-                if granted {
+                self?.notificationPermissionStatus = settings.authorizationStatus
+            }
+        }
+    }
+    
+    func requestNotificationPermissions() {
+        // First check if we already have permission
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            DispatchQueue.main.async {
+                if settings.authorizationStatus == .authorized {
                     self?.notificationPermissionStatus = .authorized
-                } else if error != nil {
-                    self?.notificationPermissionStatus = .denied
+                    return
+                }
+                
+                // Only request if not already denied or authorized
+                if settings.authorizationStatus == .notDetermined {
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge]) { granted, error in
+                        DispatchQueue.main.async {
+                            if granted {
+                                self?.notificationPermissionStatus = .authorized
+                            } else if error != nil {
+                                self?.notificationPermissionStatus = .denied
+                            } else {
+                                self?.notificationPermissionStatus = .denied
+                            }
+                        }
+                    }
                 } else {
-                    self?.notificationPermissionStatus = .denied
+                    self?.notificationPermissionStatus = settings.authorizationStatus
                 }
             }
         }
