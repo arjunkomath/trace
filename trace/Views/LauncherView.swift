@@ -756,10 +756,9 @@ struct LauncherView: View {
                 
                 if score > 0.3 {
                     // Check if this window position has a hotkey assigned
-                    let assignedHotkey = UserDefaults.standard.string(forKey: "window_\(position.rawValue)_hotkey")
                     let shortcut: KeyboardShortcut? = {
-                        if let hotkeyString = assignedHotkey, !hotkeyString.isEmpty {
-                            return KeyboardShortcut(keyCombo: hotkeyString)
+                        if let hotkeyData = SettingsManager.shared.getWindowHotkey(for: position.rawValue) {
+                            return KeyboardShortcut(keyCombo: hotkeyData.hotkey)
                         }
                         return nil
                     }()

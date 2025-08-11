@@ -15,6 +15,7 @@ struct TraceSettings: Codable {
     var resultsLayout: String = "compact"
     var showMenuBarIcon: Bool = true  // Default to true - show menu bar icon
     var launchAtLogin: Bool = false
+    var hasCompletedOnboarding: Bool = false
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
@@ -136,6 +137,11 @@ class SettingsManager: ObservableObject {
     
     func updateLaunchAtLogin(_ launch: Bool) {
         settings.launchAtLogin = launch
+        saveSettings()
+    }
+    
+    func updateOnboardingCompleted(_ completed: Bool) {
+        settings.hasCompletedOnboarding = completed
         saveSettings()
     }
     
@@ -340,129 +346,6 @@ class SettingsManager: ObservableObject {
         try importSettings(importedSettings, overwriteExisting: overwriteExisting)
         
         logger.info("Successfully imported settings from: \(fileURL.path)")
-    }
-    
-    // MARK: - Migration from UserDefaults
-    
-    func migrateFromUserDefaults() {
-        // Check if we've already migrated (settings file exists with non-default values)
-        if fileManager.fileExists(atPath: settingsURL.path) {
-            logger.info("Settings file already exists, skipping UserDefaults migration")
-            return
-        }
-        
-        logger.info("Starting migration from UserDefaults...")
-        
-        let userDefaults = UserDefaults.standard
-        var migrated = false
-        
-        // Migrate general settings
-        if let resultsLayout = userDefaults.string(forKey: "resultsLayout") {
-            settings.resultsLayout = resultsLayout
-            migrated = true
-        }
-        
-        if userDefaults.object(forKey: "showMenuBarIcon") != nil {
-            settings.showMenuBarIcon = userDefaults.bool(forKey: "showMenuBarIcon")
-            migrated = true
-        }
-        
-        // Migrate main hotkey
-        if userDefaults.object(forKey: "hotkey_keyCode") != nil {
-            settings.mainHotkeyKeyCode = userDefaults.integer(forKey: "hotkey_keyCode")
-            settings.mainHotkeyModifiers = userDefaults.integer(forKey: "hotkey_modifiers")
-            migrated = true
-        }
-        
-        // Migrate window hotkeys
-        for key in userDefaults.dictionaryRepresentation().keys {
-            if key.hasPrefix("window_") && key.hasSuffix("_hotkey") {
-                let positionPart = String(key.dropFirst(7).dropLast(7)) // Remove "window_" and "_hotkey"
-                if let hotkey = userDefaults.string(forKey: key), !hotkey.isEmpty {
-                    let keyCode = userDefaults.integer(forKey: "window_\(positionPart)_keycode")
-                    let modifiers = userDefaults.integer(forKey: "window_\(positionPart)_modifiers")
-                    
-                    settings.windowHotkeys[positionPart] = TraceSettings.WindowHotkeyData(
-                        hotkey: hotkey,
-                        keyCode: keyCode,
-                        modifiers: modifiers
-                    )
-                    migrated = true
-                }
-            }
-        }
-        
-        // Migrate app hotkeys
-        for key in userDefaults.dictionaryRepresentation().keys {
-            if key.hasPrefix("app_") && key.hasSuffix("_hotkey") {
-                let bundleId = String(key.dropFirst(4).dropLast(7)) // Remove "app_" and "_hotkey"
-                if let hotkey = userDefaults.string(forKey: key), !hotkey.isEmpty {
-                    let keyCode = userDefaults.integer(forKey: "app_\(bundleId)_keycode")
-                    let modifiers = userDefaults.integer(forKey: "app_\(bundleId)_modifiers")
-                    
-                    settings.appHotkeys[bundleId] = TraceSettings.AppHotkeyData(
-                        hotkey: hotkey,
-                        keyCode: keyCode,
-                        modifiers: modifiers
-                    )
-                    migrated = true
-                }
-            }
-        }
-        
-        // Migrate custom folders
-        if let data = userDefaults.data(forKey: "com.trace.customFolders"),
-           let folders = try? JSONDecoder().decode([FolderShortcut].self, from: data) {
-            for folder in folders where !folder.isDefault {
-                settings.customFolders.append(TraceSettings.CustomFolderData(
-                    id: folder.id,
-                    name: folder.name,
-                    path: folder.path,
-                    isDefault: folder.isDefault
-                ))
-            }
-            migrated = true
-        }
-        
-        // Migrate folder hotkeys
-        if let data = userDefaults.data(forKey: "com.trace.folderHotkeys"),
-           let hotkeys = try? JSONDecoder().decode([String: String].self, from: data) {
-            settings.folderHotkeys.merge(hotkeys) { _, new in new }
-            migrated = true
-        }
-        
-        if migrated {
-            saveSettings()
-            logger.info("Successfully migrated settings from UserDefaults")
-            
-            // Clear UserDefaults after successful migration
-            clearUserDefaults()
-        } else {
-            logger.info("No UserDefaults to migrate")
-        }
-    }
-    
-    private func clearUserDefaults() {
-        let userDefaults = UserDefaults.standard
-        let keysToRemove = [
-            "resultsLayout", "showMenuBarIcon", "hotkey_keyCode", "hotkey_modifiers",
-            "com.trace.customFolders", "com.trace.folderHotkeys"
-        ]
-        
-        for key in keysToRemove {
-            userDefaults.removeObject(forKey: key)
-        }
-        
-        // Remove window hotkeys
-        let allKeys = Array(userDefaults.dictionaryRepresentation().keys)
-        for key in allKeys {
-            if (key.hasPrefix("window_") && (key.hasSuffix("_hotkey") || key.hasSuffix("_keycode") || key.hasSuffix("_modifiers"))) ||
-               (key.hasPrefix("app_") && (key.hasSuffix("_hotkey") || key.hasSuffix("_keycode") || key.hasSuffix("_modifiers"))) {
-                userDefaults.removeObject(forKey: key)
-            }
-        }
-        
-        logger.info("Cleared migrated UserDefaults keys")
     }
 }
 

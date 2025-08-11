@@ -16,7 +16,6 @@ class ServiceContainer: ObservableObject {
     private var _hotkeyRegistry: HotkeyRegistry?
     private var _appHotkeyManager: AppHotkeyManager?
     private var _windowHotkeyManager: WindowHotkeyManager?
-    private var _settingsService: SettingsService?
     private var _folderManager: FolderManager?
     private var _permissionManager: PermissionManager?
     private var _networkUtilities: NetworkUtilities?
@@ -77,14 +76,6 @@ class ServiceContainer: ObservableObject {
         return manager
     }
     
-    var settingsService: SettingsService {
-        if let service = _settingsService {
-            return service
-        }
-        let service = SettingsService()
-        _settingsService = service
-        return service
-    }
     
     var folderManager: FolderManager {
         if let manager = _folderManager {
@@ -122,7 +113,6 @@ class ServiceContainer: ObservableObject {
         _hotkeyRegistry = nil
         _appHotkeyManager = nil
         _windowHotkeyManager = nil
-        _settingsService = nil
         _folderManager = nil
         _permissionManager = nil
         _networkUtilities = nil

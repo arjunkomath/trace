@@ -22,7 +22,6 @@ enum AppLogger {
     static let appDelegate = logger(for: "AppDelegate")
     static let appSearchManager = logger(for: "AppSearchManager")
     static let hotkeyManager = logger(for: "HotkeyManager")
-    static let settingsService = logger(for: "SettingsService")
     static let settingsView = logger(for: "SettingsView")
     static let launcherView = logger(for: "LauncherView")
     static let launcherWindow = logger(for: "LauncherWindow")

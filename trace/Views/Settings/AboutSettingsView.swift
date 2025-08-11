@@ -189,8 +189,8 @@ struct AboutSettingsView: View {
     }
     
     private func resetOnboarding() {
-        // Simply reset the UserDefaults flag
-        ServiceContainer.shared.settingsService.hasCompletedOnboarding = false
+        // Reset the onboarding flag using SettingsManager
+        SettingsManager.shared.updateOnboardingCompleted(false)
         showingResetAlert = true
     }
     

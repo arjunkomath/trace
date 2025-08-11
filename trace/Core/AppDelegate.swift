@@ -31,7 +31,6 @@ extension NSEvent.ModifierFlags {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = AppLogger.appDelegate
-    private let settingsService = SettingsService()
     private let settingsManager = SettingsManager.shared
     
     private var launcherWindow: LauncherWindow?
@@ -47,9 +46,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         logger.info("✅ Set app activation policy to .accessory (background app)")
         
-        // Migrate from UserDefaults if needed
-        settingsManager.migrateFromUserDefaults()
-        logger.info("✅ Settings migration completed")
         
         // Initialize unified hotkey registry first
         _ = HotkeyRegistry.shared
@@ -67,7 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = AppHotkeyManager.shared
         
         // Show onboarding if first time user
-        if !settingsService.hasCompletedOnboarding {
+        if !settingsManager.settings.hasCompletedOnboarding {
             showOnboarding()
         }
         
@@ -120,8 +116,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openItem.target = self
         
         // Get the current hotkey and convert to key equivalent
-        let keyCode = settingsService.hotkeyKeyCode
-        let modifiers = settingsService.hotkeyModifiers
+        let keyCode = UInt32(settingsManager.settings.mainHotkeyKeyCode)
+        let modifiers = UInt32(settingsManager.settings.mainHotkeyModifiers)
         
         // Convert to NSMenuItem key equivalent and modifier mask
         if let keyChar = keyCodeToString(keyCode) {
@@ -369,7 +365,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func completeOnboarding() {
-        settingsService.hasCompletedOnboarding = true
+        settingsManager.updateOnboardingCompleted(true)
         onboardingWindow?.hide()
         onboardingWindow = nil
         logger.info("✅ Onboarding completed")
