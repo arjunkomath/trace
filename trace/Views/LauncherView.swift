@@ -14,10 +14,10 @@ struct LauncherView: View {
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @FocusState private var isSearchFocused: Bool
-    @State private var resultsLayout: ResultsLayout = .compact
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var services = ServiceContainer.shared
+    @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var loadingCommands: Set<String> = [] // Track which commands are loading
     @State private var cachedResults: [SearchResult] = [] // Background-computed results
     @State private var isSearching = false // Track if background search is running
@@ -93,7 +93,7 @@ struct LauncherView: View {
                             VStack(spacing: 0) {
                                 ForEach(Array(results.enumerated()), id: \.offset) { index, result in
                                     Group {
-                                        if resultsLayout == .compact {
+                                        if ResultsLayout(rawValue: settingsManager.settings.resultsLayout) == .compact {
                                             CompactResultRowView(
                                                 result: result,
                                                 isSelected: index == selectedIndex
@@ -143,9 +143,6 @@ struct LauncherView: View {
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
             clearSearch()
-            // Load results layout from SettingsManager
-            resultsLayout = ResultsLayout(rawValue: SettingsManager.shared.settings.resultsLayout) ?? .compact
-            
             // Set focus immediately
             isSearchFocused = true
         }
@@ -870,7 +867,8 @@ struct ResultRowView: View {
             // Loading spinner or result type
             if result.isLoading {
                 ProgressView()
-                    .frame(width: 12, height: 12)
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(0.5)
                     .foregroundColor(isSelected ? .white : .secondary)
             } else {
                 Text(result.type.displayName)
@@ -945,7 +943,8 @@ struct CompactResultRowView: View {
             // Loading spinner or result type
             if result.isLoading {
                 ProgressView()
-                    .frame(width: 10, height: 10)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(0.4)
                     .foregroundColor(isSelected ? .white : .secondary)
             } else {
                 Text(result.type.displayName)
