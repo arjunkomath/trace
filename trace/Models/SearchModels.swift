@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import Ifrit
 
 enum ResultsLayout: String, CaseIterable {
     case compact = "compact"
@@ -35,6 +36,7 @@ enum SearchResultType {
     case application
     case command
     case file
+    case folder
     case person
     case recent
     case suggestion
@@ -47,6 +49,8 @@ enum SearchResultType {
             return "Command"
         case .file:
             return "File"
+        case .folder:
+            return "Folder"
         case .person:
             return "Person"
         case .recent:
@@ -119,7 +123,7 @@ struct SearchCategory {
 
 // MARK: - Application Model
 
-struct Application: Identifiable, Hashable {
+struct Application: Identifiable, Hashable, Searchable {
     let id: String // bundle identifier
     let name: String
     let displayName: String
@@ -129,6 +133,16 @@ struct Application: Identifiable, Hashable {
     let description: String?
     let keywords: [String]
     var icon: NSImage?
+    
+    // Searchable protocol requirement
+    var properties: [FuseProp] {
+        return [
+            FuseProp(displayName, weight: 0.4),  // Display name is most important
+            FuseProp(name, weight: 0.35),         // App name is also very important
+            FuseProp(keywords.joined(separator: " "), weight: 0.2),  // Keywords are important
+            FuseProp(description ?? "", weight: 0.05)  // Description is least important
+        ]
+    }
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(bundleIdentifier)

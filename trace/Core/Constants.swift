@@ -45,6 +45,7 @@ enum AppConstants {
         static let applications = [
             "/Applications",
             "/System/Applications",
+            "/System/Library/CoreServices/Applications",
             "/usr/local",
             "~/Applications",
         ]

@@ -7,8 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		551AB0DC2E49B8CA008C78E5 /* Ifrit in Frameworks */ = {isa = PBXBuildFile; productRef = 551AB0DB2E49B8CA008C78E5 /* Ifrit */; };
+		551AB0DD2E49BC66008C78E5 /* Ifrit in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 551AB0DB2E49B8CA008C78E5 /* Ifrit */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		55A89B632E48A0890053E87C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55A89B622E48A0890053E87C /* Sparkle */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		551AB0DE2E49BC66008C78E5 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				551AB0DD2E49BC66008C78E5 /* Ifrit in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		5567D2AC2E4469D500536CFF /* trace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = trace.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -28,6 +44,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				55A89B632E48A0890053E87C /* Sparkle in Frameworks */,
+				551AB0DC2E49B8CA008C78E5 /* Ifrit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,6 +77,7 @@
 				5567D2A82E4469D500536CFF /* Sources */,
 				5567D2A92E4469D500536CFF /* Frameworks */,
 				5567D2AA2E4469D500536CFF /* Resources */,
+				551AB0DE2E49BC66008C78E5 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -71,6 +89,7 @@
 			name = trace;
 			packageProductDependencies = (
 				55A89B622E48A0890053E87C /* Sparkle */,
+				551AB0DB2E49B8CA008C78E5 /* Ifrit */,
 			);
 			productName = trace;
 			productReference = 5567D2AC2E4469D500536CFF /* trace.app */;
@@ -102,6 +121,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				55A89B612E48A0890053E87C /* XCRemoteSwiftPackageReference "Sparkle" */,
+				551AB0DA2E49B8CA008C78E5 /* XCRemoteSwiftPackageReference "Ifrit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5567D2AD2E4469D500536CFF /* Products */;
@@ -342,6 +362,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		551AB0DA2E49B8CA008C78E5 /* XCRemoteSwiftPackageReference "Ifrit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ukushu/Ifrit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		55A89B612E48A0890053E87C /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -353,6 +381,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		551AB0DB2E49B8CA008C78E5 /* Ifrit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 551AB0DA2E49B8CA008C78E5 /* XCRemoteSwiftPackageReference "Ifrit" */;
+			productName = Ifrit;
+		};
 		55A89B622E48A0890053E87C /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 55A89B612E48A0890053E87C /* XCRemoteSwiftPackageReference "Sparkle" */;

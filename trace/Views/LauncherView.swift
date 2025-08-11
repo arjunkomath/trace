@@ -534,9 +534,9 @@ struct LauncherView: View {
                 matchScore = max(matchScore, subtitleScore)
             }
             if matchScore > 0.3 {
-                let commandId = getCommandIdentifier(for: command.title)
+                let commandId = command.commandId ?? getCommandIdentifier(for: command.title)
                 let usageScore = usageScores[commandId] ?? 0.0
-                let normalizedUsage = min(usageScore / 50.0, 1.0)
+                let normalizedUsage = normalizeUsageScore(usageScore)
                 let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
                 scoredResults.append((command, combinedScore))
             }
@@ -549,7 +549,7 @@ struct LauncherView: View {
             if matchScore > 0.3 {
                 let commandId = "com.trace.folder.\(folder.id)"
                 let usageScore = usageScores[commandId] ?? 0.0
-                let normalizedUsage = min(usageScore / 50.0, 1.0)
+                let normalizedUsage = normalizeUsageScore(usageScore)
                 let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
                 
                 // Get hotkey for this folder
@@ -564,7 +564,7 @@ struct LauncherView: View {
                     title: folder.name,
                     subtitle: folder.path,
                     icon: .system(folder.iconName),
-                    type: .file,
+                    type: .folder,
                     category: folder.isDefault ? nil : "Custom Folder",
                     shortcut: shortcut,
                     lastUsed: nil,
@@ -662,6 +662,10 @@ struct LauncherView: View {
         case .suggestion:
             let commandId = result.commandId ?? "com.trace.search.unknown"
             services.usageTracker.recordUsage(for: commandId, type: .webSearch)
+        case .folder:
+            // Use the command's semantic identifier for tracking folders
+            let commandId = result.commandId ?? "com.trace.folder.unknown"
+            services.usageTracker.recordUsage(for: commandId, type: .command)
         case .file, .person, .recent:
             // These types aren't implemented yet, so no tracking for now
             break
@@ -695,6 +699,16 @@ struct LauncherView: View {
     
     private func matchesSearchTerms(query: String, terms: [String]) -> Double {
         return FuzzyMatcher.matchBest(query: query, terms: terms)
+    }
+    
+    private func normalizeUsageScore(_ score: Double) -> Double {
+        // More aggressive normalization that better rewards frequently used items
+        // Usage of 1 = 0.1, Usage of 5 = 0.35, Usage of 10 = 0.55, Usage of 20 = 0.75, Usage of 50+ = 1.0
+        if score <= 0 { return 0 }
+        if score >= 50 { return 1.0 }
+        
+        // Use logarithmic scale for better differentiation
+        return min(log10(score + 1) / log10(51), 1.0)
     }
     
     // MARK: - Window Management

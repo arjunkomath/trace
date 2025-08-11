@@ -8,6 +8,7 @@
 import Foundation
 import AppKit
 import Cocoa
+import Ifrit
 
 class AppSearchManager: ObservableObject {
     
@@ -24,6 +25,14 @@ class AppSearchManager: ObservableObject {
     private var isLoading = false
     
     private let applicationPaths = AppConstants.Paths.applications
+    
+    // Ifrit fuzzy search instance with optimized settings
+    private let fuse = Fuse(
+        location: 0,
+        distance: 100,
+        threshold: 0.35,  // More lenient for typos
+        isCaseSensitive: false
+    )
     
     init(usageTracker: UsageTracker? = nil) {
         self.usageTracker = usageTracker
@@ -44,63 +53,43 @@ class AppSearchManager: ObservableObject {
         
         let queryLower = query.lowercased()
         var scoredResults: [(Application, Double)] = []
-        var processedBundleIds = Set<String>()
         
         // Get usage scores for all apps
         let usageScores = usageTracker?.getAllUsageScores() ?? [:]
         
-        // Fast path: exact name matches
-        if let bundleIds = appsByName[queryLower] {
-            for bundleId in bundleIds {
-                if let app = apps[bundleId] {
-                    let matchScore = 1.0
-                    let usageScore = usageScores[bundleId] ?? 0.0
-                    let normalizedUsage = normalizeUsageScore(usageScore)
-                    let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
-                    scoredResults.append((app, combinedScore))
-                    processedBundleIds.insert(bundleId)
-                }
-            }
-        }
+        // Use Ifrit's weighted multi-field search for better results
+        let allApps = Array(apps.values)
         
-        // Early return if we have enough exact matches
-        if scoredResults.count >= limit {
-            return Array(scoredResults
-                .sorted { $0.1 > $1.1 }
-                .prefix(limit)
-                .map { $0.0 })
-        }
+        // Search across all apps using Ifrit's weighted properties
+        let searchResults = fuse.searchSync(query, in: allApps, by: \Application.properties)
         
-        // Enhanced fuzzy matching with keyword and description support
-        for (name, bundleIds) in appsByName {
-            let matchScore = FuzzyMatcher.match(query: queryLower, text: name)
+        // Process search results
+        for result in searchResults {
+            guard result.index < allApps.count else { continue }
+            let app = allApps[result.index]
             
-            // Only include results with meaningful scores
-            if matchScore > 0.1 {
-                for bundleId in bundleIds where !processedBundleIds.contains(bundleId) {
-                    if let app = apps[bundleId] {
-                        // Calculate enhanced match score considering all searchable content
-                        let enhancedMatchScore = calculateEnhancedMatchScore(query: queryLower, app: app, baseScore: matchScore)
-                        
-                        let usageScore = usageScores[bundleId] ?? 0.0
-                        let normalizedUsage = normalizeUsageScore(usageScore)
-                        let combinedScore = (enhancedMatchScore * 0.6) + (normalizedUsage * 0.4)
-                        scoredResults.append((app, combinedScore))
-                        processedBundleIds.insert(bundleId)
-                        
-                        if scoredResults.count >= limit * 3 { // Get more for better sorting
-                            break
-                        }
-                    }
-                }
-            }
+            // Convert Ifrit score (0 = perfect, 1 = no match) to our system (1 = perfect, 0 = no match)
+            let matchScore = 1.0 - result.diffScore
             
-            if scoredResults.count >= limit * 3 {
+            // Skip poor matches
+            guard matchScore > 0.2 else { continue }
+            
+            // Combine with usage score
+            let usageScore = usageScores[app.bundleIdentifier] ?? 0.0
+            let normalizedUsage = normalizeUsageScore(usageScore)
+            
+            // Weight: 60% match quality, 40% usage frequency - give more weight to usage
+            let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+            
+            scoredResults.append((app, combinedScore))
+            
+            // Limit results for performance
+            if scoredResults.count >= limit * 2 {
                 break
             }
         }
         
-        // Sort by combined score (match + usage) and return top results
+        // Sort by combined score and return top results
         return scoredResults
             .sorted { $0.1 > $1.1 || ($0.1 == $1.1 && $0.0.displayName.localizedCaseInsensitiveCompare($1.0.displayName) == .orderedAscending) }
             .prefix(limit)
@@ -241,12 +230,11 @@ class AppSearchManager: ObservableObject {
             let contents = try fileManager.contentsOfDirectory(
                 at: URL(fileURLWithPath: path),
                 includingPropertiesForKeys: [.isApplicationKey, .contentModificationDateKey, .isDirectoryKey],
-                options: [.skipsHiddenFiles]
+                options: [] // Don't skip hidden files - some system apps are symlinks that appear "hidden"
             )
             
             for url in contents {
                 if url.pathExtension == "app" {
-                    // Found an .app bundle
                     if let app = createApp(from: url) {
                         apps.append(app)
                     }
@@ -275,8 +263,18 @@ class AppSearchManager: ObservableObject {
     }
     
     private func createApp(from url: URL) -> Application? {
-        guard let bundle = Bundle(url: url) else { return nil }
-        guard let bundleId = bundle.bundleIdentifier else { return nil }
+        // Resolve symlinks first - important for system apps like Safari
+        let resolvedURL = url.resolvingSymlinksInPath()
+        
+        guard let bundle = Bundle(url: resolvedURL) else {
+            logger.debug("Failed to create Bundle for: \(resolvedURL.path) (original: \(url.path))")
+            return nil
+        }
+        
+        guard let bundleId = bundle.bundleIdentifier else {
+            logger.debug("No bundle identifier for: \(url.path)")
+            return nil
+        }
         
         let displayName = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
@@ -301,7 +299,7 @@ class AppSearchManager: ObservableObject {
             id: bundleId,
             name: name,
             displayName: displayName,
-            url: url,
+            url: url, // Use original URL for display purposes
             bundleIdentifier: bundleId,
             lastModified: lastModified,
             description: description,
@@ -366,8 +364,15 @@ class AppSearchManager: ObservableObject {
         return categoryKeywords[category] ?? []
     }
     
+    
     private func normalizeUsageScore(_ score: Double) -> Double {
-        return min(sqrt(score) / 10.0, 1.0)
+        // More aggressive normalization that better rewards frequently used items
+        // Usage of 1 = 0.1, Usage of 5 = 0.35, Usage of 10 = 0.55, Usage of 20 = 0.75, Usage of 50+ = 1.0
+        if score <= 0 { return 0 }
+        if score >= 50 { return 1.0 }
+        
+        // Use logarithmic scale for better differentiation
+        return min(log10(score + 1) / log10(51), 1.0)
     }
     
     private func updateAppsCache(_ newApps: [String: Application]) {
@@ -434,29 +439,6 @@ class AppSearchManager: ObservableObject {
         refreshTimer = nil
     }
     
-    // MARK: - Search Scoring
-    
-    private func calculateEnhancedMatchScore(query: String, app: Application, baseScore: Double) -> Double {
-        var bestScore = baseScore
-        
-        // Check direct name matches (highest priority)
-        let nameScore = max(
-            FuzzyMatcher.match(query: query, text: app.name.lowercased()),
-            FuzzyMatcher.match(query: query, text: app.displayName.lowercased())
-        )
-        bestScore = max(bestScore, nameScore)
-        
-        // Check keyword matches (high priority)
-        for keyword in app.keywords {
-            let keywordScore = FuzzyMatcher.match(query: query, text: keyword) * 0.8 // Slightly lower than name
-            bestScore = max(bestScore, keywordScore)
-        }
-        
-        // Check description matches (medium priority) - already indexed, so skip expensive reprocessing
-        // Description words are already included in the search index for better performance
-        
-        return bestScore
-    }
     
     // MARK: - Lifecycle Management
     

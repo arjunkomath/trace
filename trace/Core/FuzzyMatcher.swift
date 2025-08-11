@@ -6,9 +6,17 @@
 //
 
 import Foundation
+import Ifrit
 
 /// Shared fuzzy matching utility with consistent scoring across the app
 struct FuzzyMatcher {
+    
+    private static let fuse = Fuse(
+        location: 0,
+        distance: 100,
+        threshold: 0.4,
+        isCaseSensitive: false
+    )
     
     /// Performs fuzzy matching between a query and text
     /// - Parameters:
@@ -26,16 +34,25 @@ struct FuzzyMatcher {
         
         // Prefix match gets high score
         if textLower.hasPrefix(queryLower) {
-            return 0.9
+            return 0.95
         }
         
-        // Contains match gets medium score
-        if textLower.contains(queryLower) {
-            return 0.7
+        // Use Ifrit for fuzzy matching
+        if let result = fuse.searchSync(query, in: text) {
+            // Ifrit returns a score where lower is better (0 = perfect match)
+            // Convert to our scoring system where higher is better (1.0 = perfect match)
+            let normalizedScore = 1.0 - result.score
+            
+            // Apply a minimum threshold to filter out poor matches
+            if normalizedScore < 0.3 {
+                return 0.0
+            }
+            
+            // Scale the score to our range, giving fuzzy matches up to 0.85
+            return normalizedScore * 0.85
         }
         
-        // Fuzzy character-by-character matching
-        return fuzzyCharacterMatch(query: queryLower, text: textLower)
+        return 0.0
     }
     
     /// Matches against multiple search terms and returns the best score
@@ -44,40 +61,32 @@ struct FuzzyMatcher {
     ///   - terms: Array of terms to match against
     /// - Returns: The highest matching score from all terms
     static func matchBest(query: String, terms: [String]) -> Double {
-        return terms.compactMap { term in
-            match(query: query, text: term)
-        }.max() ?? 0.0
-    }
-    
-    // MARK: - Private Helpers
-    
-    private static func fuzzyCharacterMatch(query: String, text: String) -> Double {
-        let queryChars = Array(query)
-        let textChars = Array(text)
+        // Use Ifrit's built-in array search for better performance
+        let results = fuse.searchSync(query, in: terms)
         
-        var queryIndex = 0
-        var matches = 0
-        var consecutiveMatches = 0
-        var maxConsecutive = 0
-        
-        for textChar in textChars {
-            if queryIndex < queryChars.count && queryChars[queryIndex] == textChar {
-                matches += 1
-                queryIndex += 1
-                consecutiveMatches += 1
-                maxConsecutive = max(maxConsecutive, consecutiveMatches)
-            } else {
-                consecutiveMatches = 0
+        if let bestResult = results.first {
+            let normalizedScore = 1.0 - bestResult.diffScore
+            
+            // Check for exact or prefix matches in the original terms
+            let queryLower = query.lowercased()
+            for term in terms {
+                let termLower = term.lowercased()
+                if termLower == queryLower {
+                    return 1.0
+                }
+                if termLower.hasPrefix(queryLower) {
+                    return 0.95
+                }
             }
+            
+            // Apply minimum threshold
+            if normalizedScore < 0.3 {
+                return 0.0
+            }
+            
+            return normalizedScore * 0.85
         }
         
-        // All query characters must be found
-        guard matches == queryChars.count else { return 0 }
-        
-        // Score based on match ratio and consecutive matches
-        let matchRatio = Double(matches) / Double(textChars.count)
-        let consecutiveBonus = Double(maxConsecutive) / Double(queryChars.count)
-        
-        return min(0.6, matchRatio * 0.4 + consecutiveBonus * 0.2)
+        return 0.0
     }
 }

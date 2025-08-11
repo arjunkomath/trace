@@ -1,6 +1,15 @@
 {
-  "originHash" : "e721da7f9826abdffcb6185e886155efa2514bd6234475f1afa893e29eb258d6",
+  "originHash" : "09d65b03c56071585fb1e5e6bcaa4ceddba89004d2c93fa06439f36fe6543d73",
   "pins" : [
+    {
+      "identity" : "ifrit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ukushu/Ifrit",
+      "state" : {
+        "branch" : "main",
+        "revision" : "5cb8badc28c7a4b7f59a05b8f0da37c363d25b6a"
+      }
+    },
     {
       "identity" : "sparkle",
       "kind" : "remoteSourceControl",
