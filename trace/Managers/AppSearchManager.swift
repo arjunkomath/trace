@@ -24,6 +24,11 @@ class AppSearchManager: ObservableObject {
     private var refreshTimer: Timer?
     private var isLoading = false
     
+    // Running apps tracking
+    private var runningApps: Set<String> = [] // Set of running app bundle IDs
+    private let runningAppsQueue = DispatchQueue(label: "com.trace.appsearch.runningapps", attributes: .concurrent)
+    private var workspaceObservers: [Any] = [] // Store notification observers for cleanup
+    
     private let applicationPaths = AppConstants.Paths.applications
     
     // Ifrit fuzzy search instance with optimized settings
@@ -36,12 +41,14 @@ class AppSearchManager: ObservableObject {
     
     init(usageTracker: UsageTracker? = nil) {
         self.usageTracker = usageTracker
+        setupRunningAppsMonitoring()
         loadAppsInBackground()
         setupFileSystemWatcher()
     }
     
     deinit {
         stopFileSystemWatcher()
+        cleanupRunningAppsMonitoring()
         refreshTimer?.invalidate()
         refreshTimer = nil
     }
@@ -439,6 +446,94 @@ class AppSearchManager: ObservableObject {
         refreshTimer = nil
     }
     
+    
+    // MARK: - Running Apps Monitoring
+    
+    private func setupRunningAppsMonitoring() {
+        // Initial population of running apps cache
+        updateRunningAppsCache()
+        
+        // Set up workspace notifications
+        let workspace = NSWorkspace.shared
+        let notificationCenter = workspace.notificationCenter
+        
+        // Listen for app launches
+        let launchObserver = notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               let bundleId = app.bundleIdentifier {
+                self?.addRunningApp(bundleId)
+            }
+        }
+        
+        // Listen for app terminations
+        let terminateObserver = notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               let bundleId = app.bundleIdentifier {
+                self?.removeRunningApp(bundleId)
+            }
+        }
+        
+        workspaceObservers = [launchObserver, terminateObserver]
+        logger.info("✅ Running apps monitoring setup complete")
+    }
+    
+    private func cleanupRunningAppsMonitoring() {
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+        for observer in workspaceObservers {
+            notificationCenter.removeObserver(observer)
+        }
+        workspaceObservers.removeAll()
+        logger.info("🧹 Running apps monitoring cleanup complete")
+    }
+    
+    private func updateRunningAppsCache() {
+        let currentRunningApps = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
+        
+        runningAppsQueue.async(flags: .barrier) {
+            self.runningApps = currentRunningApps
+            self.logger.info("🔄 Running apps cache updated: \(currentRunningApps.count) apps")
+        }
+    }
+    
+    private func addRunningApp(_ bundleId: String) {
+        runningAppsQueue.async(flags: .barrier) {
+            let wasInserted = self.runningApps.insert(bundleId).inserted
+            if wasInserted {
+                self.logger.info("🚀 App launched: \(bundleId)")
+            }
+        }
+    }
+    
+    private func removeRunningApp(_ bundleId: String) {
+        runningAppsQueue.async(flags: .barrier) {
+            let wasRemoved = self.runningApps.remove(bundleId) != nil
+            if wasRemoved {
+                self.logger.info("🛑 App terminated: \(bundleId)")
+            }
+        }
+    }
+    
+    // MARK: - Running Apps Detection
+    
+    func isAppRunning(bundleIdentifier: String) -> Bool {
+        return runningAppsQueue.sync {
+            return runningApps.contains(bundleIdentifier)
+        }
+    }
+    
+    func getRunningAppBundleIds() -> Set<String> {
+        return runningAppsQueue.sync {
+            return runningApps
+        }
+    }
     
     // MARK: - Lifecycle Management
     

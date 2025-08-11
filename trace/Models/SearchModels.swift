@@ -72,6 +72,7 @@ struct SearchResult: Identifiable {
     let lastUsed: Date?
     let commandId: String? // Semantic identifier for tracking
     var isLoading: Bool = false // Indicates if this result is currently processing
+    let accessory: SearchResultAccessory? // Generic accessory indicator
     let action: () -> Void
 }
 
@@ -80,6 +81,48 @@ enum SearchIcon {
     case emoji(String)
     case image(NSImage)
     case app(String)
+}
+
+enum SearchResultAccessory {
+    case runningIndicator // Green dot for running apps
+    case badge(String) // Text badge with custom string
+    case count(Int) // Number badge
+    case status(String, Color) // Status with custom text and color
+    
+    var displayText: String? {
+        switch self {
+        case .runningIndicator:
+            return nil
+        case .badge(let text):
+            return text
+        case .count(let number):
+            return "\(number)"
+        case .status(let text, _):
+            return text
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .runningIndicator:
+            return .green
+        case .badge:
+            return .secondary
+        case .count:
+            return .accentColor
+        case .status(_, let color):
+            return color
+        }
+    }
+    
+    var isIndicatorDot: Bool {
+        switch self {
+        case .runningIndicator:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 struct KeyboardShortcut {

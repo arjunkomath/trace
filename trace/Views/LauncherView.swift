@@ -222,6 +222,7 @@ struct LauncherView: View {
             shortcut: shortcut,
             lastUsed: nil,
             commandId: commandId,
+            accessory: nil,
             action: action
         )
     }
@@ -333,6 +334,10 @@ struct LauncherView: View {
                 return nil
             }()
             
+            // Check if app is currently running
+            let isRunning = services.appSearchManager.isAppRunning(bundleIdentifier: app.bundleIdentifier)
+            let accessory: SearchResultAccessory? = isRunning ? .runningIndicator : nil
+            
             let result = SearchResult(
                 title: app.displayName,
                 subtitle: nil,
@@ -342,6 +347,7 @@ struct LauncherView: View {
                 shortcut: shortcut,
                 lastUsed: nil,
                 commandId: app.bundleIdentifier,
+                accessory: accessory,
                 action: { [services] in
                     services.appSearchManager.launchApp(app)
                 }
@@ -514,6 +520,7 @@ struct LauncherView: View {
                     shortcut: nil,
                     lastUsed: nil,
                     commandId: commandId,
+                    accessory: nil,
                     action: command.action
                 )
                 
@@ -566,6 +573,7 @@ struct LauncherView: View {
                     shortcut: shortcut,
                     lastUsed: nil,
                     commandId: commandId,
+                    accessory: nil,
                     action: { [services] in
                         services.folderManager.openFolder(folder)
                     }
@@ -594,6 +602,7 @@ struct LauncherView: View {
                 shortcut: nil,
                 lastUsed: nil,
                 commandId: "com.trace.search.google",
+                accessory: nil,
                 action: {
                     if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                        let url = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
@@ -610,6 +619,7 @@ struct LauncherView: View {
                 shortcut: nil,
                 lastUsed: nil,
                 commandId: "com.trace.search.duckduckgo",
+                accessory: nil,
                 action: {
                     if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                        let url = URL(string: "https://duckduckgo.com/?q=\(encodedQuery)") {
@@ -626,6 +636,7 @@ struct LauncherView: View {
                 shortcut: nil,
                 lastUsed: nil,
                 commandId: "com.trace.search.perplexity",
+                accessory: nil,
                 action: {
                     if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                        let url = URL(string: "https://www.perplexity.ai/search?q=\(encodedQuery)") {
@@ -769,6 +780,7 @@ struct LauncherView: View {
                         shortcut: shortcut,
                         lastUsed: nil,
                         commandId: "com.trace.window.\(position.rawValue)",
+                        accessory: nil,
                         action: { [services] in
                             services.windowManager.applyWindowPosition(position)
                         }
@@ -864,6 +876,25 @@ struct ResultRowView: View {
             
             Spacer()
             
+            // Accessory (running indicator, badge, etc.)
+            if let accessory = result.accessory {
+                if accessory.isIndicatorDot {
+                    Circle()
+                        .fill(accessory.color)
+                        .frame(width: 6, height: 6)
+                } else if let displayText = accessory.displayText {
+                    Text(displayText)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(isSelected ? .white : accessory.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(accessory.color.opacity(isSelected ? 0.3 : 0.15))
+                        )
+                }
+            }
+            
             // Loading spinner or result type
             if result.isLoading {
                 ProgressView()
@@ -939,6 +970,25 @@ struct CompactResultRowView: View {
             }
             
             Spacer()
+            
+            // Accessory (running indicator, badge, etc.)
+            if let accessory = result.accessory {
+                if accessory.isIndicatorDot {
+                    Circle()
+                        .fill(accessory.color)
+                        .frame(width: 5, height: 5)
+                } else if let displayText = accessory.displayText {
+                    Text(displayText)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(isSelected ? .white : accessory.color)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(accessory.color.opacity(isSelected ? 0.3 : 0.15))
+                        )
+                }
+            }
             
             // Loading spinner or result type
             if result.isLoading {
