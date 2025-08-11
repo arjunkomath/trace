@@ -3,6 +3,15 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.1.0</title>
+            <pubDate>Mon, 11 Aug 2025 23:11:23 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.1.0.dmg" length="2256989" type="application/octet-stream" sparkle:edSignature="FM+c7RD5c7TMqZBAOML6hd5wiYu4zbVOYvfTtBoHcaeU1yt3DIxYbDPdCxSRYA4+3G1TB7PpLNFh36RkDY+NDw=="/>
+        </item>
+        <item>
             <title>1.0.1</title>
             <pubDate>Sun, 10 Aug 2025 23:45:46 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
@@ -19,15 +28,6 @@
             <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
             <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.0.0.dmg" length="2129199" type="application/octet-stream" sparkle:edSignature="zrJEDArxL9yjJoG5NWhJompxKDrsLkUZkM2uyCFyJ0JHsy0icqDgvAFu5rf2obXj7H2Oa25YbNi9a9y4Q0gWBA=="/>
-        </item>
-        <item>
-            <title>1.0</title>
-            <pubDate>Sun, 10 Aug 2025 20:18:05 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>6</sparkle:version>
-            <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.0.0.dmg" length="2092640" type="application/octet-stream"/>
         </item>
     </channel>
 </rss>
