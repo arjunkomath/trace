@@ -17,20 +17,20 @@ struct SearchContext {
     let usageScores: [String: Double]
     let services: ServiceContainer
     let runningApps: Set<String>
-    let updateCachedResults: @MainActor (String, @escaping (SearchResult) -> SearchResult) -> Void
+    let eventPublisher: ResultEventPublisher
     
     init(
         query: String, 
         services: ServiceContainer, 
         runningApps: Set<String>, 
-        updateCachedResults: @escaping @MainActor (String, @escaping (SearchResult) -> SearchResult) -> Void
+        eventPublisher: ResultEventPublisher
     ) {
         self.query = query
         self.queryLower = query.lowercased()
         self.usageScores = services.usageTracker.getAllUsageScores()
         self.services = services
         self.runningApps = runningApps
-        self.updateCachedResults = updateCachedResults
+        self.eventPublisher = eventPublisher
     }
 }
 
@@ -45,13 +45,13 @@ class SearchCoordinator {
         query: String, 
         services: ServiceContainer, 
         runningApps: Set<String>, 
-        updateCachedResults: @escaping @MainActor (String, @escaping (SearchResult) -> SearchResult) -> Void
+        eventPublisher: ResultEventPublisher
     ) async -> [SearchResult] {
         let context = SearchContext(
             query: query, 
             services: services, 
             runningApps: runningApps, 
-            updateCachedResults: updateCachedResults
+            eventPublisher: eventPublisher
         )
         
         var allResults: [(SearchResult, Double)] = []

@@ -40,36 +40,17 @@ class NetworkCommandProvider: ResultProvider {
             return nil
         }
         
-        let updateCallback = context.updateCachedResults
-        
         // Primary action: Fetch and display (no clipboard copy)
         let fetchPublicIPAction = NetworkCommandAction(
             id: "\(publicIPId)-fetch",
             displayName: "Fetch IP",
+            commandId: publicIPId,
+            eventPublisher: context.eventPublisher,
             iconName: "eye",
             keyboardShortcut: "↩",
             description: "Fetch and display your public IP address",
             networkOperation: {
                 return await context.services.networkUtilities.getPublicIPAddress()
-            },
-            onResult: { ipAddress in
-                Task { @MainActor in
-                    updateCallback(publicIPId) { updatedResult in
-                        return SearchResult(
-                            title: "Public IP Address: \(ipAddress)",
-                            subtitle: updatedResult.subtitle,
-                            icon: updatedResult.icon,
-                            type: updatedResult.type,
-                            category: updatedResult.category,
-                            shortcut: updatedResult.shortcut,
-                            lastUsed: updatedResult.lastUsed,
-                            commandId: updatedResult.commandId,
-                            isLoading: false,
-                            accessory: .status("Fetched", .blue),
-                            commandAction: updatedResult.commandAction
-                        )
-                    }
-                }
             },
             skipClipboard: true
         )
@@ -78,30 +59,13 @@ class NetworkCommandProvider: ResultProvider {
         let copyPublicIPAction = NetworkCommandAction(
             id: "\(publicIPId)-copy",
             displayName: "Copy to Clipboard",
+            commandId: publicIPId,
+            eventPublisher: context.eventPublisher,
             iconName: "doc.on.clipboard",
             keyboardShortcut: nil,
             description: "Fetch your public IP address and copy to clipboard",
             networkOperation: {
                 return await context.services.networkUtilities.getPublicIPAddress()
-            },
-            onResult: { ipAddress in
-                Task { @MainActor in
-                    updateCallback(publicIPId) { updatedResult in
-                        return SearchResult(
-                            title: "Public IP Address: \(ipAddress)",
-                            subtitle: "Copied \(ipAddress) to clipboard",
-                            icon: updatedResult.icon,
-                            type: updatedResult.type,
-                            category: updatedResult.category,
-                            shortcut: updatedResult.shortcut,
-                            lastUsed: updatedResult.lastUsed,
-                            commandId: updatedResult.commandId,
-                            isLoading: false,
-                            accessory: .status("Copied", .green),
-                            commandAction: updatedResult.commandAction
-                        )
-                    }
-                }
             },
             skipClipboard: false
         )
@@ -143,36 +107,17 @@ class NetworkCommandProvider: ResultProvider {
             return nil
         }
         
-        let updateCallback = context.updateCachedResults
-        
         // Primary action: Fetch and display (no clipboard copy)
         let fetchPrivateIPAction = NetworkCommandAction(
             id: "\(privateIPId)-fetch",
             displayName: "Fetch IP",
+            commandId: privateIPId,
+            eventPublisher: context.eventPublisher,
             iconName: "eye",
             keyboardShortcut: "↩",
             description: "Fetch and display your private IP address",
             networkOperation: {
                 return context.services.networkUtilities.getPrivateIPAddress()
-            },
-            onResult: { ipAddress in
-                Task { @MainActor in
-                    updateCallback(privateIPId) { updatedResult in
-                        return SearchResult(
-                            title: "Private IP Address: \(ipAddress)",
-                            subtitle: updatedResult.subtitle,
-                            icon: updatedResult.icon,
-                            type: updatedResult.type,
-                            category: updatedResult.category,
-                            shortcut: updatedResult.shortcut,
-                            lastUsed: updatedResult.lastUsed,
-                            commandId: updatedResult.commandId,
-                            isLoading: false,
-                            accessory: .status("Fetched", .blue),
-                            commandAction: updatedResult.commandAction
-                        )
-                    }
-                }
             },
             skipClipboard: true
         )
@@ -181,30 +126,13 @@ class NetworkCommandProvider: ResultProvider {
         let copyPrivateIPAction = NetworkCommandAction(
             id: "\(privateIPId)-copy",
             displayName: "Copy to Clipboard",
+            commandId: privateIPId,
+            eventPublisher: context.eventPublisher,
             iconName: "doc.on.clipboard",
             keyboardShortcut: nil,
             description: "Fetch your private IP address and copy to clipboard",
             networkOperation: {
                 return context.services.networkUtilities.getPrivateIPAddress()
-            },
-            onResult: { ipAddress in
-                Task { @MainActor in
-                    updateCallback(privateIPId) { updatedResult in
-                        return SearchResult(
-                            title: "Private IP Address: \(ipAddress)",
-                            subtitle: "Copied \(ipAddress) to clipboard",
-                            icon: updatedResult.icon,
-                            type: updatedResult.type,
-                            category: updatedResult.category,
-                            shortcut: updatedResult.shortcut,
-                            lastUsed: updatedResult.lastUsed,
-                            commandId: updatedResult.commandId,
-                            isLoading: false,
-                            accessory: .status("Copied", .green),
-                            commandAction: updatedResult.commandAction
-                        )
-                    }
-                }
             },
             skipClipboard: false
         )

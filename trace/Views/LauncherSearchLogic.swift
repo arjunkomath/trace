@@ -112,7 +112,7 @@ extension LauncherView {
             query: query,
             services: services,
             runningApps: runningApps,
-            updateCachedResults: updateCachedResults
+            eventPublisher: eventPublisher
         )
     }
     
@@ -136,16 +136,81 @@ extension LauncherView {
         return SearchCoordinator(providers: providers)
     }
     
-    /// Update cached results with transformed version
-    func updateCachedResults(_ commandId: String, transform: @escaping (SearchResult) -> SearchResult) {
-        if let index = cachedResults.firstIndex(where: { $0.commandId == commandId }) {
-            cachedResults[index] = transform(cachedResults[index])
-        }
-    }
     
     /// Generate command identifier from title
     func getCommandIdentifier(for title: String) -> String {
         return "com.trace.command.\(title.lowercased().replacingOccurrences(of: " ", with: "_"))"
+    }
+    
+    /// Setup reactive event handling for result updates
+    func setupResultEventHandling() {
+        eventPublisher.events
+            .receive(on: DispatchQueue.main)
+            .sink { event in
+                handleResultUpdate(event)
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Handle result update events reactively
+    private func handleResultUpdate(_ event: ResultUpdateEvent) {
+        switch event {
+        case .loading(let commandId):
+            updateResultState(commandId: commandId) { result in
+                return SearchResult(
+                    title: result.title,
+                    subtitle: result.subtitle,
+                    icon: result.icon,
+                    type: result.type,
+                    category: result.category,
+                    shortcut: result.shortcut,
+                    lastUsed: result.lastUsed,
+                    commandId: result.commandId,
+                    isLoading: true,
+                    accessory: result.accessory,
+                    commandAction: result.commandAction
+                )
+            }
+        case .completed(let commandId, let title, let subtitle, let accessory):
+            updateResultState(commandId: commandId) { result in
+                return SearchResult(
+                    title: title,
+                    subtitle: subtitle,
+                    icon: result.icon,
+                    type: result.type,
+                    category: result.category,
+                    shortcut: result.shortcut,
+                    lastUsed: result.lastUsed,
+                    commandId: result.commandId,
+                    isLoading: false,
+                    accessory: accessory,
+                    commandAction: result.commandAction
+                )
+            }
+        case .failed(let commandId, let error):
+            updateResultState(commandId: commandId) { result in
+                return SearchResult(
+                    title: result.title,
+                    subtitle: error,
+                    icon: result.icon,
+                    type: result.type,
+                    category: result.category,
+                    shortcut: result.shortcut,
+                    lastUsed: result.lastUsed,
+                    commandId: result.commandId,
+                    isLoading: false,
+                    accessory: .status("Error", .red),
+                    commandAction: result.commandAction
+                )
+            }
+        }
+    }
+    
+    /// Update individual result state
+    private func updateResultState(commandId: String, transform: (SearchResult) -> SearchResult) {
+        if let index = cachedResults.firstIndex(where: { $0.commandId == commandId }) {
+            cachedResults[index] = transform(cachedResults[index])
+        }
     }
     
     // MARK: - Helper Functions

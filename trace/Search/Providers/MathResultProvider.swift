@@ -16,35 +16,17 @@ class MathResultProvider: ResultProvider {
         
         let mathId = "com.trace.command.math"
         let queryExpression = context.query
-        let updateCallback = context.updateCachedResults
         
         // Primary action: Calculate and show result
         let calculateAction = MathCommandAction(
             id: "\(mathId)-calculate",
             displayName: "Calculate",
             expression: queryExpression,
+            commandId: mathId,
+            eventPublisher: context.eventPublisher,
             iconName: "equal.circle",
             keyboardShortcut: "↩",
-            description: "Calculate the result",
-            onResult: { result in
-                Task { @MainActor in
-                    updateCallback(mathId) { updatedResult in
-                        return SearchResult(
-                            title: "\(queryExpression) = \(result)",
-                            subtitle: "Math calculation result",
-                            icon: updatedResult.icon,
-                            type: updatedResult.type,
-                            category: updatedResult.category,
-                            shortcut: updatedResult.shortcut,
-                            lastUsed: updatedResult.lastUsed,
-                            commandId: updatedResult.commandId,
-                            isLoading: false,
-                            accessory: .status("Calculated", .green),
-                            commandAction: updatedResult.commandAction
-                        )
-                    }
-                }
-            }
+            description: "Calculate the result"
         )
         
         // Secondary action: Calculate and copy to clipboard
@@ -52,27 +34,10 @@ class MathResultProvider: ResultProvider {
             id: "\(mathId)-copy",
             displayName: "Copy Result",
             expression: queryExpression,
+            commandId: mathId,
+            eventPublisher: context.eventPublisher,
             iconName: "doc.on.clipboard",
-            description: "Calculate and copy result to clipboard",
-            onResult: { result in
-                Task { @MainActor in
-                    updateCallback(mathId) { updatedResult in
-                        return SearchResult(
-                            title: "\(queryExpression) = \(result)",
-                            subtitle: "Copied \(result) to clipboard",
-                            icon: updatedResult.icon,
-                            type: updatedResult.type,
-                            category: updatedResult.category,
-                            shortcut: updatedResult.shortcut,
-                            lastUsed: updatedResult.lastUsed,
-                            commandId: updatedResult.commandId,
-                            isLoading: false,
-                            accessory: .status("Copied", .blue),
-                            commandAction: updatedResult.commandAction
-                        )
-                    }
-                }
-            }
+            description: "Calculate and copy result to clipboard"
         )
         
         // Create multi-action container

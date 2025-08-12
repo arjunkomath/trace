@@ -59,14 +59,6 @@ class ControlCenterManager {
         executeAppleScript(script)
     }
     
-    /// Returns the current app appearance (true for dark, false for light)
-    func getCurrentAppearance() -> Bool {
-        if #available(macOS 10.14, *) {
-            let appearance = NSApp.effectiveAppearance
-            return appearance.name == .darkAqua
-        }
-        return false
-    }
     
     // MARK: - Control Center Commands
     
@@ -79,10 +71,9 @@ class ControlCenterManager {
             "toggle appearance", "switch theme", "mode", "appearance mode",
             "toggle", "switch", "toggle dark", "toggle light", "toggle mode"
         ]) {
-            let isDark = getCurrentAppearance()
-            let title = isDark ? "Switch to Light Mode" : "Switch to Dark Mode"
-            let subtitle = "Toggle system appearance"
-            let icon = isDark ? "sun.max" : "moon"
+            let title = "Toggle Appearance"
+            let subtitle = "Switch between Light and Dark mode"
+            let icon = "circle.lefthalf.filled"
             
             commands.append(ControlCenterCommand(
                 id: "toggle_appearance",

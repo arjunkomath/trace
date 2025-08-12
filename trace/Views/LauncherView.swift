@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import CoreGraphics
+import Combine
 
 struct LauncherView: View {
 
@@ -24,6 +25,8 @@ struct LauncherView: View {
     @State var currentSearchTask: Task<Void, Never>? // Track current search task
     @StateObject var actionExecutor = ActionExecutor() // Handle async actions
     @State var showActionsMenu = false // Track if actions menu is visible
+    @StateObject var eventPublisher = ResultEventPublisher() // Event publisher for result updates
+    @State var cancellables = Set<AnyCancellable>() // Combine cancellables
     
     let onClose: () -> Void
     
@@ -151,6 +154,7 @@ struct LauncherView: View {
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
             clearSearch()
+            setupResultEventHandling()
             // Set focus immediately
             isSearchFocused = true
         }
@@ -166,6 +170,7 @@ struct LauncherView: View {
         }
         .onDisappear {
             currentSearchTask?.cancel()
+            cancellables.removeAll()
         }
         .onKeyPress(.escape) {
             if showActionsMenu {

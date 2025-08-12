@@ -198,49 +198,64 @@ struct NetworkCommandAction: DisplayableCommandAction {
     let description: String?
     let networkOperation: () async -> String?
     let showsLoadingState = true
-    let onResult: ((String) -> Void)?
     let skipClipboard: Bool
+    private let eventPublisher: ResultEventPublisher
+    private let commandId: String
     
-    // New multi-action constructor
     init(
         id: String,
         displayName: String,
+        commandId: String,
+        eventPublisher: ResultEventPublisher,
         iconName: String? = nil,
         keyboardShortcut: String? = nil,
         description: String? = nil,
         networkOperation: @escaping () async -> String?,
-        onResult: ((String) -> Void)? = nil,
         skipClipboard: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
+        self.commandId = commandId
+        self.eventPublisher = eventPublisher
         self.iconName = iconName
         self.keyboardShortcut = keyboardShortcut
         self.description = description
         self.networkOperation = networkOperation
-        self.onResult = onResult
         self.skipClipboard = skipClipboard
     }
     
     
     func execute() async -> ActionResult {
+        eventPublisher.publishUpdate(.loading(commandId: commandId))
+        
         guard let result = await networkOperation() else {
+            eventPublisher.publishUpdate(.failed(commandId: commandId, error: "Failed to fetch \(displayName.lowercased())"))
             return .failure(error: "Failed to fetch \(displayName.lowercased())")
         }
         
-        // Call the result callback to update UI
-        if let onResult = onResult {
-            await MainActor.run {
-                onResult(result)
-            }
-        }
-        
         if skipClipboard {
+            eventPublisher.publishUpdate(.completed(
+                commandId: commandId,
+                newTitle: "\(displayName): \(result)",
+                newSubtitle: "Fetched successfully",
+                accessory: .status("Fetched", .blue)
+            ))
             return .success(
                 message: "\(displayName): \(result)",
                 data: nil
             )
         } else {
+            // Copy to clipboard
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(result, forType: .string)
+            
+            eventPublisher.publishUpdate(.completed(
+                commandId: commandId,
+                newTitle: "\(displayName): \(result)",
+                newSubtitle: "Copied \(result) to clipboard",
+                accessory: .status("Copied", .green)
+            ))
             return .success(
                 message: "\(displayName) \(result) copied to clipboard",
                 data: .text(result)
@@ -318,37 +333,43 @@ struct MathCommandAction: DisplayableCommandAction {
     let description: String?
     let expression: String
     let showsLoadingState = true
-    let onResult: ((String) -> Void)?
+    private let eventPublisher: ResultEventPublisher
+    private let commandId: String
     
     init(
         id: String,
         displayName: String,
         expression: String,
+        commandId: String,
+        eventPublisher: ResultEventPublisher,
         iconName: String? = nil,
         keyboardShortcut: String? = nil,
-        description: String? = nil,
-        onResult: ((String) -> Void)? = nil
+        description: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.expression = expression
+        self.commandId = commandId
+        self.eventPublisher = eventPublisher
         self.iconName = iconName
         self.keyboardShortcut = keyboardShortcut
         self.description = description
-        self.onResult = onResult
     }
     
     func execute() async -> ActionResult {
+        eventPublisher.publishUpdate(.loading(commandId: commandId))
+        
         guard let result = await MathEvaluator.evaluate(expression) else {
+            eventPublisher.publishUpdate(.failed(commandId: commandId, error: "Unable to calculate \(expression)"))
             return .failure(error: "Unable to calculate \(expression)")
         }
         
-        // Call the result callback to update UI
-        if let onResult = onResult {
-            await MainActor.run {
-                onResult(result)
-            }
-        }
+        eventPublisher.publishUpdate(.completed(
+            commandId: commandId,
+            newTitle: "\(expression) = \(result)",
+            newSubtitle: "Math calculation result",
+            accessory: .status("Calculated", .green)
+        ))
         
         return .success(
             message: nil,
@@ -365,37 +386,48 @@ struct MathCopyCommandAction: DisplayableCommandAction {
     let description: String?
     let expression: String
     let showsLoadingState = true
-    let onResult: ((String) -> Void)?
+    private let eventPublisher: ResultEventPublisher
+    private let commandId: String
     
     init(
         id: String,
         displayName: String,
         expression: String,
+        commandId: String,
+        eventPublisher: ResultEventPublisher,
         iconName: String? = nil,
         keyboardShortcut: String? = nil,
-        description: String? = nil,
-        onResult: ((String) -> Void)? = nil
+        description: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.expression = expression
+        self.commandId = commandId
+        self.eventPublisher = eventPublisher
         self.iconName = iconName
         self.keyboardShortcut = keyboardShortcut
         self.description = description
-        self.onResult = onResult
     }
     
     func execute() async -> ActionResult {
+        eventPublisher.publishUpdate(.loading(commandId: commandId))
+        
         guard let result = await MathEvaluator.evaluate(expression) else {
+            eventPublisher.publishUpdate(.failed(commandId: commandId, error: "Unable to calculate \(expression)"))
             return .failure(error: "Unable to calculate \(expression)")
         }
         
-        // Call the result callback to update UI
-        if let onResult = onResult {
-            await MainActor.run {
-                onResult(result)
-            }
-        }
+        // Copy to clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(result, forType: .string)
+        
+        eventPublisher.publishUpdate(.completed(
+            commandId: commandId,
+            newTitle: "\(expression) = \(result)",
+            newSubtitle: "Copied \(result) to clipboard",
+            accessory: .status("Copied", .blue)
+        ))
         
         return .success(
             message: "Result \(result) copied to clipboard",
