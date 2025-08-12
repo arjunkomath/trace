@@ -2,6 +2,8 @@
 
 **Lightning-fast app launcher for macOS**
 
+<img width="1606" height="995" alt="CleanShot 2025-08-12 at 23 21 19@2x" src="https://github.com/user-attachments/assets/f6fde413-9732-4d76-a639-1e67f615533e" />
+
 A beautiful, native macOS application launcher that lives in your background. Press `⌥Space`, type what you need, and launch instantly. Built with SwiftUI for modern macOS.
 
 ## ✨ Features
