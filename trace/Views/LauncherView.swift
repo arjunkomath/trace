@@ -13,15 +13,17 @@ struct LauncherView: View {
 
     @State var searchText = ""
     @State var selectedIndex = 0
+    @State var selectedActionIndex = 0 // Track which action is selected
     @FocusState private var isSearchFocused: Bool
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) var openSettings
     @ObservedObject var services = ServiceContainer.shared
     @ObservedObject var settingsManager = SettingsManager.shared
-    @State var loadingCommands: Set<String> = [] // Track which commands are loading
     @State var cachedResults: [SearchResult] = [] // Background-computed results
     @State var isSearching = false // Track if background search is running
     @State var currentSearchTask: Task<Void, Never>? // Track current search task
+    @StateObject var actionExecutor = ActionExecutor() // Handle async actions
+    @State var showActionsMenu = false // Track if actions menu is visible
     
     let onClose: () -> Void
     
@@ -95,12 +97,12 @@ struct LauncherView: View {
                                     Group {
                                         if ResultsLayout(rawValue: settingsManager.settings.resultsLayout) == .compact {
                                             CompactResultRowView(
-                                                result: result,
+                                                result: getResultWithLoadingState(result),
                                                 isSelected: index == selectedIndex
                                             )
                                         } else {
                                             ResultRowView(
-                                                result: result,
+                                                result: getResultWithLoadingState(result),
                                                 isSelected: index == selectedIndex
                                             )
                                         }
@@ -121,8 +123,11 @@ struct LauncherView: View {
                     }
                     .frame(maxHeight: AppConstants.Window.maxResultsHeight)
                     
-                    // Footer with keyboard shortcuts
-                    LauncherFooterView(selectedResult: selectedIndex < results.count ? results[selectedIndex] : nil)
+                    // Footer showing available actions and shortcuts
+                    LauncherFooterView(
+                        selectedResult: selectedIndex < results.count ? results[selectedIndex] : nil,
+                        selectedActionIndex: selectedActionIndex
+                    )
                 }
             }
         }
@@ -163,8 +168,12 @@ struct LauncherView: View {
             currentSearchTask?.cancel()
         }
         .onKeyPress(.escape) {
-            clearSearch()
-            onClose()
+            if showActionsMenu {
+                showActionsMenu = false
+            } else {
+                clearSearch()
+                onClose()
+            }
             return .handled
         }
         .onKeyPress(.return) {
@@ -174,12 +183,31 @@ struct LauncherView: View {
         .onKeyPress(.upArrow) {
             if selectedIndex > 0 {
                 selectedIndex -= 1
+                selectedActionIndex = 0 // Reset action selection when changing results
             }
             return .handled
         }
         .onKeyPress(.downArrow) {
             if selectedIndex < results.count - 1 {
                 selectedIndex += 1
+                selectedActionIndex = 0 // Reset action selection when changing results
+            }
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            if selectedIndex < results.count && results[selectedIndex].hasMultipleActions {
+                if selectedActionIndex > 0 {
+                    selectedActionIndex -= 1
+                }
+            }
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            if selectedIndex < results.count && results[selectedIndex].hasMultipleActions {
+                let actionCount = results[selectedIndex].allActions.count
+                if selectedActionIndex < actionCount - 1 {
+                    selectedActionIndex += 1
+                }
             }
             return .handled
         }

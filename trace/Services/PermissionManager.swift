@@ -14,7 +14,7 @@ import os.log
 class PermissionManager: ObservableObject {
     static let shared = PermissionManager()
     
-    private let logger = Logger(subsystem: "com.techulus.trace", category: "PermissionManager")
+    private let logger = AppLogger.permissionManager
     
     /// Published properties for SwiftUI views to observe
     @Published var windowManagementAvailable = false

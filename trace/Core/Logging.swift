@@ -27,4 +27,13 @@ enum AppLogger {
     static let launcherWindow = logger(for: "LauncherWindow")
     static let windowManager = logger(for: "WindowManager")
     static let networkUtilities = logger(for: "NetworkUtilities")
+    static let usageTracker = logger(for: "UsageTracker")
+    static let hotkeyRegistry = logger(for: "HotkeyRegistry")
+    static let windowHotkeyManager = logger(for: "WindowHotkeyManager")
+    static let settingsManager = logger(for: "SettingsManager")
+    static let actionExecutor = logger(for: "ActionExecutor")
+    static let appHotkeyManager = logger(for: "AppHotkeyManager")
+    static let folderManager = logger(for: "FolderManager")
+    static let permissionManager = logger(for: "PermissionManager")
+    static let controlCenterManager = logger(for: "ControlCenterManager")
 }

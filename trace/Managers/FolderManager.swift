@@ -10,7 +10,7 @@ import AppKit
 import os
 
 class FolderManager: ObservableObject {
-    private let logger = Logger(subsystem: "com.trace.app", category: "FolderManager")
+    private let logger = AppLogger.folderManager
     private let settingsManager = SettingsManager.shared
     
     @Published var customFolders: [FolderShortcut] = []

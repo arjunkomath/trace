@@ -4,7 +4,7 @@ import os.log
 class UsageTracker {
     static let shared = UsageTracker()
     
-    private let logger = Logger(subsystem: "com.trace.app", category: "UsageTracker")
+    private let logger = AppLogger.usageTracker
     private let fileManager = FileManager.default
     private let fileName = "usage_data.json"
     

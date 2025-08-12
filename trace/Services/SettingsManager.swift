@@ -59,7 +59,7 @@ struct TraceSettings: Codable {
 
 class SettingsManager: ObservableObject {
     static let shared = SettingsManager()
-    private let logger = Logger(subsystem: "com.techulus.trace", category: "SettingsManager")
+    private let logger = AppLogger.settingsManager
     private let fileManager = FileManager.default
     
     @Published var settings: TraceSettings
@@ -68,7 +68,9 @@ class SettingsManager: ObservableObject {
     
     private init() {
         // Create settings directory in Application Support
-        let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Could not locate Application Support directory")
+        }
         let traceSettingsDir = appSupportURL.appendingPathComponent("Trace", isDirectory: true)
         
         // Ensure directory exists
@@ -93,7 +95,7 @@ class SettingsManager: ObservableObject {
     // MARK: - File Operations
     
     private static func loadSettings(from url: URL) -> TraceSettings? {
-        let logger = Logger(subsystem: "com.techulus.trace", category: "SettingsManager")
+        let logger = AppLogger.settingsManager
         
         do {
             let data = try Data(contentsOf: url)

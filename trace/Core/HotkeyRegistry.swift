@@ -41,7 +41,7 @@ struct HotkeyRegistration {
 
 class HotkeyRegistry {
     static let shared = HotkeyRegistry()
-    private let logger = Logger(subsystem: "com.trace.app", category: "HotkeyRegistry")
+    private let logger = AppLogger.hotkeyRegistry
     
     private var registrations: [UInt32: HotkeyRegistration] = [:]
     private var signatureToId: [String: UInt32] = [:] // For conflict detection

@@ -102,7 +102,50 @@ struct SearchResult: Identifiable {
     let commandId: String? // Semantic identifier for tracking
     var isLoading: Bool = false // Indicates if this result is currently processing
     let accessory: SearchResultAccessory? // Generic accessory indicator
-    let action: () -> Void
+    let commandAction: CommandAction
+    
+    // Multi-action support
+    var hasMultipleActions: Bool {
+        if let multiAction = commandAction as? MultiCommandAction {
+            return multiAction.hasMultipleActions
+        }
+        return false
+    }
+    
+    var allActions: [DisplayableCommandAction] {
+        if let multiAction = commandAction as? MultiCommandAction {
+            return multiAction.allActions
+        } else if let displayableAction = commandAction as? DisplayableCommandAction {
+            return [displayableAction]
+        }
+        return []
+    }
+    
+    init(
+        title: String,
+        subtitle: String?,
+        icon: SearchIcon,
+        type: SearchResultType,
+        category: ResultCategory? = nil,
+        shortcut: KeyboardShortcut? = nil,
+        lastUsed: Date? = nil,
+        commandId: String? = nil,
+        isLoading: Bool = false,
+        accessory: SearchResultAccessory? = nil,
+        commandAction: CommandAction
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.type = type
+        self.category = category
+        self.shortcut = shortcut
+        self.lastUsed = lastUsed
+        self.commandId = commandId
+        self.isLoading = isLoading
+        self.accessory = accessory
+        self.commandAction = commandAction
+    }
 }
 
 enum SearchIcon {

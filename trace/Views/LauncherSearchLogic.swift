@@ -25,18 +25,14 @@ extension LauncherView {
     
     // MARK: - Scoring Utilities
     
-    /// Calculate combined score from match score and usage
-    func calculateCombinedScore(matchScore: Double, usageScore: Double, usageNormalizationFactor: Double = 50.0) -> Double {
-        let normalizedUsage = min(usageScore / usageNormalizationFactor, 1.0)
-        return (matchScore * 0.6) + (normalizedUsage * 0.4)
+    
+    /// Unified scoring function for consistent scoring across all result types
+    func calculateUnifiedScore(matchScore: Double, usageScore: Double, threshold: Double = 0.3) -> Double? {
+        guard matchScore > threshold else { return nil }
+        let normalizedUsage = normalizeUsageScore(usageScore)
+        return (matchScore * 0.8) + (normalizedUsage * 0.2)
     }
     
-    /// Check if match score meets minimum threshold and calculate combined score
-    func shouldIncludeCommand(matchScore: Double, usageScore: Double, threshold: Double = 0.3) -> (Bool, Double) {
-        guard matchScore > threshold else { return (false, 0.0) }
-        let combinedScore = calculateCombinedScore(matchScore: matchScore, usageScore: usageScore)
-        return (true, combinedScore)
-    }
     
     /// Create a system command result with common parameters
     func createSystemCommand(
@@ -46,8 +42,15 @@ extension LauncherView {
         icon: String,
         category: ResultCategory? = nil,
         shortcut: KeyboardShortcut? = nil,
-        action: @escaping () -> Void
+        operation: @escaping () -> Void
     ) -> SearchResult {
+        let commandAction = InstantCommandAction(
+            id: commandId,
+            displayName: title,
+            iconName: icon,
+            operation: operation
+        )
+        
         return SearchResult(
             title: title,
             subtitle: subtitle,
@@ -58,7 +61,7 @@ extension LauncherView {
             lastUsed: nil,
             commandId: commandId,
             accessory: nil,
-            action: action
+            commandAction: commandAction
         )
     }
     
@@ -66,47 +69,16 @@ extension LauncherView {
     func createStandardAction(commandId: String, customAction: @escaping () -> Void) -> () -> Void {
         return { [services, self] in
             services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
-            customAction()
-            clearSearch()
-            onClose()
+            
+            // Ensure all UI operations happen on main thread
+            DispatchQueue.main.async {
+                customAction()
+                self.clearSearch()
+                self.onClose()
+            }
         }
     }
     
-    /// Create an IP command with dynamic title/subtitle and loading state support
-    func createIPCommand(
-        commandId: String,
-        matchScore: Double,
-        usageScore: Double,
-        terms: [String],
-        baseTitle: String,
-        baseSubtitle: String,
-        icon: String,
-        cachedValue: String?,
-        onAction: @escaping (String?, @escaping () -> Void) -> Void
-    ) -> (SearchResult, Double)? {
-        let (shouldInclude, score) = shouldIncludeCommand(matchScore: matchScore, usageScore: usageScore)
-        guard shouldInclude else { return nil }
-        
-        // Dynamic title and subtitle based on cached value
-        let displayTitle = cachedValue != nil ? "\(baseTitle): \(cachedValue!)" : baseTitle
-        let displaySubtitle = cachedValue != nil ? "Copy \(cachedValue!) to clipboard" : baseSubtitle
-        
-        var result = createSystemCommand(
-            commandId: commandId,
-            title: displayTitle,
-            subtitle: displaySubtitle,
-            icon: icon,
-            category: .network,
-            action: createStandardAction(commandId: commandId) {
-                onAction(cachedValue) {
-                    // Callback for additional cleanup if needed
-                }
-            }
-        )
-        
-        result.isLoading = isCommandLoading(commandId)
-        return (result, score)
-    }
     
     // MARK: - Search Functions
     
@@ -136,19 +108,18 @@ extension LauncherView {
         let searchLower = query.lowercased()
         var scoredResults: [(SearchResult, Double)] = []
         
-        // Get usage scores for all items (this can be heavy)
+        // Cache expensive operations once per search
         let usageScores = services.usageTracker.getAllUsageScores()
+        let runningApps = services.appSearchManager.getRunningAppBundleIds()
         
-        // Get apps but calculate our own scores for fair comparison
+        // Get apps with their pre-calculated scores from AppSearchManager
         let apps = services.appSearchManager.searchApps(query: query, limit: 30)
+        
         for app in apps {
-            // Calculate match score ourselves for consistency
-            let matchScore = FuzzyMatcher.match(query: searchLower, text: app.displayName.lowercased())
+            // AppSearchManager already provides scored results, so we trust those scores
+            // and only need to build the SearchResult objects
             
-            // Skip if match score is too low
-            if matchScore < 0.3 { continue }
-            
-            // Check if there's a hotkey assigned for this app
+            // Get hotkey for this app (direct lookup for now - optimize in Phase 2)
             let shortcut: KeyboardShortcut? = {
                 if let hotkeyString = services.appHotkeyManager.getHotkey(for: app.bundleIdentifier), !hotkeyString.isEmpty {
                     return KeyboardShortcut(keyCombo: hotkeyString)
@@ -156,9 +127,17 @@ extension LauncherView {
                 return nil
             }()
             
-            // Check if app is currently running
-            let isRunning = services.appSearchManager.isAppRunning(bundleIdentifier: app.bundleIdentifier)
-            let accessory: SearchResultAccessory? = isRunning ? .runningIndicator : nil
+            // Check if app is running (from cached lookup)
+            let accessory: SearchResultAccessory? = runningApps.contains(app.bundleIdentifier) ? .runningIndicator : nil
+            
+            let launchAction = InstantCommandAction(
+                id: app.bundleIdentifier,
+                displayName: "Launch \(app.displayName)",
+                iconName: nil,
+                operation: { [services] in
+                    services.appSearchManager.launchApp(app)
+                }
+            )
             
             let result = SearchResult(
                 title: app.displayName,
@@ -170,16 +149,16 @@ extension LauncherView {
                 lastUsed: nil,
                 commandId: app.bundleIdentifier,
                 accessory: accessory,
-                action: { [services] in
-                    services.appSearchManager.launchApp(app)
-                }
+                commandAction: launchAction
             )
             
-            // Calculate combined score using unified scoring
+            // Calculate proper fuzzy match score for consistency with commands
+            let matchScore = FuzzyMatcher.match(query: searchLower, text: app.displayName.lowercased())
             let usageScore = usageScores[app.bundleIdentifier] ?? 0.0
-            let combinedScore = calculateCombinedScore(matchScore: matchScore, usageScore: usageScore)
             
-            scoredResults.append((result, combinedScore))
+            if let combinedScore = calculateUnifiedScore(matchScore: matchScore, usageScore: usageScore) {
+                scoredResults.append((result, combinedScore))
+            }
         }
         
         // Add system commands with fuzzy matching and usage scores
@@ -192,16 +171,14 @@ extension LauncherView {
         ])
         let settingsId = "com.trace.command.settings"
         let settingsUsageScore = usageScores[settingsId] ?? 0.0
-        let (includeSettings, settingsScore) = shouldIncludeCommand(matchScore: settingsMatchScore, usageScore: settingsUsageScore)
-        
-        if includeSettings {
+        if let settingsScore = calculateUnifiedScore(matchScore: settingsMatchScore, usageScore: settingsUsageScore) {
             let settingsResult = createSystemCommand(
                 commandId: settingsId,
                 title: "Trace Settings",
                 subtitle: "Configure hotkeys and preferences",
                 icon: "gearshape",
                 shortcut: KeyboardShortcut(key: ",", modifiers: ["⌘"]),
-                action: createStandardAction(commandId: settingsId) {
+                operation: createStandardAction(commandId: settingsId) {
                     openSettings()
                 }
             )
@@ -215,16 +192,14 @@ extension LauncherView {
         ])
         let quitId = "com.trace.command.quit"
         let quitUsageScore = usageScores[quitId] ?? 0.0
-        let (includeQuit, quitScore) = shouldIncludeCommand(matchScore: quitMatchScore, usageScore: quitUsageScore)
-        
-        if includeQuit {
+        if let quitScore = calculateUnifiedScore(matchScore: quitMatchScore, usageScore: quitUsageScore) {
             let quitResult = createSystemCommand(
                 commandId: quitId,
                 title: "Quit Trace",
                 subtitle: "Exit the application",
                 icon: "power",
                 shortcut: KeyboardShortcut(key: "Q", modifiers: ["⌘"]),
-                action: createStandardAction(commandId: quitId) {
+                operation: createStandardAction(commandId: quitId) {
                     NSApp.terminate(nil)
                 }
             )
@@ -238,41 +213,100 @@ extension LauncherView {
         ])
         let publicIPId = "com.trace.command.publicip"
         let publicIPUsageScore = usageScores[publicIPId] ?? 0.0
-        let cachedPublicIP = services.networkUtilities.getCachedPublicIP()
-        
-        // Start fetching public IP if not cached and not already loading
-        if publicIPMatchScore > 0.3 && cachedPublicIP == nil && !isCommandLoading(publicIPId) {
-            setCommandLoading(publicIPId, isLoading: true)
-            Task { @MainActor in
-                _ = await services.networkUtilities.getPublicIPAddress()
-                setCommandLoading(publicIPId, isLoading: false)
-            }
-        }
-        
-        if let publicIPResult = createIPCommand(
-            commandId: publicIPId,
-            matchScore: publicIPMatchScore,
-            usageScore: publicIPUsageScore,
-            terms: ["public ip", "external ip", "my ip"],
-            baseTitle: "Public IP Address",
-            baseSubtitle: "Get your external IP address",
-            icon: "globe",
-            cachedValue: cachedPublicIP
-        ) { cachedIP, cleanup in
-            if let ip = cachedIP {
-                services.networkUtilities.copyToClipboard(ip)
-                let notification = NSUserNotification()
-                notification.title = "Public IP Copied"
-                notification.informativeText = "Your public IP address \(ip) has been copied to the clipboard"
-                NSUserNotificationCenter.default.deliver(notification)
-            } else {
-                let notification = NSUserNotification()
-                notification.title = "Public IP Loading"
-                notification.informativeText = "Please wait while we fetch your public IP address"
-                NSUserNotificationCenter.default.deliver(notification)
-            }
-        } {
-            systemCommands.append(publicIPResult)
+        if let publicIPScore = calculateUnifiedScore(matchScore: publicIPMatchScore, usageScore: publicIPUsageScore) {
+            // Primary action: Fetch and display (no clipboard copy)
+            let fetchPublicIPAction = NetworkCommandAction(
+                id: "\(publicIPId)-fetch",
+                displayName: "Fetch IP",
+                iconName: "eye",
+                keyboardShortcut: "↩",
+                description: "Fetch and display your public IP address",
+                networkOperation: {
+                    return await services.networkUtilities.getPublicIPAddress()
+                },
+                onResult: { ipAddress in
+                    // Update the result in the cached results to show the IP
+                    if let index = self.cachedResults.firstIndex(where: { $0.commandId == publicIPId }) {
+                        let updatedResult = self.cachedResults[index]
+                        
+                        // Create a new result with updated title and subtitle
+                        let updatedResultWithIP = SearchResult(
+                            title: "Public IP Address: \(ipAddress)",
+                            subtitle: updatedResult.subtitle,
+                            icon: updatedResult.icon,
+                            type: updatedResult.type,
+                            category: updatedResult.category,
+                            shortcut: updatedResult.shortcut,
+                            lastUsed: updatedResult.lastUsed,
+                            commandId: updatedResult.commandId,
+                            isLoading: false,
+                            accessory: .status("Fetched", .blue),
+                            commandAction: updatedResult.commandAction
+                        )
+                        
+                        self.cachedResults[index] = updatedResultWithIP
+                    }
+                },
+                skipClipboard: true
+            )
+            
+            // Secondary action: Fetch and copy to clipboard
+            let copyPublicIPAction = NetworkCommandAction(
+                id: "\(publicIPId)-copy",
+                displayName: "Copy to Clipboard",
+                iconName: "doc.on.clipboard",
+                keyboardShortcut: nil,
+                description: "Fetch your public IP address and copy to clipboard",
+                networkOperation: {
+                    return await services.networkUtilities.getPublicIPAddress()
+                },
+                onResult: { ipAddress in
+                    // Update the result in the cached results to show copied state
+                    if let index = self.cachedResults.firstIndex(where: { $0.commandId == publicIPId }) {
+                        let updatedResult = self.cachedResults[index]
+                        
+                        let updatedResultWithIP = SearchResult(
+                            title: "Public IP Address: \(ipAddress)",
+                            subtitle: "Copied \(ipAddress) to clipboard",
+                            icon: updatedResult.icon,
+                            type: updatedResult.type,
+                            category: updatedResult.category,
+                            shortcut: updatedResult.shortcut,
+                            lastUsed: updatedResult.lastUsed,
+                            commandId: updatedResult.commandId,
+                            isLoading: false,
+                            accessory: .status("Copied", .green),
+                            commandAction: updatedResult.commandAction
+                        )
+                        
+                        self.cachedResults[index] = updatedResultWithIP
+                    }
+                },
+                skipClipboard: false
+            )
+            
+            // Create multi-action container
+            let publicIPMultiAction = MultiCommandAction(
+                id: publicIPId,
+                primaryAction: fetchPublicIPAction,
+                secondaryActions: [copyPublicIPAction]
+            )
+            
+            let publicIPResult = SearchResult(
+                title: "Public IP Address",
+                subtitle: "Get your external IP address",
+                icon: .system("globe"),
+                type: .command,
+                category: .network,
+                shortcut: nil,
+                lastUsed: nil,
+                commandId: publicIPId,
+                isLoading: false,
+                accessory: nil,
+                commandAction: publicIPMultiAction
+            )
+            
+            systemCommands.append((publicIPResult, publicIPScore))
         }
         
         // Private IP Address command
@@ -282,56 +316,123 @@ extension LauncherView {
         ])
         let privateIPId = "com.trace.command.privateip"
         let privateIPUsageScore = usageScores[privateIPId] ?? 0.0
-        let cachedPrivateIP = services.networkUtilities.getCachedPrivateIP()
-        
-        if let privateIPResult = createIPCommand(
-            commandId: privateIPId,
-            matchScore: privateIPMatchScore,
-            usageScore: privateIPUsageScore,
-            terms: ["private ip", "local ip", "internal ip"],
-            baseTitle: "Private IP Address", 
-            baseSubtitle: "Get your local network IP address",
-            icon: "wifi",
-            cachedValue: cachedPrivateIP
-        ) { cachedIP, cleanup in
-            // Set brief loading state for consistency (private IP is usually instant)
-            self.setCommandLoading(privateIPId, isLoading: true)
+        if let privateIPScore = calculateUnifiedScore(matchScore: privateIPMatchScore, usageScore: privateIPUsageScore) {
+            // Primary action: Fetch and display (no clipboard copy)
+            let fetchPrivateIPAction = NetworkCommandAction(
+                id: "\(privateIPId)-fetch",
+                displayName: "Fetch IP",
+                iconName: "eye",
+                keyboardShortcut: "↩",
+                description: "Fetch and display your private IP address",
+                networkOperation: {
+                    return services.networkUtilities.getPrivateIPAddress()
+                },
+                onResult: { ipAddress in
+                    // Update the result in the cached results to show the IP
+                    if let index = self.cachedResults.firstIndex(where: { $0.commandId == privateIPId }) {
+                        let updatedResult = self.cachedResults[index]
+                        
+                        // Create a new result with updated title and subtitle
+                        let updatedResultWithIP = SearchResult(
+                            title: "Private IP Address: \(ipAddress)",
+                            subtitle: updatedResult.subtitle,
+                            icon: updatedResult.icon,
+                            type: updatedResult.type,
+                            category: updatedResult.category,
+                            shortcut: updatedResult.shortcut,
+                            lastUsed: updatedResult.lastUsed,
+                            commandId: updatedResult.commandId,
+                            isLoading: false,
+                            accessory: .status("Fetched", .blue),
+                            commandAction: updatedResult.commandAction
+                        )
+                        
+                        self.cachedResults[index] = updatedResultWithIP
+                    }
+                },
+                skipClipboard: true
+            )
             
-            // Use a small delay to show spinner briefly since private IP is usually instant
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if let ip = cachedIP ?? services.networkUtilities.getPrivateIPAddress() {
-                    services.networkUtilities.copyToClipboard(ip)
-                    let notification = NSUserNotification()
-                    notification.title = "Private IP Copied"
-                    notification.informativeText = "Your private IP address \(ip) has been copied to the clipboard"
-                    NSUserNotificationCenter.default.deliver(notification)
-                } else {
-                    let notification = NSUserNotification()
-                    notification.title = "IP Address Not Found"
-                    notification.informativeText = "Could not determine your private IP address"
-                    NSUserNotificationCenter.default.deliver(notification)
-                }
-                self.setCommandLoading(privateIPId, isLoading: false)
-            }
-        } {
-            systemCommands.append(privateIPResult)
+            // Secondary action: Fetch and copy to clipboard
+            let copyPrivateIPAction = NetworkCommandAction(
+                id: "\(privateIPId)-copy",
+                displayName: "Copy to Clipboard",
+                iconName: "doc.on.clipboard",
+                keyboardShortcut: nil,
+                description: "Fetch your private IP address and copy to clipboard",
+                networkOperation: {
+                    return services.networkUtilities.getPrivateIPAddress()
+                },
+                onResult: { ipAddress in
+                    // Update the result in the cached results to show copied state
+                    if let index = self.cachedResults.firstIndex(where: { $0.commandId == privateIPId }) {
+                        let updatedResult = self.cachedResults[index]
+                        
+                        let updatedResultWithIP = SearchResult(
+                            title: "Private IP Address: \(ipAddress)",
+                            subtitle: "Copied \(ipAddress) to clipboard",
+                            icon: updatedResult.icon,
+                            type: updatedResult.type,
+                            category: updatedResult.category,
+                            shortcut: updatedResult.shortcut,
+                            lastUsed: updatedResult.lastUsed,
+                            commandId: updatedResult.commandId,
+                            isLoading: false,
+                            accessory: .status("Copied", .green),
+                            commandAction: updatedResult.commandAction
+                        )
+                        
+                        self.cachedResults[index] = updatedResultWithIP
+                    }
+                },
+                skipClipboard: false
+            )
+            
+            // Create multi-action container
+            let privateIPMultiAction = MultiCommandAction(
+                id: privateIPId,
+                primaryAction: fetchPrivateIPAction,
+                secondaryActions: [copyPrivateIPAction]
+            )
+            
+            let privateIPResult = SearchResult(
+                title: "Private IP Address",
+                subtitle: "Get your local network IP address",
+                icon: .system("wifi"),
+                type: .command,
+                category: .network,
+                shortcut: nil,
+                lastUsed: nil,
+                commandId: privateIPId,
+                isLoading: false,
+                accessory: nil,
+                commandAction: privateIPMultiAction
+            )
+            
+            systemCommands.append((privateIPResult, privateIPScore))
         }
         
         // Add system commands to scored results
         scoredResults.append(contentsOf: systemCommands)
         
-        // Add Control Center commands with consistent scoring
+        // Add Control Center commands with unified scoring
         let controlCenterCommands = getControlCenterCommands(query: searchLower)
         for command in controlCenterCommands {
             // Calculate match score for control center command (check both title and subtitle)
             var matchScore = FuzzyMatcher.match(query: searchLower, text: command.title.lowercased())
             let subtitleScore = FuzzyMatcher.match(query: searchLower, text: command.subtitle.lowercased())
             matchScore = max(matchScore, subtitleScore)
-            if matchScore > 0.3 {
-                let commandId = "com.trace.controlcenter.\(command.id)"
-                let usageScore = usageScores[commandId] ?? 0.0
-                let normalizedUsage = min(usageScore / 50.0, 1.0)
-                let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+            
+            let commandId = "com.trace.controlcenter.\(command.id)"
+            let usageScore = usageScores[commandId] ?? 0.0
+            
+            if let combinedScore = calculateUnifiedScore(matchScore: matchScore, usageScore: usageScore) {
+                let commandAction = InstantCommandAction(
+                    id: commandId,
+                    displayName: command.title,
+                    iconName: command.icon,
+                    operation: command.action
+                )
                 
                 let searchResult = SearchResult(
                     title: command.title,
@@ -343,14 +444,14 @@ extension LauncherView {
                     lastUsed: nil,
                     commandId: commandId,
                     accessory: nil,
-                    action: command.action
+                    commandAction: commandAction
                 )
                 
                 scoredResults.append((searchResult, combinedScore))
             }
         }
         
-        // Add window management commands with consistent scoring
+        // Add window management commands with unified scoring
         let windowCommands = getWindowManagementCommands(query: searchLower)
         for command in windowCommands {
             // Calculate match score for window command (check both title and subtitle)
@@ -359,25 +460,23 @@ extension LauncherView {
                 let subtitleScore = FuzzyMatcher.match(query: searchLower, text: subtitle.lowercased())
                 matchScore = max(matchScore, subtitleScore)
             }
-            if matchScore > 0.3 {
-                let commandId = command.commandId ?? getCommandIdentifier(for: command.title)
-                let usageScore = usageScores[commandId] ?? 0.0
-                let normalizedUsage = normalizeUsageScore(usageScore)
-                let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
+            
+            let commandId = command.commandId ?? getCommandIdentifier(for: command.title)
+            let usageScore = usageScores[commandId] ?? 0.0
+            
+            if let combinedScore = calculateUnifiedScore(matchScore: matchScore, usageScore: usageScore) {
                 scoredResults.append((command, combinedScore))
             }
         }
         
-        // Add folder shortcuts with consistent scoring
+        // Add folder shortcuts with unified scoring
         let folderResults = services.folderManager.searchFolders(query: searchLower)
         for folder in folderResults {
             let matchScore = FuzzyMatcher.match(query: searchLower, text: folder.name.lowercased())
-            if matchScore > 0.3 {
-                let commandId = "com.trace.folder.\(folder.id)"
-                let usageScore = usageScores[commandId] ?? 0.0
-                let normalizedUsage = normalizeUsageScore(usageScore)
-                let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
-                
+            let commandId = "com.trace.folder.\(folder.id)"
+            let usageScore = usageScores[commandId] ?? 0.0
+            
+            if let combinedScore = calculateUnifiedScore(matchScore: matchScore, usageScore: usageScore) {
                 // Get hotkey for this folder
                 let shortcut: KeyboardShortcut? = {
                     if let hotkeyString = folder.hotkey, !hotkeyString.isEmpty {
@@ -385,6 +484,15 @@ extension LauncherView {
                     }
                     return nil
                 }()
+                
+                let folderAction = InstantCommandAction(
+                    id: commandId,
+                    displayName: "Open \(folder.name)",
+                    iconName: folder.iconName,
+                    operation: { [services] in
+                        services.folderManager.openFolder(folder)
+                    }
+                )
                 
                 let result = SearchResult(
                     title: folder.name,
@@ -396,9 +504,7 @@ extension LauncherView {
                     lastUsed: nil,
                     commandId: commandId,
                     accessory: nil,
-                    action: { [services] in
-                        services.folderManager.openFolder(folder)
-                    }
+                    commandAction: folderAction
                 )
                 
                 scoredResults.append((result, combinedScore))
@@ -414,59 +520,72 @@ extension LauncherView {
         var finalResults = Array(sortedResults)
         
         // Add search engine options
-        let searchEngines = [
-            SearchResult(
-                title: "Search Google for '\(query)'",
-                subtitle: "Open in browser",
-                icon: .system("globe"),
-                type: .suggestion,
-                category: .web,
-                shortcut: nil,
-                lastUsed: nil,
-                commandId: "com.trace.search.google",
-                accessory: nil,
-                action: {
-                    if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                       let url = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-            ),
-            SearchResult(
-                title: "Search DuckDuckGo for '\(query)'",
-                subtitle: "Privacy-focused search",
-                icon: .system("shield"),
-                type: .suggestion,
-                category: .web,
-                shortcut: nil,
-                lastUsed: nil,
-                commandId: "com.trace.search.duckduckgo",
-                accessory: nil,
-                action: {
-                    if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                       let url = URL(string: "https://duckduckgo.com/?q=\(encodedQuery)") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-            ),
-            SearchResult(
-                title: "Search Perplexity for '\(query)'",
-                subtitle: "AI-powered search",
-                icon: .system("brain.head.profile"),
-                type: .suggestion,
-                category: .web,
-                shortcut: nil,
-                lastUsed: nil,
-                commandId: "com.trace.search.perplexity",
-                accessory: nil,
-                action: {
-                    if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                       let url = URL(string: "https://www.perplexity.ai/search?q=\(encodedQuery)") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-            )
-        ]
+        var searchEngines: [SearchResult] = []
+        
+        if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            if let googleUrl = URL(string: "https://www.google.com/search?q=\(encodedQuery)") {
+                let googleAction = URLCommandAction(
+                    id: "com.trace.search.google",
+                    displayName: "Search Google",
+                    iconName: "globe",
+                    url: googleUrl
+                )
+                searchEngines.append(SearchResult(
+                    title: "Search Google for '\(query)'",
+                    subtitle: "Open in browser",
+                    icon: .system("globe"),
+                    type: .suggestion,
+                    category: .web,
+                    shortcut: nil,
+                    lastUsed: nil,
+                    commandId: "com.trace.search.google",
+                    accessory: nil,
+                    commandAction: googleAction
+                ))
+            }
+            
+            if let duckUrl = URL(string: "https://duckduckgo.com/?q=\(encodedQuery)") {
+                let duckAction = URLCommandAction(
+                    id: "com.trace.search.duckduckgo",
+                    displayName: "Search DuckDuckGo",
+                    iconName: "shield",
+                    url: duckUrl
+                )
+                searchEngines.append(SearchResult(
+                    title: "Search DuckDuckGo for '\(query)'",
+                    subtitle: "Privacy-focused search",
+                    icon: .system("shield"),
+                    type: .suggestion,
+                    category: .web,
+                    shortcut: nil,
+                    lastUsed: nil,
+                    commandId: "com.trace.search.duckduckgo",
+                    accessory: nil,
+                    commandAction: duckAction
+                ))
+            }
+            
+            if let perplexityUrl = URL(string: "https://www.perplexity.ai/search?q=\(encodedQuery)") {
+                let perplexityAction = URLCommandAction(
+                    id: "com.trace.search.perplexity",
+                    displayName: "Search Perplexity",
+                    iconName: "brain.head.profile",
+                    url: perplexityUrl
+                )
+                searchEngines.append(SearchResult(
+                    title: "Search Perplexity for '\(query)'",
+                    subtitle: "AI-powered search",
+                    icon: .system("brain.head.profile"),
+                    type: .suggestion,
+                    category: .web,
+                    shortcut: nil,
+                    lastUsed: nil,
+                    commandId: "com.trace.search.perplexity",
+                    accessory: nil,
+                    commandAction: perplexityAction
+                ))
+            }
+        }
         
         finalResults.append(contentsOf: searchEngines)
         
@@ -526,13 +645,10 @@ extension LauncherView {
         }
         
         if hasWindowMatch || !directMatches.isEmpty {
-            // If we have direct matches, prioritize those, otherwise show common ones
-            let positionsToShow = !directMatches.isEmpty ? directMatches : [
-                .leftHalf, .rightHalf, .center, .maximize, .almostMaximize,
-                .topLeft, .topRight, .bottomLeft, .bottomRight
-            ]
+            // If we have direct matches, prioritize those, otherwise show all that meet threshold
+            let positionsToCheck = !directMatches.isEmpty ? directMatches : WindowPosition.allCases
             
-            for position in positionsToShow {
+            for position in positionsToCheck {
                 let searchTerms = [
                     position.rawValue,
                     position.displayName.lowercased(),
@@ -541,6 +657,7 @@ extension LauncherView {
                 
                 let score = FuzzyMatcher.matchBest(query: query, terms: searchTerms)
                 
+                // Use consistent scoring with other commands
                 if score > 0.3 {
                     // Check if this window position has a hotkey assigned
                     let shortcut: KeyboardShortcut? = {
@@ -549,6 +666,15 @@ extension LauncherView {
                         }
                         return nil
                     }()
+                    
+                    let windowAction = InstantCommandAction(
+                        id: "com.trace.window.\(position.rawValue)",
+                        displayName: position.displayName,
+                        iconName: getWindowIcon(for: position),
+                        operation: { [services] in
+                            services.windowManager.applyWindowPosition(position)
+                        }
+                    )
                     
                     commands.append(SearchResult(
                         title: position.displayName,
@@ -560,9 +686,7 @@ extension LauncherView {
                         lastUsed: nil,
                         commandId: "com.trace.window.\(position.rawValue)",
                         accessory: nil,
-                        action: { [services] in
-                            services.windowManager.applyWindowPosition(position)
-                        }
+                        commandAction: windowAction
                     ))
                 }
             }
@@ -592,21 +716,6 @@ extension LauncherView {
         }
     }
     
-    // MARK: - Loading State Management
-    
-    func setCommandLoading(_ commandId: String, isLoading: Bool) {
-        DispatchQueue.main.async {
-            if isLoading {
-                self.loadingCommands.insert(commandId)
-            } else {
-                self.loadingCommands.remove(commandId)
-            }
-        }
-    }
-    
-    func isCommandLoading(_ commandId: String) -> Bool {
-        return loadingCommands.contains(commandId)
-    }
     
     // MARK: - Search and Actions
     
@@ -616,6 +725,13 @@ extension LauncherView {
         searchText = ""
         cachedResults = []
         selectedIndex = 0
+    }
+    
+    /// Get result with current loading state
+    func getResultWithLoadingState(_ result: SearchResult) -> SearchResult {
+        var updatedResult = result
+        updatedResult.isLoading = actionExecutor.isLoading(result.commandAction.id)
+        return updatedResult
     }
     
     /// Execute the currently selected result
@@ -645,16 +761,30 @@ extension LauncherView {
             break
         }
         
-        // Special handling for quit command - let the action handle everything
-        if result.title == "Quit Trace" {
-            result.action()
-            // Don't call onClose() here - action already handles it
-            return
-        }
+        let commandAction = result.commandAction
         
-        result.action()
-        searchText = ""
-        selectedIndex = 0
-        onClose()
+        // For multi-action results, execute the selected action
+        if result.hasMultipleActions {
+            let selectedAction = result.allActions[selectedActionIndex]
+            actionExecutor.executeAction(by: selectedAction.id, from: commandAction) { success in
+                // For multi-action results, always keep launcher open
+                // User can dismiss with ESC when done
+                selectedIndex = 0
+            }
+        } else {
+            // Single action - execute normally
+            actionExecutor.execute(commandAction) { success in
+                // For network commands like IP, don't close launcher and keep search visible
+                if commandAction is NetworkCommandAction {
+                    // Keep launcher open and don't clear search - user can see the result
+                    // Reset selection to first item
+                    selectedIndex = 0
+                } else {
+                    // For other commands, close launcher
+                    clearSearch()
+                    onClose()
+                }
+            }
+        }
     }
 }

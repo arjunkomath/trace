@@ -130,7 +130,7 @@ class AppSearchManager: ObservableObject {
                     self?.iconCache[bundleId] = icon
                 }
                 
-                // Also update the app's icon for legacy compatibility
+                // Also update the app's icon property for direct access
                 Task { @MainActor in
                     self?.apps[bundleId]?.icon = icon
                     continuation.resume(returning: icon)
@@ -139,13 +139,6 @@ class AppSearchManager: ObservableObject {
         }
     }
     
-    // Legacy completion-based method for backward compatibility
-    func getAppIcon(for app: Application, completion: @escaping (NSImage?) -> Void) {
-        Task {
-            let icon = await getAppIcon(for: app)
-            completion(icon)
-        }
-    }
     
     func launchApp(_ app: Application) {
         NSWorkspace.shared.open(app.url)

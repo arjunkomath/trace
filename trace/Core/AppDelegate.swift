@@ -117,27 +117,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Open Launcher with hotkey display
         let openItem = NSMenuItem(title: "Open Trace", action: #selector(showLauncher), keyEquivalent: "")
         openItem.target = self
-        
-        // Get the current hotkey and convert to key equivalent
-        let keyCode = UInt32(settingsManager.settings.mainHotkeyKeyCode)
-        let modifiers = UInt32(settingsManager.settings.mainHotkeyModifiers)
-        
-        // Convert to NSMenuItem key equivalent and modifier mask
-        if let keyChar = keyCodeToString(keyCode) {
-            openItem.keyEquivalent = keyChar
-            openItem.keyEquivalentModifierMask = NSEvent.ModifierFlags(carbonModifiers: modifiers)
-            // Disable the actual key equivalent functionality since we handle it globally
-            openItem.isEnabled = true
-        }
-        
         menu.addItem(openItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // Settings
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
         
         // Check for Updates - Connect directly to Sparkle as per documentation
         let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
@@ -182,43 +162,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    @objc private func showPreferencesFromMenu() {
-        showPreferences()
-    }
-    
     @objc private func quitFromMenu() {
         NSApp.terminate(nil)
     }
     
     // MARK: - Helper Functions
-    
-    private func keyCodeToString(_ keyCode: UInt32) -> String? {
-        // Convert common key codes to their string representations
-        switch Int(keyCode) {
-        case 49: return " "  // Space
-        case 36: return "\r" // Return
-        case 48: return "\t" // Tab
-        case 51: return "\u{08}" // Delete
-        case 53: return "\u{1B}" // Escape
-        case 123: return "\u{F702}" // Left arrow
-        case 124: return "\u{F703}" // Right arrow
-        case 125: return "\u{F701}" // Down arrow
-        case 126: return "\u{F700}" // Up arrow
-        default:
-            // For letter and number keys, use the KeyBindingView approach
-            let keyBinding = KeyBindingView(keyCode: keyCode, modifiers: 0)
-            if let lastKey = keyBinding.keys.last {
-                // Remove modifier symbols and return just the key
-                let key = lastKey.replacingOccurrences(of: "⌘", with: "")
-                    .replacingOccurrences(of: "⌥", with: "")
-                    .replacingOccurrences(of: "⌃", with: "")
-                    .replacingOccurrences(of: "⇧", with: "")
-                return key.lowercased()
-            }
-            return nil
-        }
-    }
-
     
     private func setupLauncherWindow() {
         launcherWindow = LauncherWindow()
@@ -255,44 +203,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showLauncher() {
         launcherWindow?.show()
         startGlobalEventMonitoring()
-    }
-    
-    func showPreferences() {
-        // First check if settings window is already open
-        if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
-            // Force the app to activate and bring the window to front
-            NSApp.activate(ignoringOtherApps: true)
-            settingsWindow.makeKeyAndOrderFront(nil)
-            settingsWindow.orderFrontRegardless()
-            return
-        }
-        
-        // Use the main menu approach to open settings
-        // This is the most reliable way for SwiftUI Settings scenes
-        if let mainMenu = NSApp.mainMenu {
-            for menuItem in mainMenu.items {
-                if let submenu = menuItem.submenu {
-                    for subMenuItem in submenu.items {
-                        if subMenuItem.title.contains("Settings") || subMenuItem.title.contains("Preferences") {
-                            // Activate the app first
-                            NSApp.activate(ignoringOtherApps: true)
-                            NSApp.sendAction(subMenuItem.action!, to: subMenuItem.target, from: nil)
-                            
-                            // After a brief delay, ensure the window is at front
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
-                                    settingsWindow.orderFrontRegardless()
-                                }
-                            }
-                            return
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Fallback: try the standard preferences action
-        NSApp.orderFrontStandardAboutPanel(nil)
     }
     
     private func toggleLauncher() {

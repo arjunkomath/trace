@@ -10,7 +10,7 @@ import os.log
 
 class AppHotkeyManager {
     static let shared = AppHotkeyManager()
-    private let logger = Logger(subsystem: "com.trace.app", category: "AppHotkeyManager")
+    private let logger = AppLogger.appHotkeyManager
     private let settingsManager = SettingsManager.shared
     
     private var bundleIdToHotkeyId: [String: UInt32] = [:]

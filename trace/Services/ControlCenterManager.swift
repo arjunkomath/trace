@@ -13,7 +13,7 @@ import os.log
 class ControlCenterManager {
     static let shared = ControlCenterManager()
     
-    private let logger = Logger(subsystem: AppConstants.bundleIdentifier, category: "ControlCenter")
+    private let logger = AppLogger.controlCenterManager
     
     private init() {}
     

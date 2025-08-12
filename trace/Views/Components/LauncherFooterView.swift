@@ -9,20 +9,57 @@ import SwiftUI
 
 struct LauncherFooterView: View {
     let selectedResult: SearchResult?
+    let selectedActionIndex: Int
     @Environment(\.colorScheme) var colorScheme
+    
+    init(selectedResult: SearchResult?, selectedActionIndex: Int = 0) {
+        self.selectedResult = selectedResult
+        self.selectedActionIndex = selectedActionIndex
+    }
     
     var body: some View {
         if let result = selectedResult {
             HStack(spacing: 12) {
+                
                 Spacer()
                 
-                // Action on the right side
-                HStack(spacing: 6) {
-                    Text(getActionDescription(for: result))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    KeyBindingView(keys: ["↩"], isSelected: false, size: .small)
+                // Show all actions with selection highlighting
+                if result.hasMultipleActions {
+                    HStack(spacing: 2) {
+                        ForEach(Array(result.allActions.enumerated()), id: \.offset) { index, action in
+                            HStack(spacing: 4) {
+                                Text(action.displayName)
+                                    .font(.system(size: 12, weight: .medium))
+                                
+                                // Show return symbol for selected action
+                                if index == selectedActionIndex {
+                                    KeyBindingView(keys: ["↩"], isSelected: false, size: .small)
+                                }
+                            }
+                            .foregroundColor(index == selectedActionIndex ? .primary : .secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(index == selectedActionIndex ? Color.accentColor.opacity(0.1) : Color.clear)
+                            )
+                        }
+                        
+                        Text("←→")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 8)
+                    }
+                } else {
+                    // Default action on the right side for single actions
+                    HStack(spacing: 6) {
+                        Text(getActionDescription(for: result))
+                            .font(.system(size: 12, weight: .medium))
+                            .padding(.vertical, 3)
+                            .foregroundColor(.secondary)
+                        
+                        KeyBindingView(keys: ["↩"], isSelected: false, size: .small)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -81,3 +118,4 @@ struct LauncherFooterView: View {
         }
     }
 }
+

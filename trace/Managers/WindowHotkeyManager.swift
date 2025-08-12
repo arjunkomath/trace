@@ -4,7 +4,7 @@ import os.log
 /// Clean window hotkey service using the unified HotkeyRegistry
 class WindowHotkeyManager {
     static let shared = WindowHotkeyManager()
-    private let logger = Logger(subsystem: "com.trace.app", category: "WindowHotkeyManager")
+    private let logger = AppLogger.windowHotkeyManager
     private let settingsManager = SettingsManager.shared
     
     // Track registered hotkey IDs for each position
