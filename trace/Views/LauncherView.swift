@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AppKit
-import CoreGraphics
 import Combine
 
 struct LauncherView: View {
@@ -21,10 +20,8 @@ struct LauncherView: View {
     @ObservedObject var services = ServiceContainer.shared
     @ObservedObject var settingsManager = SettingsManager.shared
     @State var cachedResults: [SearchResult] = [] // Background-computed results
-    @State var isSearching = false // Track if background search is running
     @State var currentSearchTask: Task<Void, Never>? // Track current search task
     @StateObject var actionExecutor = ActionExecutor() // Handle async actions
-    @State var showActionsMenu = false // Track if actions menu is visible
     @StateObject var eventPublisher = ResultEventPublisher() // Event publisher for result updates
     @State var cancellables = Set<AnyCancellable>() // Combine cancellables
     
@@ -173,12 +170,8 @@ struct LauncherView: View {
             cancellables.removeAll()
         }
         .onKeyPress(.escape) {
-            if showActionsMenu {
-                showActionsMenu = false
-            } else {
-                clearSearch()
-                onClose()
-            }
+            clearSearch()
+            onClose()
             return .handled
         }
         .onKeyPress(.return) {

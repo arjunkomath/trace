@@ -15,16 +15,16 @@ class HotkeyManager {
     var onHotkeyPressed: (() -> Void)?
     
     init() {
-        logger.info("🚀 HotkeyManager initializing with unified registry...")
+        logger.notice("🚀 HotkeyManager initializing with unified registry...")
     }
     
     deinit {
         unregisterHotkey()
-        logger.info("🧹 HotkeyManager deinitialized")
+        logger.notice("🧹 HotkeyManager deinitialized")
     }
     
     func registerHotkey(keyCode: UInt32, modifiers: UInt32) throws {
-        logger.info("📝 Registering main app hotkey: keyCode=\(keyCode), modifiers=\(modifiers)")
+        logger.notice("📝 Registering main app hotkey: keyCode=\(keyCode), modifiers=\(modifiers)")
         
         // Unregister existing hotkey if any
         unregisterHotkey()
@@ -40,7 +40,6 @@ class HotkeyManager {
             modifiers: modifiers,
             type: .appLauncher,
             action: { [weak self] in
-                self?.logger.debug("🎯 Main app hotkey pressed!")
                 self?.onHotkeyPressed?()
             }
         ) else {
@@ -49,12 +48,12 @@ class HotkeyManager {
         }
         
         registeredHotkeyId = hotkeyId
-        logger.info("✅ Main app hotkey registered with ID: \(hotkeyId)")
+        logger.notice("✅ Main app hotkey registered with ID: \(hotkeyId)")
     }
     
     func unregisterHotkey() {
         if let hotkeyId = registeredHotkeyId {
-            logger.info("🗑️ Unregistering main app hotkey ID: \(hotkeyId)")
+            logger.notice("🗑️ Unregistering main app hotkey ID: \(hotkeyId)")
             HotkeyRegistry.shared.unregisterHotkey(id: hotkeyId)
             registeredHotkeyId = nil
         }

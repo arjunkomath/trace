@@ -7,7 +7,6 @@
 
 import Foundation
 import CoreGraphics
-import os.log
 
 enum AppConstants {
     /// The app's bundle identifier, dynamically retrieved from the main bundle

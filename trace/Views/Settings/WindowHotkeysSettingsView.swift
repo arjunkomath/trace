@@ -112,16 +112,8 @@ struct WindowCommandRow: View {
     }
     
     private func saveHotkey(_ hotkey: String, keyCode: UInt32, modifiers: UInt32) {
-        print("🔧 saveHotkey called for \(position.rawValue): '\(hotkey)', keyCode: \(keyCode), modifiers: \(modifiers)")
-        
         // Use WindowHotkeyManager which now saves to SettingsManager
         WindowHotkeyManager.shared.updateHotkey(for: position, keyCombo: hotkey.isEmpty ? nil : hotkey, keyCode: keyCode, modifiers: modifiers)
-        
-        if hotkey.isEmpty {
-            print("🗑️ Cleared hotkey for \(position.rawValue)")
-        } else {
-            print("💾 Saved hotkey for \(position.rawValue): keyCode=\(keyCode), modifiers=\(modifiers)")
-        }
     }
     
     private func startRecording() {

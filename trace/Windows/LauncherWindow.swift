@@ -7,7 +7,6 @@
 
 import Cocoa
 import SwiftUI
-import ApplicationServices
 
 class LauncherWindow: NSPanel {
     private var hostingView: NSHostingView<LauncherView>?

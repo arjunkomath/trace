@@ -44,17 +44,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure the app is truly a background app without dock icon
         NSApp.setActivationPolicy(.accessory)
-        logger.info("✅ Set app activation policy to .accessory (background app)")
+        logger.notice("✅ Set app activation policy to .accessory (background app)")
         
         
         // Initialize unified hotkey registry first
         _ = HotkeyRegistry.shared
-        logger.info("✅ HotkeyRegistry initialized")
+        logger.notice("✅ HotkeyRegistry initialized")
         
         setupLauncherWindow()
         setupHotkey()
         setupMenuBar()
-        // REMOVED: requestAccessibilityPermissions() - now only requested when needed
         
         // Request notification permissions on app launch
         PermissionManager.shared.requestNotificationPermissions()
@@ -186,17 +185,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let keyCode = UInt32(settingsManager.settings.mainHotkeyKeyCode)
         let modifiers = UInt32(settingsManager.settings.mainHotkeyModifiers)
         
-        logger.info("🚀 Setting up main hotkey from settings: keyCode=\(keyCode), modifiers=\(modifiers)")
+        logger.notice("🚀 Setting up main hotkey from settings: keyCode=\(keyCode), modifiers=\(modifiers)")
         
         do {
             try hotkeyManager?.registerHotkey(keyCode: keyCode, modifiers: modifiers)
-            logger.info("✅ Main hotkey registered successfully")
+            logger.notice("✅ Main hotkey registered successfully")
         } catch {
             logger.error("❌ Failed to register hotkey: \(error.localizedDescription)")
         }
     }
     
-    // Removed requestAccessibilityPermissions - now handled on-demand by WindowManager
     
 
     
@@ -274,14 +272,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.completeOnboarding()
         }
         onboardingWindow?.show()
-        logger.info("✅ Onboarding window shown for first-time user")
+        logger.notice("✅ Onboarding window shown for first-time user")
     }
     
     private func completeOnboarding() {
         settingsManager.updateOnboardingCompleted(true)
         onboardingWindow?.hide()
         onboardingWindow = nil
-        logger.info("✅ Onboarding completed")
+        logger.notice("✅ Onboarding completed")
         
         // Optionally show the launcher after onboarding
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in

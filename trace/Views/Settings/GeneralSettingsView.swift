@@ -8,6 +8,7 @@
 import SwiftUI
 import Carbon
 import UniformTypeIdentifiers
+import os.log
 
 struct GeneralSettingsView: View {
     @Binding var launchAtLogin: Bool
@@ -398,7 +399,7 @@ struct GeneralSettingsView: View {
             }
         } catch {
             // If restart fails, just continue running
-            print("Failed to restart app: \(error)")
+            // If restart fails, just continue running
         }
     }
 }

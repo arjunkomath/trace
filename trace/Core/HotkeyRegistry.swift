@@ -50,12 +50,12 @@ class HotkeyRegistry {
     private var nextHotkeyID: UInt32 = 1
     
     private init() {
-        logger.info("🏗️ HotkeyRegistry initializing...")
+        logger.notice("🏗️ HotkeyRegistry initializing...")
         installGlobalEventHandler()
     }
     
     deinit {
-        logger.info("🧹 HotkeyRegistry deinitializing...")
+        logger.notice("🧹 HotkeyRegistry deinitializing...")
         cleanup()
     }
     
@@ -111,7 +111,7 @@ class HotkeyRegistry {
         registrations[hotkeyID] = registration
         signatureToId[signature] = hotkeyID
         
-        logger.info("✅ Registered hotkey \(signature) with ID \(hotkeyID) for \(type.description)")
+        logger.notice("✅ Registered hotkey \(signature) with ID \(hotkeyID) for \(type.description)")
         
         return hotkeyID
     }
@@ -127,7 +127,7 @@ class HotkeyRegistry {
         signatureToId.removeValue(forKey: registration.signature)
         registrations.removeValue(forKey: id)
         
-        logger.info("🗑️ Unregistered hotkey ID \(id) for \(registration.type.description)")
+        logger.notice("🗑️ Unregistered hotkey ID \(id) for \(registration.type.description)")
     }
     
     /// Update an existing hotkey with new key combination
@@ -162,16 +162,16 @@ class HotkeyRegistry {
         return signatureToId[signature] != nil
     }
     
+    
     // MARK: - Private Implementation
     
     private func installGlobalEventHandler() {
-        logger.info("🔧 Installing global event handler...")
+        logger.notice("🔧 Installing global event handler...")
         
         var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         
         eventHandler = { (nextHandler, event, userData) -> OSStatus in
             let registry = HotkeyRegistry.shared
-            registry.logger.debug("🎯 Hotkey event received!")
             
             var hotkeyID = EventHotKeyID()
             let status = GetEventParameter(
@@ -189,18 +189,11 @@ class HotkeyRegistry {
                 return noErr
             }
             
-            registry.logger.info("🔑 Hotkey pressed with ID: \(hotkeyID.id), signature: \(hotkeyID.signature)")
-            
             // Find and execute the action
             if let registration = registry.registrations[hotkeyID.id] {
-                registry.logger.info("🎯 Executing action for \(registration.type.description)")
-                
                 DispatchQueue.main.async {
                     registration.action()
                 }
-            } else {
-                registry.logger.warning("⚠️ No registration found for hotkey ID \(hotkeyID.id)")
-                registry.logger.debug("📋 Registered hotkeys: \(Array(registry.registrations.keys))")
             }
             
             return noErr
@@ -216,7 +209,7 @@ class HotkeyRegistry {
         )
         
         if installStatus == noErr {
-            logger.info("✅ Global event handler installed successfully")
+            logger.notice("✅ Global event handler installed successfully")
         } else {
             logger.error("❌ Failed to install global event handler: status=\(installStatus)")
         }
@@ -236,6 +229,7 @@ class HotkeyRegistry {
             eventHandlerRef = nil
         }
         
-        logger.info("✅ HotkeyRegistry cleanup completed")
+        logger.notice("✅ HotkeyRegistry cleanup completed")
     }
 }
+
