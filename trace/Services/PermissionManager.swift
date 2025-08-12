@@ -7,7 +7,6 @@
 
 import AppKit
 import ApplicationServices
-import UserNotifications
 import os.log
 
 /// Capability-based permission system that tests actual functionality instead of relying on system APIs
@@ -19,12 +18,9 @@ class PermissionManager: ObservableObject {
     /// Published properties for SwiftUI views to observe
     @Published var windowManagementAvailable = false
     @Published private(set) var systemEventsAvailable = false
-    @Published private(set) var notificationPermissionStatus: UNAuthorizationStatus = .notDetermined
     
     
     private init() {
-        // Check current notification permission status without requesting
-        checkNotificationPermissionStatus()
     }
     
     // MARK: - Window Management Permissions
@@ -178,66 +174,6 @@ class PermissionManager: ObservableObject {
         }
     }
     
-    // MARK: - Notification Permissions
-    
-    private func checkNotificationPermissionStatus() {
-        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
-            DispatchQueue.main.async {
-                self?.notificationPermissionStatus = settings.authorizationStatus
-            }
-        }
-    }
-    
-    func requestNotificationPermissions() {
-        // First check if we already have permission
-        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
-            DispatchQueue.main.async {
-                if settings.authorizationStatus == .authorized {
-                    self?.notificationPermissionStatus = .authorized
-                    return
-                }
-                
-                // Only request if not already denied or authorized
-                if settings.authorizationStatus == .notDetermined {
-                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge]) { granted, error in
-                        DispatchQueue.main.async {
-                            if granted {
-                                self?.notificationPermissionStatus = .authorized
-                            } else if error != nil {
-                                self?.notificationPermissionStatus = .denied
-                            } else {
-                                self?.notificationPermissionStatus = .denied
-                            }
-                        }
-                    }
-                } else {
-                    self?.notificationPermissionStatus = settings.authorizationStatus
-                }
-            }
-        }
-    }
-    
-    /// Shows a system notification if permissions allow
-    func showNotification(title: String, body: String) {
-        guard notificationPermissionStatus == .authorized else { return }
-        
-        let notification = UNMutableNotificationContent()
-        notification.title = title
-        notification.body = body
-        notification.sound = nil // Silent notifications
-        
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: notification,
-            trigger: nil
-        )
-        
-        UNUserNotificationCenter.current().add(request) { [weak self] error in
-            if let error = error {
-                self?.logger.error("Failed to show notification: \(error)")
-            }
-        }
-    }
     
     // MARK: - UI Helpers
     
@@ -250,8 +186,8 @@ class PermissionManager: ObservableObject {
                 // For permission denied, just request permissions without showing additional dialog
                 self.requestWindowManagementPermissions()
             } else {
-                // For other errors, show a simple notification instead of modal dialog
-                self.showNotification(title: title, body: message)
+                // For other errors, show a toast instead of modal dialog
+                ToastManager.shared.showError("\(title): \(message)")
             }
         }
     }

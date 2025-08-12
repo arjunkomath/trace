@@ -26,12 +26,56 @@ struct GeneralSettingsView: View {
     @State private var importOverwriteExisting = false
     @State private var importError: String?
     @ObservedObject private var settingsManager = SettingsManager.shared
+    
+    // Permissions states
+    @ObservedObject private var permissionManager = PermissionManager.shared
+    @State private var accessibilityEnabled = false
+    @State private var checkingPermissions = false
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
     
     var body: some View {
         Form {
+            // Permissions section
+            Section {
+                PermissionRow(
+                    title: "Accessibility Access",
+                    subtitle: "Required for window management and global hotkeys",
+                    icon: "accessibility",
+                    status: accessibilityEnabled ? .granted : .denied,
+                    action: {
+                        openAccessibilitySettings()
+                    }
+                )
+                
+                HStack {
+                    Text("Permission status is checked automatically when this tab opens.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Button(action: checkPermissions) {
+                        HStack(spacing: 4) {
+                            Image(systemName: checkingPermissions ? "arrow.clockwise" : "arrow.clockwise")
+                                .font(.system(size: 11))
+                            Text("Refresh")
+                                .font(.system(size: 11))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(checkingPermissions)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Permissions")
+            } footer: {
+                Text("These permissions help Trace work seamlessly with macOS. Click 'Open Settings' to grant missing permissions.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            
             // Startup section
             Section {
                 HStack {
@@ -214,6 +258,9 @@ struct GeneralSettingsView: View {
             // Load settings from SettingsManager
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
+            
+            // Check permissions
+            checkPermissions()
         }
         .onDisappear {
             stopRecording()
@@ -401,5 +448,119 @@ struct GeneralSettingsView: View {
             // If restart fails, just continue running
             // If restart fails, just continue running
         }
+    }
+    
+    // MARK: - Permissions Methods
+    
+    private func checkPermissions() {
+        guard !checkingPermissions else { return } // Prevent concurrent checks
+        checkingPermissions = true
+        
+        // Check accessibility permissions with retry mechanism for release builds
+        checkAccessibilityPermissions()
+    }
+    
+    private func checkAccessibilityPermissions() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let capability = self.permissionManager.testWindowManagementCapability()
+            
+            DispatchQueue.main.async {
+                switch capability {
+                case .available:
+                    self.accessibilityEnabled = true
+                    
+                case .permissionDenied:
+                    self.accessibilityEnabled = false
+                    
+                case .noTargetApp, .noWindows:
+                    // These states don't indicate permission problems - use system API as fallback
+                    self.accessibilityEnabled = AXIsProcessTrusted()
+                }
+                
+                self.checkingPermissions = false // Reset the concurrent check guard
+            }
+        }
+    }
+    
+    private func openAccessibilitySettings() {
+        // Open System Settings to Accessibility
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+// MARK: - Permission Types
+
+enum PermissionStatus {
+    case granted
+    case denied
+    case checking
+    
+    var color: Color {
+        switch self {
+        case .granted: return .green
+        case .denied: return .orange
+        case .checking: return .secondary
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .granted: return "checkmark.circle.fill"
+        case .denied: return "exclamationmark.triangle.fill"
+        case .checking: return "clock"
+        }
+    }
+    
+    var statusText: String {
+        switch self {
+        case .granted: return "Granted"
+        case .denied: return "Not Granted"
+        case .checking: return "Checking..."
+        }
+    }
+}
+
+struct PermissionRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let status: PermissionStatus
+    let action: () -> Void
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 13))
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: status.icon)
+                        .font(.system(size: 12))
+                        .foregroundColor(status.color)
+                    
+                    Text(status.statusText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(status.color)
+                }
+                
+                if status != .granted {
+                    Button("Open Settings") {
+                        action()
+                    }
+                    .font(.system(size: 11))
+                    .buttonStyle(.link)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }

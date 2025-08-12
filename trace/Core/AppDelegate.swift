@@ -55,9 +55,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkey()
         setupMenuBar()
         
-        // Request notification permissions on app launch
-        PermissionManager.shared.requestNotificationPermissions()
-        
         // Initialize window hotkey manager to register saved hotkeys
         _ = WindowHotkeyManager.shared
         
@@ -174,11 +171,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         hotkeyManager = HotkeyManager()
         hotkeyManager?.onHotkeyPressed = { [weak self] in
-            // Track the current active window (for window management features)
-            // The new permission system handles permissions on-demand
-            WindowManager.shared.trackCurrentActiveWindow()
-            
-            // Show launcher immediately
+            self?.logger.debug("🔑 Main hotkey pressed - toggling launcher")
             self?.toggleLauncher()
         }
         
@@ -204,12 +197,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func toggleLauncher() {
-        guard let launcherWindow = launcherWindow else { return }
+        guard let launcherWindow = launcherWindow else { 
+            logger.error("⚠️ LauncherWindow is nil in toggleLauncher")
+            return 
+        }
         
         if launcherWindow.isVisible {
+            logger.debug("Hiding launcher window")
             launcherWindow.hide()
             stopGlobalEventMonitoring()
         } else {
+            logger.debug("Showing launcher window")
             launcherWindow.show()
             startGlobalEventMonitoring()
         }

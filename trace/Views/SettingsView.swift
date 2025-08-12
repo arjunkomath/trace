@@ -32,40 +32,33 @@ struct SettingsView: View {
             }
             .tag(0)
             
-            PermissionsSettingsView()
-                .tabItem {
-                    Image(systemName: "lock.shield")
-                    Text("Permissions")
-                }
-                .tag(1)
-            
             WindowManagementSettingsView()
                 .tabItem {
                     Image(systemName: "macwindow")
                     Text("Window Hotkeys")
                 }
-                .tag(2)
+                .tag(1)
             
             AppHotkeysSettingsView()
                 .tabItem {
                     Image(systemName: "app.badge")
                     Text("App Hotkeys")
                 }
-                .tag(3)
+                .tag(2)
             
             FolderSettingsView()
                 .tabItem {
                     Image(systemName: "folder")
                     Text("Folders")
                 }
-                .tag(4)
+                .tag(3)
             
             AboutSettingsView()
                 .tabItem {
                     Image(systemName: "info.circle")
                     Text("About")
                 }
-                .tag(5)
+                .tag(4)
         }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
         .onAppear {

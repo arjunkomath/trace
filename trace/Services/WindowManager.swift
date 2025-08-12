@@ -444,10 +444,7 @@ class WindowManager: ObservableObject {
             },
             onFailure: { error in
                 self.logger.error("Failed to toggle system appearance: \(error)")
-                self.permissionManager.showNotification(
-                    title: "System Appearance Error", 
-                    body: error
-                )
+                ToastManager.shared.showError("System Appearance Error: \(error)")
             }
         )
     }

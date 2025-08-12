@@ -180,11 +180,13 @@ class ActionExecutor: ObservableObject {
     }
     
     private func showNotification(title: String, message: String, isError: Bool) {
-        let notification = NSUserNotification()
-        notification.title = title
-        notification.informativeText = message
-        notification.soundName = isError ? NSUserNotificationDefaultSoundName : nil
-        NSUserNotificationCenter.default.deliver(notification)
+        let combinedMessage = message.isEmpty ? title : "\(title): \(message)"
+        if isError {
+            ToastManager.shared.showError(combinedMessage)
+        } else {
+            print(message)
+            ToastManager.shared.showSuccess(message)
+        }
     }
 }
 
@@ -257,7 +259,7 @@ struct NetworkCommandAction: DisplayableCommandAction {
                 accessory: .status("Copied", .green)
             ))
             return .success(
-                message: "\(displayName) \(result) copied to clipboard",
+                message: "\(result) copied to clipboard",
                 data: .text(result)
             )
         }
@@ -430,7 +432,7 @@ struct MathCopyCommandAction: DisplayableCommandAction {
         ))
         
         return .success(
-            message: "Result \(result) copied to clipboard",
+            message: "\(result) copied to clipboard",
             data: .text(result)
         )
     }
