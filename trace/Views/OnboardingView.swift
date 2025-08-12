@@ -78,13 +78,37 @@ struct OnboardingView: View {
                             .font(.system(size: 28, weight: .semibold))
                             .multilineTextAlignment(.center)
                         
-                        // Description
-                        Text(steps[currentStep].description)
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
+                        // Description with custom hotkey display for Global Hotkey step
+                        if currentStep == 1 {
+                            // Global Hotkey step - show actual key binding
+                            VStack(spacing: 16) {
+                                Text("Press")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.secondary)
+                                
+                                KeyBindingView(keys: ["⌥", "Space"], isSelected: false, size: .normal)
+                                    .scaleEffect(1.2)
+                                
+                                Text("anywhere to open Trace")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.secondary)
+                                
+                                Text("You can customize this hotkey in settings")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary.opacity(0.8))
+                                    .padding(.top, 8)
+                            }
                             .multilineTextAlignment(.center)
-                            .lineSpacing(4)
                             .frame(maxWidth: 400)
+                        } else {
+                            // Other steps - regular description
+                            Text(steps[currentStep].description)
+                                .font(.system(size: 16))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(4)
+                                .frame(maxWidth: 400)
+                        }
                     }
                     .padding(.horizontal, 32)
                     
@@ -137,12 +161,6 @@ struct OnboardingView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.primary.opacity(colorScheme == .dark ? 0.2 : 0.15), lineWidth: 1)
         )
-        .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.6 : 0.3),
-            radius: 20,
-            x: 0,
-            y: 8
-        )
         .onAppear {
             triggerAnimation()
         }
@@ -192,8 +210,6 @@ class OnboardingWindow: NSWindow {
         hasShadow = false
         level = .floating
         isMovableByWindowBackground = true
-        
-        center()
     }
     
     private func setupContent() {
@@ -203,7 +219,20 @@ class OnboardingWindow: NSWindow {
     
     func show() {
         makeKeyAndOrderFront(nil)
+        centerWithOffset()
         NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private func centerWithOffset() {
+        guard let screen = NSScreen.main else { return }
+        
+        let screenFrame = screen.visibleFrame
+        let windowFrame = frame
+        
+        let x = screenFrame.midX - windowFrame.width / 2
+        let y = screenFrame.midY - windowFrame.height / 2 - 50
+        
+        setFrameOrigin(NSPoint(x: x, y: y))
     }
     
     func hide() {

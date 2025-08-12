@@ -535,6 +535,12 @@ class AppSearchManager: ObservableObject {
         }
     }
     
+    /// Manually refresh the application cache by rediscovering all apps
+    func refreshCache() {
+        logger.info("🔄 Manual cache refresh requested")
+        loadAppsInBackground()
+    }
+    
     // MARK: - Lifecycle Management
     
     func shutdown() {

@@ -61,13 +61,42 @@ enum SearchResultType {
     }
 }
 
+enum ResultCategory {
+    case applications
+    case network
+    case web
+    case window
+    case customFolder
+    case appearance
+    case systemSettings
+    
+    var displayName: String {
+        switch self {
+        case .applications:
+            return "Applications"
+        case .network:
+            return "Network"
+        case .web:
+            return "Web"
+        case .window:
+            return "Window"
+        case .customFolder:
+            return "Custom Folder"
+        case .appearance:
+            return "Appearance"
+        case .systemSettings:
+            return "System Settings"
+        }
+    }
+}
+
 struct SearchResult: Identifiable {
     let id = UUID()
     let title: String
     let subtitle: String?
     let icon: SearchIcon
     let type: SearchResultType
-    let category: String?
+    let category: ResultCategory?
     let shortcut: KeyboardShortcut?
     let lastUsed: Date?
     let commandId: String? // Semantic identifier for tracking

@@ -19,7 +19,7 @@ struct TraceSettings: Codable {
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
-    var mainHotkeyModifiers: Int = 524288 // Default: Option
+    var mainHotkeyModifiers: Int = 2048 // Default: Option
     
     // Window Hotkeys
     var windowHotkeys: [String: WindowHotkeyData] = [:]
@@ -261,7 +261,7 @@ class SettingsManager: ObservableObject {
             }
             
             // Main hotkey - only update if current is default
-            if settings.mainHotkeyKeyCode == 49 && settings.mainHotkeyModifiers == 524288 {
+            if settings.mainHotkeyKeyCode == 49 && settings.mainHotkeyModifiers == 2048 {
                 settings.mainHotkeyKeyCode = importedSettings.mainHotkeyKeyCode
                 settings.mainHotkeyModifiers = importedSettings.mainHotkeyModifiers
             }

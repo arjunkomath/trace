@@ -11,6 +11,7 @@ import Sparkle
 struct AboutSettingsView: View {
     @State private var dataPath: String = ""
     @State private var showingResetAlert = false
+    @State private var showingCacheRefreshAlert = false
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -94,12 +95,17 @@ struct AboutSettingsView: View {
                     
                 }
                 .padding(.vertical, 4)
-                
+            } header: {
+                Text("Storage")
+            }
+            
+            // Reset Section
+            Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Application Cache")
                             .font(.system(size: 13, weight: .medium))
-                        Text("Discovered apps and icons")
+                        Text("Refresh discovered apps and icons")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -116,12 +122,7 @@ struct AboutSettingsView: View {
                     .buttonStyle(.bordered)
                 }
                 .padding(.vertical, 4)
-            } header: {
-                Text("Storage")
-            }
-            
-            // Reset Section
-            Section {
+                
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Reset Onboarding")
@@ -156,6 +157,11 @@ struct AboutSettingsView: View {
         } message: {
             Text("The welcome tutorial will be shown when you next launch the app.")
         }
+        .alert("Cache Refreshed", isPresented: $showingCacheRefreshAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Application cache has been refreshed successfully.")
+        }
     }
     
     private func loadDebugInfo() {
@@ -170,8 +176,8 @@ struct AboutSettingsView: View {
     private func refreshAppCache() {
         // Trigger app cache refresh through ServiceContainer
         let services = ServiceContainer.shared
-        // AppSearchManager will reload apps as needed when accessed
-        _ = services.appSearchManager
+        services.appSearchManager.refreshCache()
+        showingCacheRefreshAlert = true
     }
     
     private func openDataFolder() {

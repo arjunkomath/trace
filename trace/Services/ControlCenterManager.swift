@@ -89,9 +89,148 @@ class ControlCenterManager {
                 title: title,
                 subtitle: subtitle,
                 icon: icon,
-                category: "Appearance",
+                category: .appearance,
                 action: { [weak self] in
                     self?.toggleSystemAppearance()
+                }
+            ))
+        }
+        
+        // System Settings commands
+        commands.append(contentsOf: getSystemSettingsCommands(matching: query))
+        
+        return commands
+    }
+    
+    // MARK: - System Settings Commands
+    
+    func getSystemSettingsCommands(matching query: String) -> [ControlCenterCommand] {
+        var commands: [ControlCenterCommand] = []
+        
+        // Bluetooth Settings
+        if matchesQuery(query, terms: [
+            "bluetooth", "bt", "wireless", "pairing", "bluetooth settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "bluetooth_settings",
+                title: "Bluetooth Settings",
+                subtitle: "Open Bluetooth preferences",
+                icon: "antenna.radiowaves.left.and.right",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preferences.Bluetooth")
+                }
+            ))
+        }
+        
+        // WiFi/Network Settings
+        if matchesQuery(query, terms: [
+            "wifi", "wi-fi", "wireless", "network", "internet", "network settings", "wifi settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "wifi_settings",
+                title: "WiFi Settings",
+                subtitle: "Open WiFi & Network preferences",
+                icon: "wifi",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Network-Settings.extension?Wi-Fi")
+                }
+            ))
+        }
+        
+        // System Update
+        if matchesQuery(query, terms: [
+            "update", "software update", "system update", "upgrade", "updates", "software upgrade"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "system_update",
+                title: "Software Update",
+                subtitle: "Check for system updates",
+                icon: "gear.badge.questionmark",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Software-Update-Settings.extension")
+                }
+            ))
+        }
+        
+        // Security & Privacy
+        if matchesQuery(query, terms: [
+            "security", "privacy", "permissions", "firewall", "security settings", "privacy settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "security_privacy",
+                title: "Security & Privacy",
+                subtitle: "Open Security & Privacy settings",
+                icon: "lock.shield",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension")
+                }
+            ))
+        }
+        
+        // Notifications
+        if matchesQuery(query, terms: [
+            "notifications", "alerts", "banners", "notification settings", "notification center"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "notifications",
+                title: "Notifications",
+                subtitle: "Configure notification settings",
+                icon: "bell",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+                }
+            ))
+        }
+        
+        // Apple ID
+        if matchesQuery(query, terms: [
+            "apple id", "appleid", "icloud", "apple account", "account settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "apple_id",
+                title: "Apple ID",
+                subtitle: "Manage your Apple ID settings",
+                icon: "person.crop.circle",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.systempreferences.AppleIDSettings")
+                }
+            ))
+        }
+        
+        // Sharing
+        if matchesQuery(query, terms: [
+            "sharing", "file sharing", "screen sharing", "remote login", "sharing settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "sharing",
+                title: "Sharing",
+                subtitle: "Configure sharing preferences",
+                icon: "square.and.arrow.up",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preferences.sharing")
+                }
+            ))
+        }
+        
+        // Screen Time
+        if matchesQuery(query, terms: [
+            "screen time", "screentime", "app limits", "downtime", "screen time settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "screen_time",
+                title: "Screen Time",
+                subtitle: "Manage Screen Time settings",
+                icon: "hourglass",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Screen-Time-Settings.extension")
                 }
             ))
         }
@@ -199,6 +338,22 @@ class ControlCenterManager {
     
     // MARK: - Private Helpers
     
+    /// Opens a specific System Preference pane using URL scheme
+    private func openSystemPreference(_ urlString: String) {
+        logger.info("🔧 Opening system preference: \(urlString)")
+        
+        guard let url = URL(string: urlString) else {
+            logger.error("❌ Invalid system preference URL: \(urlString)")
+            return
+        }
+        
+        if NSWorkspace.shared.open(url) {
+            logger.info("✅ Successfully opened system preference")
+        } else {
+            logger.error("❌ Failed to open system preference: \(urlString)")
+        }
+    }
+    
     /// Executes an AppleScript and logs the result
     private func executeAppleScript(_ script: String) {
         var error: NSDictionary?
@@ -230,6 +385,6 @@ struct ControlCenterCommand {
     let title: String
     let subtitle: String
     let icon: String
-    let category: String
+    let category: ResultCategory
     let action: () -> Void
 }
