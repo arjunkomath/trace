@@ -45,9 +45,7 @@ struct LauncherFooterView: View {
                             )
                         }
                         
-                        Text("←→")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.secondary)
+                        KeyBindingView(keys: ["TAB"], isSelected: false, size: .small)
                             .padding(.leading, 8)
                     }
                 } else {
@@ -91,6 +89,8 @@ struct LauncherFooterView: View {
             switch commandId {
             case "com.trace.command.publicip", "com.trace.command.privateip":
                 return "Copy to Clipboard"
+            case "com.trace.command.math":
+                return "Calculate"
             case "com.trace.command.settings":
                 return "Open Settings"
             case "com.trace.command.quit":
@@ -112,6 +112,9 @@ struct LauncherFooterView: View {
             
         case .folder:
             return "Open Folder"
+            
+        case .math:
+            return "Calculate"
             
         default:
             return "Execute"

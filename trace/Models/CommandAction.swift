@@ -309,3 +309,97 @@ struct URLCommandAction: DisplayableCommandAction {
         return .success(message: nil, data: .url(url))
     }
 }
+
+struct MathCommandAction: DisplayableCommandAction {
+    let id: String
+    let displayName: String
+    let iconName: String?
+    let keyboardShortcut: String?
+    let description: String?
+    let expression: String
+    let showsLoadingState = true
+    let onResult: ((String) -> Void)?
+    
+    init(
+        id: String,
+        displayName: String,
+        expression: String,
+        iconName: String? = nil,
+        keyboardShortcut: String? = nil,
+        description: String? = nil,
+        onResult: ((String) -> Void)? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.expression = expression
+        self.iconName = iconName
+        self.keyboardShortcut = keyboardShortcut
+        self.description = description
+        self.onResult = onResult
+    }
+    
+    func execute() async -> ActionResult {
+        guard let result = await MathEvaluator.evaluate(expression) else {
+            return .failure(error: "Unable to calculate \(expression)")
+        }
+        
+        // Call the result callback to update UI
+        if let onResult = onResult {
+            await MainActor.run {
+                onResult(result)
+            }
+        }
+        
+        return .success(
+            message: nil,
+            data: nil
+        )
+    }
+}
+
+struct MathCopyCommandAction: DisplayableCommandAction {
+    let id: String
+    let displayName: String
+    let iconName: String?
+    let keyboardShortcut: String?
+    let description: String?
+    let expression: String
+    let showsLoadingState = true
+    let onResult: ((String) -> Void)?
+    
+    init(
+        id: String,
+        displayName: String,
+        expression: String,
+        iconName: String? = nil,
+        keyboardShortcut: String? = nil,
+        description: String? = nil,
+        onResult: ((String) -> Void)? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.expression = expression
+        self.iconName = iconName
+        self.keyboardShortcut = keyboardShortcut
+        self.description = description
+        self.onResult = onResult
+    }
+    
+    func execute() async -> ActionResult {
+        guard let result = await MathEvaluator.evaluate(expression) else {
+            return .failure(error: "Unable to calculate \(expression)")
+        }
+        
+        // Call the result callback to update UI
+        if let onResult = onResult {
+            await MainActor.run {
+                onResult(result)
+            }
+        }
+        
+        return .success(
+            message: "Result \(result) copied to clipboard",
+            data: .text(result)
+        )
+    }
+}

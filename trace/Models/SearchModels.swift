@@ -40,6 +40,7 @@ enum SearchResultType {
     case person
     case recent
     case suggestion
+    case math
     
     var displayName: String {
         switch self {
@@ -57,6 +58,8 @@ enum SearchResultType {
             return "Recent"
         case .suggestion:
             return "Suggestion"
+        case .math:
+            return "Math"
         }
     }
 }

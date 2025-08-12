@@ -412,6 +412,99 @@ extension LauncherView {
             systemCommands.append((privateIPResult, privateIPScore))
         }
         
+        // Add math calculation if query is a math expression
+        if MathEvaluator.isMathExpression(query) {
+            let mathId = "com.trace.command.math"
+            
+            // Primary action: Calculate and show result
+            let calculateAction = MathCommandAction(
+                id: "\(mathId)-calculate",
+                displayName: "Calculate",
+                expression: query,
+                iconName: "equal.circle",
+                keyboardShortcut: "↩",
+                description: "Calculate the result",
+                onResult: { result in
+                    // Update the result in the cached results to show the calculation
+                    if let index = self.cachedResults.firstIndex(where: { $0.commandId == mathId }) {
+                        let updatedResult = self.cachedResults[index]
+                        
+                        // Create a new result with updated title showing the answer
+                        let updatedResultWithAnswer = SearchResult(
+                            title: "\(query) = \(result)",
+                            subtitle: "Math calculation result",
+                            icon: updatedResult.icon,
+                            type: updatedResult.type,
+                            category: updatedResult.category,
+                            shortcut: updatedResult.shortcut,
+                            lastUsed: updatedResult.lastUsed,
+                            commandId: updatedResult.commandId,
+                            isLoading: false,
+                            accessory: .status("Calculated", .green),
+                            commandAction: updatedResult.commandAction
+                        )
+                        
+                        self.cachedResults[index] = updatedResultWithAnswer
+                    }
+                }
+            )
+            
+            // Secondary action: Calculate and copy to clipboard
+            let copyResultAction = MathCopyCommandAction(
+                id: "\(mathId)-copy",
+                displayName: "Copy Result",
+                expression: query,
+                iconName: "doc.on.clipboard",
+                description: "Calculate and copy result to clipboard",
+                onResult: { result in
+                    // Update the result in the cached results to show copied state
+                    if let index = self.cachedResults.firstIndex(where: { $0.commandId == mathId }) {
+                        let updatedResult = self.cachedResults[index]
+                        
+                        let updatedResultWithAnswer = SearchResult(
+                            title: "\(query) = \(result)",
+                            subtitle: "Copied \(result) to clipboard",
+                            icon: updatedResult.icon,
+                            type: updatedResult.type,
+                            category: updatedResult.category,
+                            shortcut: updatedResult.shortcut,
+                            lastUsed: updatedResult.lastUsed,
+                            commandId: updatedResult.commandId,
+                            isLoading: false,
+                            accessory: .status("Copied", .blue),
+                            commandAction: updatedResult.commandAction
+                        )
+                        
+                        self.cachedResults[index] = updatedResultWithAnswer
+                    }
+                }
+            )
+            
+            // Create multi-action container
+            let mathMultiAction = MultiCommandAction(
+                id: mathId,
+                primaryAction: calculateAction,
+                secondaryActions: [copyResultAction]
+            )
+            
+            let mathResult = SearchResult(
+                title: "\(query) = ?",
+                subtitle: "Calculate math expression",
+                icon: .system("plus.forwardslash.minus"),
+                type: .math,
+                category: nil,
+                shortcut: nil,
+                lastUsed: nil,
+                commandId: mathId,
+                isLoading: false,
+                accessory: nil,
+                commandAction: mathMultiAction
+            )
+            
+            // Math results get high priority (score 1.0)
+            scoredResults.append((mathResult, 1.0))
+        }
+        
         // Add system commands to scored results
         scoredResults.append(contentsOf: systemCommands)
         
@@ -756,6 +849,10 @@ extension LauncherView {
             // Use the command's semantic identifier for tracking folders
             let commandId = result.commandId ?? "com.trace.folder.unknown"
             services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
+        case .math:
+            // Track math calculations
+            let commandId = result.commandId ?? "com.trace.math.calculation"
+            services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
         case .file, .person, .recent:
             // These types aren't implemented yet, so no tracking for now
             break
@@ -774,8 +871,8 @@ extension LauncherView {
         } else {
             // Single action - execute normally
             actionExecutor.execute(commandAction) { success in
-                // For network commands like IP, don't close launcher and keep search visible
-                if commandAction is NetworkCommandAction {
+                // For network and math commands, don't close launcher and keep search visible
+                if commandAction is NetworkCommandAction || commandAction is MathCommandAction {
                     // Keep launcher open and don't clear search - user can see the result
                     // Reset selection to first item
                     selectedIndex = 0

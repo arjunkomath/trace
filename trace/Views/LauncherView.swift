@@ -194,20 +194,10 @@ struct LauncherView: View {
             }
             return .handled
         }
-        .onKeyPress(.leftArrow) {
-            if selectedIndex < results.count && results[selectedIndex].hasMultipleActions {
-                if selectedActionIndex > 0 {
-                    selectedActionIndex -= 1
-                }
-            }
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
+        .onKeyPress(.tab) {
             if selectedIndex < results.count && results[selectedIndex].hasMultipleActions {
                 let actionCount = results[selectedIndex].allActions.count
-                if selectedActionIndex < actionCount - 1 {
-                    selectedActionIndex += 1
-                }
+                selectedActionIndex = (selectedActionIndex + 1) % actionCount
             }
             return .handled
         }
