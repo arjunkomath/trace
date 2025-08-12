@@ -58,7 +58,6 @@ class AppSearchManager: ObservableObject {
     func searchApps(query: String, limit: Int = AppConstants.Search.defaultLimit) -> [Application] {
         guard !query.isEmpty else { return [] }
         
-        let queryLower = query.lowercased()
         var scoredResults: [(Application, Double)] = []
         
         // Get usage scores for all apps
