@@ -10,6 +10,7 @@
 		551AB0DC2E49B8CA008C78E5 /* Ifrit in Frameworks */ = {isa = PBXBuildFile; productRef = 551AB0DB2E49B8CA008C78E5 /* Ifrit */; };
 		551AB0DD2E49BC66008C78E5 /* Ifrit in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 551AB0DB2E49B8CA008C78E5 /* Ifrit */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		55A89B632E48A0890053E87C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55A89B622E48A0890053E87C /* Sparkle */; };
+		55D107D22E4C54D300CF7F63 /* SymbolPicker in Frameworks */ = {isa = PBXBuildFile; productRef = 55D107D12E4C54D300CF7F63 /* SymbolPicker */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -45,6 +46,7 @@
 			files = (
 				55A89B632E48A0890053E87C /* Sparkle in Frameworks */,
 				551AB0DC2E49B8CA008C78E5 /* Ifrit in Frameworks */,
+				55D107D22E4C54D300CF7F63 /* SymbolPicker in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +92,7 @@
 			packageProductDependencies = (
 				55A89B622E48A0890053E87C /* Sparkle */,
 				551AB0DB2E49B8CA008C78E5 /* Ifrit */,
+				55D107D12E4C54D300CF7F63 /* SymbolPicker */,
 			);
 			productName = trace;
 			productReference = 5567D2AC2E4469D500536CFF /* trace.app */;
@@ -122,6 +125,7 @@
 			packageReferences = (
 				55A89B612E48A0890053E87C /* XCRemoteSwiftPackageReference "Sparkle" */,
 				551AB0DA2E49B8CA008C78E5 /* XCRemoteSwiftPackageReference "Ifrit" */,
+				55D107D02E4C54D300CF7F63 /* XCRemoteSwiftPackageReference "SymbolPicker" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5567D2AD2E4469D500536CFF /* Products */;
@@ -378,6 +382,14 @@
 				minimumVersion = 2.7.1;
 			};
 		};
+		55D107D02E4C54D300CF7F63 /* XCRemoteSwiftPackageReference "SymbolPicker" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/xnth97/SymbolPicker";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -390,6 +402,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 55A89B612E48A0890053E87C /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		55D107D12E4C54D300CF7F63 /* SymbolPicker */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 55D107D02E4C54D300CF7F63 /* XCRemoteSwiftPackageReference "SymbolPicker" */;
+			productName = SymbolPicker;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

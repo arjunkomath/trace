@@ -1,5 +1,5 @@
 {
-  "originHash" : "09d65b03c56071585fb1e5e6bcaa4ceddba89004d2c93fa06439f36fe6543d73",
+  "originHash" : "ff7b050d2c231981528741f2953b034446867a71eafe168a542c3f53925d2983",
   "pins" : [
     {
       "identity" : "ifrit",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "df074165274afaa39539c05d57b0832620775b11",
         "version" : "2.7.1"
+      }
+    },
+    {
+      "identity" : "symbolpicker",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xnth97/SymbolPicker",
+      "state" : {
+        "revision" : "8bb08c982235b8e601bc500a41e770d7e198759b",
+        "version" : "1.6.2"
       }
     }
   ],

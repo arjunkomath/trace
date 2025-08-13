@@ -37,7 +37,7 @@ struct LauncherView: View {
                 
                 TextField("What would you like to do?", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16))
+                    .font(.system(size: 18))
                     .focused($isSearchFocused)
                     .onChange(of: searchText) { _, newValue in
                         selectedIndex = 0

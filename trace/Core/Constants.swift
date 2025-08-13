@@ -21,7 +21,7 @@ enum AppConstants {
         static let searchPadding: CGFloat = 30
         
         static let settingsWidth: CGFloat = 550
-        static let settingsHeight: CGFloat = 500
+        static let settingsHeight: CGFloat = 650
     }
     
     enum Search {

@@ -360,10 +360,10 @@ struct GeneralSettingsView: View {
             }
         }
         
-        // Reload folder manager
+        // Reload quick links manager
         DispatchQueue.main.async {
             let serviceContainer = ServiceContainer.shared
-            serviceContainer.folderManager.loadFolders()
+            serviceContainer.quickLinksManager.loadQuickLinks()
         }
     }
     

@@ -33,7 +33,7 @@ enum AppLogger {
     static let settingsManager = logger(for: "SettingsManager")
     static let actionExecutor = logger(for: "ActionExecutor")
     static let appHotkeyManager = logger(for: "AppHotkeyManager")
-    static let folderManager = logger(for: "FolderManager")
+    static let quickLinksManager = logger(for: "QuickLinksManager")
     static let permissionManager = logger(for: "PermissionManager")
     static let controlCenterManager = logger(for: "ControlCenterManager")
 }

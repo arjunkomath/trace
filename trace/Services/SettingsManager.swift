@@ -27,9 +27,11 @@ struct TraceSettings: Codable {
     // App Hotkeys  
     var appHotkeys: [String: AppHotkeyData] = [:]
     
-    // Custom Folders
-    var customFolders: [CustomFolderData] = []
-    var folderHotkeys: [String: String] = [:]
+    
+    // Quick Links
+    var quickLinks: [QuickLinkData] = []
+    var quickLinkHotkeys: [String: String] = [:]
+    var quickLinksHasLoadedBefore: Bool = false
     
     // Settings metadata
     var version: String = "1.0"
@@ -47,11 +49,14 @@ struct TraceSettings: Codable {
         let modifiers: Int
     }
     
-    struct CustomFolderData: Codable {
+    
+    struct QuickLinkData: Codable {
         let id: String
         let name: String
-        let path: String
-        let isDefault: Bool
+        let urlString: String
+        let iconName: String?
+        let keywords: [String]
+        let isSystemDefault: Bool
     }
 }
 
@@ -111,7 +116,10 @@ class SettingsManager: ObservableObject {
     }
     
     func saveSettings() {
-        settings.lastModified = Date()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.settings.lastModified = Date()
+        }
         
         do {
             let encoder = JSONEncoder()
@@ -128,8 +136,11 @@ class SettingsManager: ObservableObject {
     // MARK: - General Settings
     
     func updateResultsLayout(_ layout: String) {
-        settings.resultsLayout = layout
-        saveSettings()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.settings.resultsLayout = layout
+            self.saveSettings()
+        }
     }
     
     func updateShowMenuBarIcon(_ show: Bool) {
@@ -205,38 +216,49 @@ class SettingsManager: ObservableObject {
         return result
     }
     
-    // MARK: - Custom Folders
     
-    func addCustomFolder(_ folder: TraceSettings.CustomFolderData) {
-        settings.customFolders.append(folder)
+    // MARK: - Quick Links
+    
+    func addQuickLink(_ quickLink: TraceSettings.QuickLinkData) {
+        settings.quickLinks.append(quickLink)
         saveSettings()
     }
     
-    func updateCustomFolder(_ folder: TraceSettings.CustomFolderData) {
-        if let index = settings.customFolders.firstIndex(where: { $0.id == folder.id }) {
-            settings.customFolders[index] = folder
+    func updateQuickLink(_ quickLink: TraceSettings.QuickLinkData) {
+        if let index = settings.quickLinks.firstIndex(where: { $0.id == quickLink.id }) {
+            settings.quickLinks[index] = quickLink
             saveSettings()
         }
     }
     
-    func removeCustomFolder(withId id: String) {
-        settings.customFolders.removeAll { $0.id == id }
+    func removeQuickLink(withId id: String) {
+        settings.quickLinks.removeAll { $0.id == id }
+        settings.quickLinkHotkeys.removeValue(forKey: id)
         saveSettings()
     }
     
-    // MARK: - Folder Hotkeys
+    func getQuickLinks() -> [TraceSettings.QuickLinkData] {
+        return settings.quickLinks
+    }
     
-    func updateFolderHotkey(for folderId: String, hotkey: String?) {
+    func updateQuickLinksHasLoadedBefore(_ hasLoaded: Bool) {
+        settings.quickLinksHasLoadedBefore = hasLoaded
+        saveSettings()
+    }
+    
+    // MARK: - Quick Link Hotkeys
+    
+    func updateQuickLinkHotkey(for quickLinkId: String, hotkey: String?) {
         if let hotkey = hotkey {
-            settings.folderHotkeys[folderId] = hotkey
+            settings.quickLinkHotkeys[quickLinkId] = hotkey
         } else {
-            settings.folderHotkeys.removeValue(forKey: folderId)
+            settings.quickLinkHotkeys.removeValue(forKey: quickLinkId)
         }
         saveSettings()
     }
     
-    func getFolderHotkey(for folderId: String) -> String? {
-        return settings.folderHotkeys[folderId]
+    func getQuickLinkHotkey(for quickLinkId: String) -> String? {
+        return settings.quickLinkHotkeys[quickLinkId]
     }
     
     // MARK: - Import/Export
@@ -282,17 +304,18 @@ class SettingsManager: ObservableObject {
                 }
             }
             
-            // Custom folders - add new ones
-            for folder in importedSettings.customFolders {
-                if !settings.customFolders.contains(where: { $0.id == folder.id }) {
-                    settings.customFolders.append(folder)
+            
+            // Quick links - add new ones
+            for quickLink in importedSettings.quickLinks {
+                if !settings.quickLinks.contains(where: { $0.id == quickLink.id }) {
+                    settings.quickLinks.append(quickLink)
                 }
             }
             
-            // Folder hotkeys - add new ones, keep existing
-            for (folderId, hotkey) in importedSettings.folderHotkeys {
-                if settings.folderHotkeys[folderId] == nil {
-                    settings.folderHotkeys[folderId] = hotkey
+            // Quick link hotkeys - add new ones, keep existing
+            for (quickLinkId, hotkey) in importedSettings.quickLinkHotkeys {
+                if settings.quickLinkHotkeys[quickLinkId] == nil {
+                    settings.quickLinkHotkeys[quickLinkId] = hotkey
                 }
             }
             

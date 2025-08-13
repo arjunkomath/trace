@@ -275,6 +275,11 @@ class AppSearchManager: ObservableObject {
             return nil
         }
         
+        // Filter out Trace app itself from the cache
+        guard bundleId != AppConstants.bundleIdentifier else {
+            return nil
+        }
+        
         let displayName = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? url.deletingPathExtension().lastPathComponent

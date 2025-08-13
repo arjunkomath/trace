@@ -46,10 +46,10 @@ struct SettingsView: View {
                 }
                 .tag(2)
             
-            FolderSettingsView()
+            QuickLinksSettingsView()
                 .tabItem {
-                    Image(systemName: "folder")
-                    Text("Folders")
+                    Image(systemName: "link")
+                    Text("Quick Links")
                 }
                 .tag(3)
             

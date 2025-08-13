@@ -128,7 +128,7 @@ extension LauncherView {
             NetworkCommandProvider(),
             ControlCenterProvider(),
             WindowManagementProvider(),
-            FolderProvider(),
+            QuickLinksProvider(),
             MathResultProvider(),
             SearchEngineProvider()
         ]

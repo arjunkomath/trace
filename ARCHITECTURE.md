@@ -25,6 +25,20 @@ High-performance app discovery and search:
 - In-memory caching with lazy icon loading
 - Fuzzy search with relevance scoring
 
+### QuickLinksManager
+Manages user-defined quick links and folder shortcuts:
+- Support for both file paths and web URLs
+- Built-in system folder defaults (Desktop, Documents, Downloads, etc.)
+- Configurable with custom hotkeys and keywords
+- Smart icon detection based on file types and domains
+
+### ToastManager
+Non-intrusive notification system:
+- Queue-based toast notifications with thread-safe operations
+- Positioned at top-right of screen with auto-positioning
+- Auto-dismissal with configurable timing
+- Multiple toast types (success, error, warning, info)
+
 ### HotkeyManager
 Carbon API wrapper for global hotkey:
 - Uses EventHotKey for system-wide hotkey registration
@@ -42,20 +56,27 @@ Professional settings interface:
 - **Background Only**: App runs as LSUIElement (no dock or menu bar presence)
 - **Carbon for Hotkeys**: Required for global hotkey functionality
 - **Concurrent App Discovery**: Background GCD queues for non-blocking startup
-- **Search Result Types**: Application, Command, Suggestion (for Google search)
+- **Search Result Types**: Application, Command, Suggestion, Math, QuickLink, SystemCommand
 - **Hotkey-Only Access**: Settings and quit commands accessible through search interface
+- **Modular Search System**: Plugin-based result providers for extensibility
+- **Toast Notifications**: Custom overlay notifications replace system notifications
+- **Math Evaluation**: Real-time math expression evaluation using AppleScript
 
 ## Data Flow
 
 1. User presses hotkey → HotkeyManager triggers → AppDelegate shows LauncherWindow
-2. User types query → LauncherView updates → AppSearchManager.searchApps() returns filtered results
-3. User selects result → Action executed (launch app/open URL) → Window hides, search clears
+2. User types query → LauncherSearchLogic coordinates multiple result providers
+3. Result providers (Apps, QuickLinks, Math, Commands, etc.) return scored results
+4. Results merged and sorted by relevance score
+5. User selects result → CommandAction executed → Optional toast notification → Window hides
 
 ## Important Files
 
 - `trace/Info.plist` - Contains LSUIElement key for background-only app behavior
 - `trace/Assets.xcassets/AppIcon.appiconset/` - App icons (generated from app.png using sips)
 - Models: `SearchModels.swift` defines Application, SearchResult, SearchResultType
+- Models: `QuickLink.swift` defines QuickLink model with URL handling and file type detection
+- Models: `CommandAction.swift` defines the modular command execution system
 
 ## UI Components
 
@@ -64,6 +85,19 @@ Reusable component for displaying keyboard shortcuts (`trace/Components/KeyBindi
 - Displays keys as separate rounded rectangles with proper macOS styling
 - Supports both direct key arrays and automatic conversion from keyCode/modifiers
 - Used throughout the app for consistent keyboard shortcut display
+
+### ToastView
+Modern toast notification component (`trace/Views/ToastView.swift`):
+- Supports multiple toast types with appropriate icons and colors
+- Smooth spring animations and drag-to-dismiss gesture
+- Auto-dismissal after 4 seconds with manual dismiss option
+
+### Result Display Components
+Adaptive result display system:
+- **ResultRowView**: Standard result display with full details
+- **CompactResultRowView**: Condensed view for secondary results
+- **AppIconView**: Consistent app icon display with fallbacks
+- **LauncherFooterView**: Status and shortcut hints
 
 ## State Management
 
@@ -75,7 +109,8 @@ Reusable component for displaying keyboard shortcuts (`trace/Components/KeyBindi
 
 - LauncherWindow: 810x360 borderless window with 30px padding for shadow
 - SettingsWindow: 450x500 standard window, non-resizable
-- Both windows centered on screen, settings window released when closed = false
+- ToastWindow: 320x60 borderless overlay window, positioned at top-right
+- All windows centered on screen, settings window released when closed = false
 
 ## Project Structure
 
@@ -90,31 +125,59 @@ trace/
 │   ├── ServiceContainer.swift
 │   └── traceApp.swift
 ├── Views/               # SwiftUI views and UI components
+│   ├── Components/      # Reusable UI components
+│   │   ├── AppIconView.swift
+│   │   ├── CompactResultRowView.swift
+│   │   ├── KeyBindingView.swift
+│   │   ├── LauncherFooterView.swift
+│   │   ├── ResultRowView.swift
+│   │   └── VisualEffectView.swift
+│   ├── Settings/        # Settings sub-views
+│   │   ├── AboutSettingsView.swift
+│   │   ├── AppHotkeysSettingsView.swift
+│   │   ├── GeneralSettingsView.swift
+│   │   ├── QuickLinksSettingsView.swift
+│   │   └── WindowHotkeysSettingsView.swift
+│   ├── LauncherSearchLogic.swift
 │   ├── LauncherView.swift
+│   ├── OnboardingView.swift
 │   ├── SettingsView.swift
-│   └── Settings/        # Settings sub-views
+│   └── ToastView.swift
 ├── Managers/            # Business logic managers
 │   ├── AppHotkeyManager.swift
 │   ├── AppSearchManager.swift
-│   ├── FolderManager.swift
 │   ├── HotkeyManager.swift
+│   ├── QuickLinksManager.swift
 │   └── WindowHotkeyManager.swift
 ├── Services/            # System integration services
 │   ├── ControlCenterManager.swift
 │   ├── NetworkUtilities.swift
 │   ├── PermissionManager.swift
-│   ├── SettingsExportManager.swift
 │   ├── SettingsManager.swift
-│   ├── SettingsService.swift
+│   ├── ToastManager.swift
 │   ├── UsageTracker.swift
 │   └── WindowManager.swift
+├── Search/              # Modular search system
+│   ├── Providers/       # Search result providers
+│   │   ├── AppResultProvider.swift
+│   │   ├── ControlCenterProvider.swift
+│   │   ├── MathResultProvider.swift
+│   │   ├── NetworkCommandProvider.swift
+│   │   ├── QuickLinksProvider.swift
+│   │   ├── SearchEngineProvider.swift
+│   │   ├── SystemCommandProvider.swift
+│   │   └── WindowManagementProvider.swift
+│   ├── ResultEventPublisher.swift
+│   └── ResultProvider.swift
 ├── Models/              # Data models
-│   ├── FolderShortcut.swift
+│   ├── CommandAction.swift
+│   ├── QuickLink.swift
 │   └── SearchModels.swift
-├── Components/          # Reusable UI components
-│   └── KeyBindingView.swift
+├── Utils/               # Utility functions
+│   └── MathEvaluator.swift
 └── Windows/             # Window management
-    └── LauncherWindow.swift
+    ├── LauncherWindow.swift
+    └── ToastWindow.swift
 ```
 
 ## Key Features
@@ -123,6 +186,10 @@ trace/
 - **Memory Efficient**: Lazy loading and intelligent caching
 - **Concurrent Processing**: Non-blocking app discovery and search
 - **Modern Swift**: Uses async/await, structured concurrency, and SwiftUI
+- **Modular Architecture**: Plugin-based search providers for extensibility
+- **Math Evaluation**: Real-time calculation with AppleScript integration
+- **Toast Notifications**: Custom overlay system replacing system notifications
+- **Quick Links**: User-configurable shortcuts for files and web URLs
 
 ## Development Guidelines
 
