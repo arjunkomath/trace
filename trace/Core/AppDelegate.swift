@@ -195,13 +195,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     
     @objc private func showLauncher() {
-        launcherWindow?.show()
+        guard let launcherWindow = launcherWindow else {
+            logger.error("⚠️ LauncherWindow is nil in showLauncher - recreating window")
+            setupLauncherWindow()
+            guard let recreatedWindow = self.launcherWindow else {
+                logger.error("❌ Failed to recreate LauncherWindow")
+                return
+            }
+            recreatedWindow.show()
+            startGlobalEventMonitoring()
+            return
+        }
+        
+        logger.debug("Showing launcher window from menu/statusbar")
+        launcherWindow.show()
         startGlobalEventMonitoring()
     }
     
     private func toggleLauncher() {
         guard let launcherWindow = launcherWindow else { 
-            logger.error("⚠️ LauncherWindow is nil in toggleLauncher")
+            logger.error("⚠️ LauncherWindow is nil in toggleLauncher - recreating window")
+            setupLauncherWindow() // Recreate the window if it's nil
+            guard let recreatedWindow = self.launcherWindow else {
+                logger.error("❌ Failed to recreate LauncherWindow")
+                return
+            }
+            recreatedWindow.show()
+            startGlobalEventMonitoring()
             return 
         }
         

@@ -76,11 +76,22 @@ class LauncherWindow: NSPanel {
     }
     
     func show() {
+        let logger = AppLogger.launcherWindow
+        logger.debug("🚪 LauncherWindow.show() called")
+        
         centerOnScreen()
         
+        // Activate the app to ensure the window can become visible
+        logger.debug("🎯 Activating app for launcher visibility")
+        NSApp.activate(ignoringOtherApps: true)
+        
         // NSPanel specific showing for full-screen overlay
+        logger.debug("📺 Making launcher window key and ordering front")
         orderFrontRegardless()
         makeKeyAndOrderFront(nil)
+        
+        // Log final window state
+        logger.debug("✅ LauncherWindow show completed - isVisible: \(self.isVisible), isKeyWindow: \(self.isKeyWindow)")
         
         // Ensure focus is properly set after panel becomes key
         DispatchQueue.main.async { [weak self] in
@@ -100,8 +111,13 @@ class LauncherWindow: NSPanel {
     }
     
     func hide() {
+        let logger = AppLogger.launcherWindow
+        logger.debug("🙈 LauncherWindow.hide() called")
+        
         preventAutoClose = false // Reset flag when hiding
         orderOut(nil)
+        
+        logger.debug("✅ LauncherWindow hide completed - isVisible: \(self.isVisible)")
     }
     
     func setPreventAutoClose(_ prevent: Bool) {

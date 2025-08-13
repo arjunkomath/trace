@@ -3,6 +3,15 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.2.0</title>
+            <pubDate>Wed, 13 Aug 2025 23:42:46 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.2.0.dmg" length="2578501" type="application/octet-stream" sparkle:edSignature="fo9CZACwXkKQt9IIHZhE+dZbY0YkHrMpt1OqnJ6+JNWXE25aFXWu9hNirmeb0wJzW6zU9nYBkUNFCIY6EZObAg=="/>
+        </item>
+        <item>
             <title>1.1.0</title>
             <pubDate>Mon, 11 Aug 2025 23:11:23 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
@@ -19,15 +28,6 @@
             <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
             <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.0.1.dmg" length="2128861" type="application/octet-stream" sparkle:edSignature="hGhlewwSy4jqZqhLgQdbsynqUI6wx7aqCxyjlWOsvzzpNvPaHNceryVbnrLtVeO5cYGjcqANO4xy9PWa8oIcAg=="/>
-        </item>
-        <item>
-            <title>1.0</title>
-            <pubDate>Sun, 10 Aug 2025 21:56:52 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>7</sparkle:version>
-            <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.0.0.dmg" length="2129199" type="application/octet-stream" sparkle:edSignature="zrJEDArxL9yjJoG5NWhJompxKDrsLkUZkM2uyCFyJ0JHsy0icqDgvAFu5rf2obXj7H2Oa25YbNi9a9y4Q0gWBA=="/>
         </item>
     </channel>
 </rss>
