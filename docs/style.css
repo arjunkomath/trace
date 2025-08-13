@@ -9,6 +9,7 @@ body {
     line-height: 1.6;
     color: #333;
     background: #fff;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .container {
@@ -154,6 +155,55 @@ footer a {
 
 footer a:hover {
     text-decoration: underline;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    body {
+        color: #e5e5e7;
+        background: #1d1d1f;
+    }
+    
+    h1, h2 {
+        color: #f5f5f7;
+    }
+    
+    .subtitle {
+        color: #a1a1a6;
+    }
+    
+    .button:not(.primary) {
+        background: #2c2c2e;
+        color: #f5f5f7;
+    }
+    
+    .button:not(.primary):hover {
+        background: #3a3a3c;
+    }
+    
+    .code-block {
+        background: #2c2c2e;
+        border-color: #48484a;
+        color: #e5e5e7;
+    }
+    
+    code:not(.code-block code) {
+        background: #3a3a3c;
+        color: #e5e5e7;
+    }
+    
+    .note {
+        color: #a1a1a6;
+    }
+    
+    footer {
+        border-color: #48484a;
+        color: #a1a1a6;
+    }
+    
+    footer a {
+        color: #007aff;
+    }
 }
 
 @media (max-width: 600px) {
