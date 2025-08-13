@@ -76,7 +76,7 @@ class SettingsManager: ObservableObject {
         guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             fatalError("Could not locate Application Support directory")
         }
-        let traceSettingsDir = appSupportURL.appendingPathComponent("Trace", isDirectory: true)
+        let traceSettingsDir = appSupportURL.appendingPathComponent(AppConstants.bundleIdentifier, isDirectory: true)
         
         // Ensure directory exists
         try? fileManager.createDirectory(at: traceSettingsDir, withIntermediateDirectories: true)
