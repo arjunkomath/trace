@@ -61,6 +61,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize app hotkey manager to register saved app hotkeys
         _ = AppHotkeyManager.shared
         
+        // Initialize QuickLink hotkey manager to register saved QuickLink hotkeys
+        _ = QuickLinkHotkeyManager.shared
+        
         // Show onboarding if first time user
         if !settingsManager.settings.hasCompletedOnboarding {
             showOnboarding()

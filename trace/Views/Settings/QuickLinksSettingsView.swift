@@ -408,6 +408,8 @@ struct EditQuickLinkView: View {
                                         startRecording()
                                     } else {
                                         quickLink.hotkey = nil
+                                        quickLink.keyCode = 0
+                                        quickLink.modifiers = 0
                                     }
                                 }
                             }) {
@@ -490,6 +492,8 @@ struct EditQuickLinkView: View {
                     // Format the key combination and update binding
                     let keyBinding = KeyBindingView(keyCode: UInt32(event.keyCode), modifiers: modifierValue)
                     self.quickLink.hotkey = keyBinding.keys.joined(separator: "")
+                    self.quickLink.keyCode = Int(event.keyCode)
+                    self.quickLink.modifiers = Int(modifierValue)
                     self.isRecordingHotkey = false
                     self.stopRecording()
                     return nil

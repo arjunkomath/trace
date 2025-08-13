@@ -29,7 +29,9 @@ class QuickLinksManager: ObservableObject {
                 urlString: quickLinkData.urlString,
                 iconName: quickLinkData.iconName,
                 keywords: quickLinkData.keywords,
-                hotkey: settingsManager.getQuickLinkHotkey(for: quickLinkData.id),
+                hotkey: quickLinkData.hotkey,
+                keyCode: quickLinkData.keyCode,
+                modifiers: quickLinkData.modifiers,
                 isSystemDefault: quickLinkData.isSystemDefault
             )
         }
@@ -55,17 +57,15 @@ class QuickLinksManager: ObservableObject {
                 urlString: quickLink.urlString,
                 iconName: quickLink.iconName,
                 keywords: quickLink.keywords,
+                hotkey: quickLink.hotkey,
+                keyCode: quickLink.keyCode,
+                modifiers: quickLink.modifiers,
                 isSystemDefault: quickLink.isSystemDefault
             )
         }
         
         // Clear existing quick links and add new ones
         settingsManager.settings.quickLinks = quickLinkData
-        
-        // Save hotkeys to settings
-        for quickLink in quickLinks where quickLink.hotkey != nil {
-            settingsManager.updateQuickLinkHotkey(for: quickLink.id, hotkey: quickLink.hotkey)
-        }
         
         logger.info("Saved \(self.quickLinks.count) quick links")
     }
@@ -82,13 +82,22 @@ class QuickLinksManager: ObservableObject {
             urlString: quickLink.urlString,
             iconName: quickLink.iconName,
             keywords: quickLink.keywords,
+            hotkey: quickLink.hotkey,
+            keyCode: quickLink.keyCode,
+            modifiers: quickLink.modifiers,
             isSystemDefault: quickLink.isSystemDefault
         )
         
         settingsManager.addQuickLink(quickLinkData)
         
-        if let hotkey = quickLink.hotkey {
-            settingsManager.updateQuickLinkHotkey(for: quickLink.id, hotkey: hotkey)
+        // Update hotkey registration if the QuickLink has a hotkey
+        if let hotkey = quickLink.hotkey, !hotkey.isEmpty && quickLink.keyCode != 0 {
+            QuickLinkHotkeyManager.shared.updateHotkey(
+                for: quickLink.id, 
+                keyCombo: hotkey, 
+                keyCode: UInt32(quickLink.keyCode), 
+                modifiers: UInt32(quickLink.modifiers)
+            )
         }
         
         logger.info("Added quick link: \(quickLink.name)")
@@ -108,11 +117,26 @@ class QuickLinksManager: ObservableObject {
             urlString: quickLink.urlString,
             iconName: quickLink.iconName,
             keywords: quickLink.keywords,
+            hotkey: quickLink.hotkey,
+            keyCode: quickLink.keyCode,
+            modifiers: quickLink.modifiers,
             isSystemDefault: quickLink.isSystemDefault
         )
         
         settingsManager.updateQuickLink(quickLinkData)
-        settingsManager.updateQuickLinkHotkey(for: quickLink.id, hotkey: quickLink.hotkey)
+        
+        // Update hotkey registration
+        if let hotkey = quickLink.hotkey, !hotkey.isEmpty && quickLink.keyCode != 0 {
+            QuickLinkHotkeyManager.shared.updateHotkey(
+                for: quickLink.id, 
+                keyCombo: hotkey, 
+                keyCode: UInt32(quickLink.keyCode), 
+                modifiers: UInt32(quickLink.modifiers)
+            )
+        } else {
+            // Remove hotkey if it was cleared
+            QuickLinkHotkeyManager.shared.updateHotkey(for: quickLink.id, keyCombo: nil, keyCode: 0, modifiers: 0)
+        }
         
         logger.info("Updated quick link: \(quickLink.name)")
     }

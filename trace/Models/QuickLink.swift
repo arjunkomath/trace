@@ -14,6 +14,8 @@ struct QuickLink: Codable, Identifiable, Equatable {
     var iconName: String?  // Optional custom icon
     var keywords: [String] // Additional search keywords
     var hotkey: String?    // Optional keyboard shortcut
+    var keyCode: Int       // Raw key code for hotkey registration
+    var modifiers: Int     // Raw modifiers for hotkey registration
     var isSystemDefault: Bool // True for default system folders
     
     init(
@@ -23,6 +25,8 @@ struct QuickLink: Codable, Identifiable, Equatable {
         iconName: String? = nil,
         keywords: [String] = [],
         hotkey: String? = nil,
+        keyCode: Int = 0,
+        modifiers: Int = 0,
         isSystemDefault: Bool = false
     ) {
         self.id = id
@@ -31,6 +35,8 @@ struct QuickLink: Codable, Identifiable, Equatable {
         self.iconName = iconName
         self.keywords = keywords
         self.hotkey = hotkey
+        self.keyCode = keyCode
+        self.modifiers = modifiers
         self.isSystemDefault = isSystemDefault
     }
     

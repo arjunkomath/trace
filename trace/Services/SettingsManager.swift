@@ -27,10 +27,8 @@ struct TraceSettings: Codable {
     // App Hotkeys  
     var appHotkeys: [String: AppHotkeyData] = [:]
     
-    
     // Quick Links
     var quickLinks: [QuickLinkData] = []
-    var quickLinkHotkeys: [String: String] = [:]
     var quickLinksHasLoadedBefore: Bool = false
     
     // Settings metadata
@@ -49,13 +47,15 @@ struct TraceSettings: Codable {
         let modifiers: Int
     }
     
-    
     struct QuickLinkData: Codable {
         let id: String
         let name: String
         let urlString: String
         let iconName: String?
         let keywords: [String]
+        let hotkey: String?
+        let keyCode: Int
+        let modifiers: Int
         let isSystemDefault: Bool
     }
 }
@@ -116,17 +116,15 @@ class SettingsManager: ObservableObject {
     }
     
     func saveSettings() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.settings.lastModified = Date()
-        }
+        // Update lastModified synchronously before encoding
+        settings.lastModified = Date()
         
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(settings)
-            try data.write(to: settingsURL)
+            try data.write(to: settingsURL, options: .atomic)
             logger.info("Successfully saved settings to: \(self.settingsURL.path)")
         } catch {
             logger.error("Failed to save settings: \(error.localizedDescription)")
@@ -136,11 +134,8 @@ class SettingsManager: ObservableObject {
     // MARK: - General Settings
     
     func updateResultsLayout(_ layout: String) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.settings.resultsLayout = layout
-            self.saveSettings()
-        }
+        settings.resultsLayout = layout
+        saveSettings()
     }
     
     func updateShowMenuBarIcon(_ show: Bool) {
@@ -233,7 +228,6 @@ class SettingsManager: ObservableObject {
     
     func removeQuickLink(withId id: String) {
         settings.quickLinks.removeAll { $0.id == id }
-        settings.quickLinkHotkeys.removeValue(forKey: id)
         saveSettings()
     }
     
@@ -249,16 +243,26 @@ class SettingsManager: ObservableObject {
     // MARK: - Quick Link Hotkeys
     
     func updateQuickLinkHotkey(for quickLinkId: String, hotkey: String?) {
-        if let hotkey = hotkey {
-            settings.quickLinkHotkeys[quickLinkId] = hotkey
-        } else {
-            settings.quickLinkHotkeys.removeValue(forKey: quickLinkId)
+        if let index = settings.quickLinks.firstIndex(where: { $0.id == quickLinkId }) {
+            let quickLink = settings.quickLinks[index]
+            let updatedQuickLink = TraceSettings.QuickLinkData(
+                id: quickLink.id,
+                name: quickLink.name,
+                urlString: quickLink.urlString,
+                iconName: quickLink.iconName,
+                keywords: quickLink.keywords,
+                hotkey: hotkey,
+                keyCode: quickLink.keyCode,
+                modifiers: quickLink.modifiers,
+                isSystemDefault: quickLink.isSystemDefault
+            )
+            settings.quickLinks[index] = updatedQuickLink
+            saveSettings()
         }
-        saveSettings()
     }
     
     func getQuickLinkHotkey(for quickLinkId: String) -> String? {
-        return settings.quickLinkHotkeys[quickLinkId]
+        return settings.quickLinks.first { $0.id == quickLinkId }?.hotkey
     }
     
     // MARK: - Import/Export
@@ -304,18 +308,10 @@ class SettingsManager: ObservableObject {
                 }
             }
             
-            
             // Quick links - add new ones
             for quickLink in importedSettings.quickLinks {
                 if !settings.quickLinks.contains(where: { $0.id == quickLink.id }) {
                     settings.quickLinks.append(quickLink)
-                }
-            }
-            
-            // Quick link hotkeys - add new ones, keep existing
-            for (quickLinkId, hotkey) in importedSettings.quickLinkHotkeys {
-                if settings.quickLinkHotkeys[quickLinkId] == nil {
-                    settings.quickLinkHotkeys[quickLinkId] = hotkey
                 }
             }
             

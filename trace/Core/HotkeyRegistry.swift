@@ -9,6 +9,7 @@ enum HotkeyType: Hashable {
     case appLauncher
     case windowManagement(WindowPosition)
     case applicationLauncher(String) // for future use
+    case quickLink(String) // QuickLink ID
     
     var description: String {
         switch self {
@@ -18,6 +19,8 @@ enum HotkeyType: Hashable {
             return "Window: \(position.rawValue)"
         case .applicationLauncher(let bundleId):
             return "App: \(bundleId)"
+        case .quickLink(let id):
+            return "QuickLink: \(id)"
         }
     }
 }
