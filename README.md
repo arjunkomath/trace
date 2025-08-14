@@ -8,24 +8,12 @@ A SwiftUI-based application launcher that runs as a background service (LSUIElem
 
 ## Features
 
-### Core Functionality
-- **Application Search**: Fuzzy search with intelligent ranking across `/Applications`, `/System/Applications`, and `~/Applications`
-- **Global Hotkey**: Customizable system-wide shortcuts (default: `⌥Space`)
-- **Background Operation**: LSUIElement with no dock/menu bar presence
-- **Quick Links**: User-defined shortcuts for files, folders, and URLs with custom hotkeys
-- **Mathematical Calculations**: Built-in calculator with expression evaluation
-
-### Window Management
-- Position commands: Left/Right Half, Thirds, Center, Maximize, Fullscreen
-- Auto-exit fullscreen detection before applying window positions
-- Multi-display support with screen-aware positioning
-- Application-specific hotkey assignments
-
-### System Integration
-- **System Commands**: Dark mode toggle, sleep, restart, shutdown
-- **Menu Bar Integration**: Version display and disabled quit option
-- **Toast Notifications**: 400x80px notifications with 3-line support
-- **Auto-updater**: Sparkle framework integration
+- **Fast Search**: Fuzzy search across all applications with intelligent ranking
+- **Window Management**: Snap windows to halves, thirds, or custom positions instantly
+- **Quick Links**: One-key access to your most-used files, folders, and websites
+- **Global Hotkeys**: Customizable shortcuts for launching apps and managing windows
+- **Built-in Calculator**: Perform calculations directly without opening a separate app
+- **Native Design**: Beautiful interface that respects your system preferences
 
 ## System Requirements
 
