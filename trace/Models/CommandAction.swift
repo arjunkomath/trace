@@ -164,10 +164,15 @@ class ActionExecutor: ObservableObject {
             NSWorkspace.shared.open(url)
             
         case .application(let app):
-            do {
-                try NSWorkspace.shared.launchApplication(at: app.url, options: [], configuration: [:])
-            } catch {
-                logger.error("Failed to launch application: \(error)")
+            let configuration = NSWorkspace.OpenConfiguration()
+            NSWorkspace.shared.openApplication(at: app.url, configuration: configuration) { [weak self] runningApp, error in
+                if let error = error {
+                    self?.logger.error("Failed to launch application: \(error.localizedDescription)")
+                } else if let runningApp = runningApp {
+                    self?.logger.info("Successfully launched application: \(runningApp.localizedName ?? "Unknown")")
+                    // The app activation observer in PermissionManager will automatically
+                    // update the lastActiveApplication when the app becomes active
+                }
             }
         }
     }

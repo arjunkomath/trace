@@ -22,7 +22,42 @@ class PermissionManager: ObservableObject {
     /// Track the last active application before Trace became frontmost
     private var lastActiveApplication: NSRunningApplication?
     
+    /// Notification observer for app activation
+    private var appActivationObserver: Any?
+    
     private init() {
+        setupAppActivationObserver()
+    }
+    
+    deinit {
+        if let observer = appActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+    }
+    
+    // MARK: - App Activation Monitoring
+    
+    /// Sets up observer for application activation notifications
+    private func setupAppActivationObserver() {
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleAppActivation(notification)
+        }
+        logger.debug("✅ App activation observer setup complete")
+    }
+    
+    /// Handles app activation notifications
+    private func handleAppActivation(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              app.bundleIdentifier != Bundle.main.bundleIdentifier else {
+            return
+        }
+        
+        lastActiveApplication = app
+        logger.debug("App activated: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
     }
     
     // MARK: - Window Management Permissions

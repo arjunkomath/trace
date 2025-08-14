@@ -140,7 +140,16 @@ class AppSearchManager: ObservableObject {
     
     
     func launchApp(_ app: Application) {
-        NSWorkspace.shared.open(app.url)
+        let configuration = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.openApplication(at: app.url, configuration: configuration) { [weak self] runningApp, error in
+            if let error = error {
+                self?.logger.error("Failed to launch app \(app.displayName): \(error.localizedDescription)")
+            } else if let runningApp = runningApp {
+                self?.logger.info("Successfully launched app: \(runningApp.localizedName ?? app.displayName)")
+                // The app activation observer in PermissionManager will automatically
+                // update the lastActiveApplication when the app becomes active
+            }
+        }
     }
     
     func getApp(by bundleIdentifier: String) -> Application? {
