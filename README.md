@@ -1,67 +1,105 @@
 # Trace
 
-**Lightning-fast app launcher for macOS**
+**Spotlight alternative and shortcut toolkit for macOS**
 
 <img width="1606" height="995" alt="CleanShot 2025-08-12 at 23 21 19@2x" src="https://github.com/user-attachments/assets/f6fde413-9732-4d76-a639-1e67f615533e" />
 
-A beautiful, native macOS application launcher that lives in your background. Press `⌥Space`, type what you need, and launch instantly. Built with SwiftUI for modern macOS.
+A SwiftUI-based application launcher that runs as a background service (LSUIElement) with global hotkey access. Features fuzzy search, window management, quick links, and system integration.
 
-## ✨ Features
+## Features
 
-- **🚀 Instant Search** - Fuzzy search across all your applications with intelligent ranking
-- **⌨️ Global Hotkey** - Access from anywhere with customizable shortcuts (default: `⌥Space`)  
-- **🎨 Native Design** - Translucent UI that respects your system theme and appearance
-- **🔍 Smart Results** - Application search with Google fallback for everything else
-- **⚙️ Invisible** - Runs silently in background, no dock or menu bar clutter
-- **🪟 Advanced** - Custom hotkeys per app, window management, and system integration
+### Core Functionality
+- **Application Search**: Fuzzy search with intelligent ranking across `/Applications`, `/System/Applications`, and `~/Applications`
+- **Global Hotkey**: Customizable system-wide shortcuts (default: `⌥Space`)
+- **Background Operation**: LSUIElement with no dock/menu bar presence
+- **Quick Links**: User-defined shortcuts for files, folders, and URLs with custom hotkeys
+- **Mathematical Calculations**: Built-in calculator with expression evaluation
+
+### Window Management
+- Position commands: Left/Right Half, Thirds, Center, Maximize, Fullscreen
+- Auto-exit fullscreen detection before applying window positions
+- Multi-display support with screen-aware positioning
+- Application-specific hotkey assignments
+
+### System Integration
+- **System Commands**: Dark mode toggle, sleep, restart, shutdown
+- **Menu Bar Integration**: Version display and disabled quit option
+- **Toast Notifications**: 400x80px notifications with 3-line support
+- **Auto-updater**: Sparkle framework integration
 
 ## System Requirements
 
-- macOS 15.5 or later
-- Apple Silicon or Intel Mac
+- **macOS**: 15.5 or later
+- **Architecture**: Apple Silicon or Intel
+- **Permissions**: Accessibility API, Apple Events
 
-## 🚀 Installation
+## Installation
 
-### Download & Build
-
+### Build from Source
 ```bash
 git clone https://github.com/arjunkomath/trace.git
 cd trace
 xcodebuild -project trace.xcodeproj -scheme trace -configuration Release build
 ```
 
-Grant permissions when prompted: **Accessibility** and **Apple Events**.
+### Required Permissions
+Grant when prompted:
+- **Accessibility**: For window management and app control
+- **Apple Events**: For system command execution
 
-## 🎯 Usage
+## Architecture
 
-1. **Launch Trace** → Runs silently in background
-2. **Press `⌥Space`** → Opens the search interface  
-3. **Type & Launch** → Search apps, press `Return` or click to launch
-4. **Access Settings** → Search "settings" to customize hotkeys and preferences
+- **Language**: Swift 5.9+
+- **Framework**: SwiftUI with AppKit integration
+- **APIs**: Accessibility (AXUIElement), Carbon (EventHotKey), Core Graphics
+- **Dependencies**: Sparkle (auto-updates), SymbolPicker (UI icons)
 
-**Pro tip**: Search for "quit" to exit the app completely.
+### Key Components
+- `AppDelegate`: Main application controller, hotkey registration
+- `LauncherWindow`: 810x360 borderless search interface  
+- `AppSearchManager`: Concurrent app discovery with in-memory caching
+- `WindowManager`: AXUIElement-based window positioning
+- `HotkeyManager`: Carbon EventHotKey wrapper
+- `ToastManager`: Non-intrusive notification system
 
-## 🛠️ Development
+## Development
 
-Built with modern Swift, SwiftUI, and macOS APIs. See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical information.
-
+### Build Commands
 ```bash
 # Debug build
 xcodebuild -project trace.xcodeproj -scheme trace -configuration Debug build
 
-# Release build  
+# Release build
 xcodebuild -project trace.xcodeproj -scheme trace -configuration Release build
+
+# Clean build
+xcodebuild -project trace.xcodeproj -scheme trace clean build
 ```
 
-## Publishing
+### Project Structure
+```
+trace/
+├── Core/                 # Application lifecycle, logging
+├── Views/               # SwiftUI interface components
+├── Services/            # Business logic, managers
+├── Models/              # Data structures, search results
+├── Search/Providers/    # Pluggable search implementations
+└── Windows/            # NSWindow subclasses
+```
 
-Generate a new build using Xcode, then create a DMG using following command:
+## Configuration
 
+Settings stored in `UserDefaults` and `~/Library/Application Support/Trace/`:
+- Hotkey combinations (keyCode + modifiers)
+- Quick links with custom hotkeys
+- Launch at login preference
+- Application cache and icons
+
+## Distribution
+
+### DMG Creation
 ```bash
-# Install create-dmg
 brew install create-dmg
-
-# Create DMG with a nice installer window
 create-dmg \
     --volname "Trace" \
     --window-pos 200 120 \
@@ -75,8 +113,7 @@ create-dmg \
     "path/to/trace.app"
 ```
 
-Generate update appcast file using:
-
+### Appcast Generation
 ```bash
 generate_appcast --download-url-prefix "https://trace.techulus.xyz/downloads/" \
       --full-release-notes-url "https://github.com/arjunkomath/trace/releases" \
@@ -84,16 +121,19 @@ generate_appcast --download-url-prefix "https://trace.techulus.xyz/downloads/" \
       docs/downloads
 ```
 
-## 🤝 Contributing
+## Contributing
 
-Contributions welcome! Fork, create a feature branch, and submit a PR.
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Follow Swift/SwiftUI conventions in [ARCHITECTURE.md](ARCHITECTURE.md)
+4. Submit a pull request
 
-## 🔗 Links
+## Links
 
 - **Website**: [trace.techulus.xyz](https://trace.techulus.xyz)
-- **GitHub**: [arjunkomath/trace](https://github.com/arjunkomath/trace)  
-- **Twitter**: [@arjunkomath](https://twitter.com/arjunkomath)
+- **Documentation**: [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Releases**: [GitHub Releases](https://github.com/arjunkomath/trace/releases)
 
 ---
 
-Built with ❤️ using SwiftUI for macOS
+**License**: MIT • **Author**: [@arjunkomath](https://twitter.com/arjunkomath)

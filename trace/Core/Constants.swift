@@ -11,6 +11,10 @@ import CoreGraphics
 enum AppConstants {
     /// The app's bundle identifier, dynamically retrieved from the main bundle
     static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.techulus.trace"
+    
+    /// App version information
+    static let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    static let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
     enum Window {
         static let launcherWidth: CGFloat = 750
         static let launcherHeight: CGFloat = 60

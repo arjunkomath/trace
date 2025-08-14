@@ -119,13 +119,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(openItem)
         
         // Check for Updates - Connect directly to Sparkle as per documentation
-        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        let updateItem = NSMenuItem(title: "Check for Updates", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
         updateItem.target = updaterController
         menu.addItem(updateItem)
         
+        // Report Issue
+        let reportIssueItem = NSMenuItem(title: "Report Issue", action: #selector(reportIssue), keyEquivalent: "")
+        reportIssueItem.target = self
+        menu.addItem(reportIssueItem)
+        
         menu.addItem(NSMenuItem.separator())
         
-        // Quit
+        // Version and Build (disabled)
+        let versionText = "Version \(AppConstants.version) (\(AppConstants.build))"
+        let versionItem = NSMenuItem(title: versionText, action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+        
         let quitItem = NSMenuItem(title: "Quit Trace", action: #selector(quitFromMenu), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -165,6 +175,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
     
+    @objc private func reportIssue() {
+        guard let url = URL(string: "https://github.com/arjunkomath/trace/issues/new") else {
+            logger.error("Failed to create GitHub issues URL")
+            return
+        }
+        NSWorkspace.shared.open(url)
+        logger.info("Opening GitHub issues page for bug reports")
+    }
+    
     // MARK: - Helper Functions
     
     private func setupLauncherWindow() {
@@ -195,6 +214,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     
     @objc private func showLauncher() {
+        // Capture the current frontmost app before showing the launcher
+        PermissionManager.shared.updateLastActiveApplication()
+        
         guard let launcherWindow = launcherWindow else {
             logger.error("⚠️ LauncherWindow is nil in showLauncher - recreating window")
             setupLauncherWindow()
@@ -220,6 +242,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 logger.error("❌ Failed to recreate LauncherWindow")
                 return
             }
+            // Capture frontmost app before showing
+            PermissionManager.shared.updateLastActiveApplication()
             recreatedWindow.show()
             startGlobalEventMonitoring()
             return 
@@ -231,6 +255,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             stopGlobalEventMonitoring()
         } else {
             logger.debug("Showing launcher window")
+            // Capture frontmost app before showing
+            PermissionManager.shared.updateLastActiveApplication()
             launcherWindow.show()
             startGlobalEventMonitoring()
         }

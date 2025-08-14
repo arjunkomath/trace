@@ -19,11 +19,22 @@ class PermissionManager: ObservableObject {
     @Published var windowManagementAvailable = false
     @Published private(set) var systemEventsAvailable = false
     
+    /// Track the last active application before Trace became frontmost
+    private var lastActiveApplication: NSRunningApplication?
     
     private init() {
     }
     
     // MARK: - Window Management Permissions
+    
+    /// Updates the last active application before showing Trace launcher
+    func updateLastActiveApplication() {
+        if let frontmostApp = NSWorkspace.shared.frontmostApplication,
+           frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier {
+            lastActiveApplication = frontmostApp
+            logger.debug("Stored last active application: \(frontmostApp.localizedName ?? frontmostApp.bundleIdentifier ?? "Unknown")")
+        }
+    }
     
     /// Tests if we can actually perform window management operations
     func testWindowManagementCapability() -> WindowManagementResult {
@@ -36,13 +47,13 @@ class PermissionManager: ObservableObject {
         }
         
         // Try to find a suitable application with windows
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
-              frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier else {
-            logger.info("No suitable frontmost application - permissions granted but no target")
+        let targetApp = findTargetApplication()
+        guard let app = targetApp else {
+            logger.info("No suitable target application found - permissions granted but no target")
             return .noTargetApp
         }
         
-        let appElement = AXUIElementCreateApplication(frontmostApp.processIdentifier)
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
         
         // Test if we can get the window list
         var windows: CFTypeRef?
@@ -56,8 +67,68 @@ class PermissionManager: ObservableObject {
         }
         
         let testWindow = windowArray[0]
-        logger.info("Window management capability test passed!")
+        logger.info("Window management capability test passed for app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
         return .available(testWindow)
+    }
+    
+    /// Finds a suitable target application for window management
+    private func findTargetApplication() -> NSRunningApplication? {
+        // Always prefer the stored last active application when available
+        // This ensures we target the window the user was working on before opening Trace
+        if let lastApp = lastActiveApplication {
+            return lastApp
+        }
+        
+        // Fallback: frontmost app if it's not Trace
+        if let frontmostApp = NSWorkspace.shared.frontmostApplication,
+           frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier {
+            return frontmostApp
+        }
+        
+        // Third try: find recently active applications (excluding Trace and system apps)
+        let runningApps = NSWorkspace.shared.runningApplications
+        let candidateApps = runningApps.filter { app in
+            guard app.bundleIdentifier != Bundle.main.bundleIdentifier else { return false }
+            guard app.activationPolicy == .regular else { return false }
+            
+            // Skip system and utility apps that typically don't have manageable windows
+            let excludedBundleIds = [
+                "com.apple.finder",
+                "com.apple.dock",
+                "com.apple.systemuiserver",
+                "com.apple.notificationcenterui",
+                "com.apple.controlcenter"
+            ]
+            
+            if let bundleId = app.bundleIdentifier, excludedBundleIds.contains(bundleId) {
+                return false
+            }
+            
+            return true
+        }
+        
+        // Sort by activation policy and try to find one with windows
+        let sortedApps = candidateApps.sorted { app1, app2 in
+            // Prefer recently active apps
+            return app1.isActive || (!app2.isActive && app1.bundleIdentifier?.localizedCompare(app2.bundleIdentifier ?? "") == .orderedAscending)
+        }
+        
+        for app in sortedApps {
+            // Quick check if this app has windows
+            let appElement = AXUIElementCreateApplication(app.processIdentifier)
+            var windows: CFTypeRef?
+            let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windows)
+            
+            if result == .success,
+               let windowArray = windows as? [AXUIElement],
+               !windowArray.isEmpty {
+                logger.debug("Found suitable fallback application: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
+                return app
+            }
+        }
+        
+        logger.debug("No suitable application with windows found")
+        return nil
     }
     
     /// Attempts to request accessibility permissions with proper user guidance

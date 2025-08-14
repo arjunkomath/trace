@@ -14,11 +14,11 @@ struct AboutSettingsView: View {
     @State private var showingCacheRefreshAlert = false
     
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        AppConstants.version
     }
     
     private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        AppConstants.build
     }
     
     var body: some View {

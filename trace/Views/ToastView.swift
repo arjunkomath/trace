@@ -48,9 +48,9 @@ struct ToastView: View {
                 .foregroundColor(type.iconColor)
             
             Text(message)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.primary)
-                .lineLimit(2)
+                .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             Button(action: onDismiss) {
@@ -73,7 +73,7 @@ struct ToastView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.primary.opacity(0.2), lineWidth: 1)
         )
-        .frame(width: 320)
+        .frame(width: 400)
         .offset(y: isShowing ? 0 : -100)
         .offset(dragOffset)
         .opacity(isShowing ? 1 : 0)

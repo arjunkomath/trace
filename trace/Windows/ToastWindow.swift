@@ -14,7 +14,7 @@ class ToastWindow: NSPanel {
     
     init(message: String, type: ToastType) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 60),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 80),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false

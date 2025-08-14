@@ -109,7 +109,7 @@ Adaptive result display system:
 
 - LauncherWindow: 810x360 borderless window with 30px padding for shadow
 - SettingsWindow: 450x500 standard window, non-resizable
-- ToastWindow: 320x60 borderless overlay window, positioned at top-right
+- ToastWindow: 400x80 borderless overlay window, positioned at top-right
 - All windows centered on screen, settings window released when closed = false
 
 ## Project Structure

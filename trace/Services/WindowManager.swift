@@ -365,7 +365,7 @@ class WindowManager: ObservableObject {
     }
     
     private func toggleFullScreen(_ window: AXUIElement) -> Bool {
-        // Method 1: Try the fullscreen attribute directly (most reliable)
+        // Method 1: Try the fullscreen attribute directly
         var isFullScreen: CFTypeRef?
         let fullScreenResult = AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &isFullScreen)
         
@@ -375,13 +375,9 @@ class WindowManager: ObservableObject {
             let fullScreenValue = newValue as CFBoolean
             let result = AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString, fullScreenValue)
             if result == .success {
-                logger.info("Successfully toggled fullscreen: \(currentValue) -> \(newValue)")
+                logger.info("Successfully toggled fullscreen using AXFullScreen attribute")
                 return true
-            } else {
-                logger.warning("Failed to set AXFullScreen attribute. Error: \(result.rawValue)")
             }
-        } else {
-            logger.debug("Window does not support AXFullScreen attribute. Error: \(fullScreenResult.rawValue)")
         }
         
         // Method 2: Use the zoom button (fallback)
@@ -393,22 +389,21 @@ class WindowManager: ObservableObject {
             if zoomResult == .success {
                 logger.info("Successfully toggled fullscreen using zoom button")
                 return true
-            } else {
-                logger.warning("Failed to press zoom button. Error: \(zoomResult.rawValue)")
             }
-        } else {
-            logger.debug("Window does not have zoom button. Error: \(zoomButtonResult.rawValue)")
         }
         
-        // Method 3: Fallback - try using keyboard shortcut simulation
-        logger.info("Attempting fullscreen toggle via keyboard shortcut")
-        
-        // Get the application element to send the keyboard shortcut to
+        // Method 3: Keyboard shortcut (most reliable)
         var appPid: pid_t = 0
         let pidResult = AXUIElementGetPid(window, &appPid)
         
         if pidResult == .success {
-            // Send Cmd+Ctrl+F (common fullscreen toggle shortcut)
+            // Activate the target application to ensure it receives the keyboard shortcut
+            if let targetApp = NSRunningApplication(processIdentifier: appPid) {
+                targetApp.activate(options: [])
+                usleep(50000) // 50ms delay to ensure activation completes
+            }
+            
+            // Send Control+Command+F (standard fullscreen toggle shortcut)
             let source = CGEventSource(stateID: .hidSystemState)
             let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: true) // F key
             let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x03, keyDown: false)
@@ -417,13 +412,14 @@ class WindowManager: ObservableObject {
             keyUpEvent?.flags = [.maskCommand, .maskControl]
             
             keyDownEvent?.postToPid(appPid)
+            usleep(1000) // 1ms delay between key down and up
             keyUpEvent?.postToPid(appPid)
             
-            logger.info("Sent Cmd+Ctrl+F to toggle fullscreen")
+            logger.info("Successfully sent fullscreen toggle shortcut")
             return true
         }
         
-        logger.warning("All fullscreen toggle methods failed")
+        logger.warning("Unable to toggle fullscreen")
         return false
     }
     
