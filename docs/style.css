@@ -132,6 +132,48 @@ main {
     font-weight: 500;
 }
 
+.install-section {
+    margin: 2rem 0 1rem;
+}
+
+.install-note {
+    font-size: 0.875rem;
+    color: #666;
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+}
+
+.install-command {
+    background: #f6f8fa;
+    border: 1px solid #e1e5e9;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    display: inline-block;
+    margin: 0 auto;
+}
+
+.install-command code {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: #24292f;
+    font-weight: 500;
+}
+
+@media (prefers-color-scheme: dark) {
+    .install-note {
+        color: #999;
+    }
+    
+    .install-command {
+        background: #21262d;
+        border-color: #30363d;
+    }
+    
+    .install-command code {
+        color: #f0f6fc;
+    }
+}
+
 kbd {
     display: inline-block;
     padding: 0.15em 0.3em;

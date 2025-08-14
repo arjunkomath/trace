@@ -35,6 +35,14 @@ A SwiftUI-based application launcher that runs as a background service (LSUIElem
 
 ## Installation
 
+### Homebrew (Recommended)
+```bash
+brew install --cask arjunkomath/tap/trace
+```
+
+### Direct Download
+Download the latest release from [GitHub Releases](https://github.com/arjunkomath/trace/releases/latest).
+
 ### Build from Source
 ```bash
 git clone https://github.com/arjunkomath/trace.git
