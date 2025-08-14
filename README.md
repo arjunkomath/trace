@@ -2,7 +2,7 @@
 
 **Spotlight alternative and shortcut toolkit for macOS**
 
-<img width="1606" height="995" alt="CleanShot 2025-08-12 at 23 21 19@2x" src="https://github.com/user-attachments/assets/f6fde413-9732-4d76-a639-1e67f615533e" />
+![Trace launcher interface showing search results](docs/screenshot.png)
 
 A SwiftUI-based application launcher that runs as a background service (LSUIElement) with global hotkey access. Features fuzzy search, window management, quick links, and system integration.
 

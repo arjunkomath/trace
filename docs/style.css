@@ -261,6 +261,30 @@ kbd {
     }
 }
 
+/* Screenshot Section */
+.screenshot {
+    max-width: var(--max-width);
+    margin: 0 auto 4rem;
+    padding: 0 1.5rem;
+    text-align: center;
+}
+
+.screenshot-img {
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    .screenshot-img {
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+}
+
 /* Features Section */
 .features {
     max-width: var(--max-width);
