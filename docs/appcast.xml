@@ -3,6 +3,15 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.2.3</title>
+            <pubDate>Thu, 14 Aug 2025 23:45:57 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.2.3.dmg" length="2595611" type="application/octet-stream" sparkle:edSignature="F8zvNazyNRO8zBY1ShLz/NmUeGLfLJXsegjBPCPW6aQ9Il9vvGqx7LLGCg28tSLwq9aKBukhm0OOw8x048ZtDA=="/>
+        </item>
+        <item>
             <title>1.2.2</title>
             <pubDate>Thu, 14 Aug 2025 23:27:55 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
@@ -19,15 +28,6 @@
             <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
             <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.2.1.dmg" length="2594470" type="application/octet-stream" sparkle:edSignature="GzGXn8y3lk4NYaXMfeJUHMdlHKbN3Eh1r40IyXAPin9zAWQSowBHLSzf3gydA3WWXZDRNK2AmsbAjIxTMIv8Bg=="/>
-        </item>
-        <item>
-            <title>1.2.0</title>
-            <pubDate>Wed, 13 Aug 2025 23:42:46 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>10</sparkle:version>
-            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.2.0.dmg" length="2578501" type="application/octet-stream" sparkle:edSignature="fo9CZACwXkKQt9IIHZhE+dZbY0YkHrMpt1OqnJ6+JNWXE25aFXWu9hNirmeb0wJzW6zU9nYBkUNFCIY6EZObAg=="/>
         </item>
     </channel>
 </rss>

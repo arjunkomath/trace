@@ -103,7 +103,7 @@ class PermissionManager: ObservableObject {
         
         let testWindow = windowArray[0]
         logger.info("Window management capability test passed for app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
-        return .available(testWindow)
+        return .available(window: testWindow, app: app)
     }
     
     /// Finds a suitable target application for window management
@@ -194,12 +194,17 @@ class PermissionManager: ObservableObject {
         let capability = testWindowManagementCapability()
         
         switch capability {
-        case .available(let window):
+        case .available(let window, let app):
             let success = operation(window)
             if success {
                 DispatchQueue.main.async {
                     self.windowManagementAvailable = true
                 }
+                
+                // Restore focus to the target application after successful window operation
+                app.activate(options: [.activateIgnoringOtherApps])
+                logger.debug("Restored focus to app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
+                
                 onSuccess()
             } else {
                 onFailure(.operationFailed)
@@ -280,6 +285,22 @@ class PermissionManager: ObservableObject {
         }
     }
     
+    // MARK: - App Activation Helpers
+    
+    /// Activates the application that owns the given window to restore focus
+    private func activateApplicationForWindow(_ window: AXUIElement) {
+        var appPid: pid_t = 0
+        let pidResult = AXUIElementGetPid(window, &appPid)
+        
+        if pidResult == .success,
+           let targetApp = NSRunningApplication(processIdentifier: appPid) {
+            // Activate the app to restore focus after window manipulation
+            targetApp.activate(options: [.activateIgnoringOtherApps])
+            logger.debug("Restored focus to app: \(targetApp.localizedName ?? targetApp.bundleIdentifier ?? "Unknown")")
+        } else {
+            logger.warning("Failed to activate app for window - could not get process ID")
+        }
+    }
     
     // MARK: - UI Helpers
     
@@ -302,7 +323,7 @@ class PermissionManager: ObservableObject {
 // MARK: - Supporting Types
 
 enum WindowManagementResult {
-    case available(AXUIElement)  // Window management is available with target window
+    case available(window: AXUIElement, app: NSRunningApplication)  // Window management is available with target window and app
     case permissionDenied       // Need accessibility permissions
     case noTargetApp           // No suitable target application
     case noWindows             // Target app has no windows
