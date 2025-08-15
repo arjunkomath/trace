@@ -18,7 +18,7 @@ enum AppConstants {
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             fatalError("Could not locate Application Support directory")
         }
-        return appSupport.appendingPathComponent(bundleIdentifier, isDirectory: true)
+        return appSupport.appendingPathComponent("Trace", isDirectory: true)
     }
     
     /// App version information
