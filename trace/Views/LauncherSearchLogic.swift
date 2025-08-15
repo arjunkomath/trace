@@ -122,8 +122,7 @@ extension LauncherView {
             AppResultProvider(),
             SystemCommandProvider(
                 clearSearch: clearSearch,
-                onClose: onClose,
-                openSettings: { openSettings() }
+                onClose: onClose
             ),
             NetworkCommandProvider(),
             ControlCenterProvider(),

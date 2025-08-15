@@ -17,62 +17,53 @@ struct SettingsView: View {
     private let logger = AppLogger.settingsView
     
     var body: some View {
-        TabView {
-            GeneralSettingsView(
-                launchAtLogin: $launchAtLogin,
-                currentKeyCombo: $currentKeyCombo,
-                isRecording: $isRecording,
-                onLaunchAtLoginChange: handleLaunchAtLoginChange,
-                onHotkeyRecord: handleHotkeyRecord,
-                onHotkeyReset: handleHotkeyReset
-            )
-            .tabItem {
-                Image(systemName: "gear")
-                Text("General")
+            TabView {
+                GeneralSettingsView(
+                    launchAtLogin: $launchAtLogin,
+                    currentKeyCombo: $currentKeyCombo,
+                    isRecording: $isRecording,
+                    onLaunchAtLoginChange: handleLaunchAtLoginChange,
+                    onHotkeyRecord: handleHotkeyRecord,
+                    onHotkeyReset: handleHotkeyReset
+                )
+                .tabItem {
+                    Image(systemName: "gear")
+                    Text("General")
+                }
+                .tag(0)
+                
+                WindowManagementSettingsView()
+                    .tabItem {
+                        Image(systemName: "macwindow")
+                        Text("Window Hotkeys")
+                    }
+                    .tag(1)
+                
+                AppHotkeysSettingsView()
+                    .tabItem {
+                        Image(systemName: "app.badge")
+                        Text("App Hotkeys")
+                    }
+                    .tag(2)
+                
+                QuickLinksSettingsView()
+                    .tabItem {
+                        Image(systemName: "link")
+                        Text("Quick Links")
+                    }
+                    .tag(3)
+                
+                AboutSettingsView()
+                    .tabItem {
+                        Image(systemName: "info.circle")
+                        Text("About")
+                    }
+                    .tag(4)
             }
-            .tag(0)
-            
-            WindowManagementSettingsView()
-                .tabItem {
-                    Image(systemName: "macwindow")
-                    Text("Window Hotkeys")
-                }
-                .tag(1)
-            
-            AppHotkeysSettingsView()
-                .tabItem {
-                    Image(systemName: "app.badge")
-                    Text("App Hotkeys")
-                }
-                .tag(2)
-            
-            QuickLinksSettingsView()
-                .tabItem {
-                    Image(systemName: "link")
-                    Text("Quick Links")
-                }
-                .tag(3)
-            
-            AboutSettingsView()
-                .tabItem {
-                    Image(systemName: "info.circle")
-                    Text("About")
-                }
-                .tag(4)
-        }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
         .onAppear {
             logger.debug("Settings view appeared")
             loadSettings()
-            
-            // Force the settings window to the front
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-                if let settingsWindow = NSApp.windows.first(where: { $0.title.contains("Settings") || $0.title.contains("Preferences") }) {
-                    settingsWindow.makeKeyAndOrderFront(nil)
-                    settingsWindow.orderFrontRegardless()
-                }
-            }
         }
     }
     

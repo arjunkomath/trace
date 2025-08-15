@@ -34,6 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsManager = SettingsManager.shared
     
     private var launcherWindow: LauncherWindow?
+    private var settingsWindow: SettingsWindow?
     private var hotkeyManager: HotkeyManager?
     private var globalEventMonitor: Any?
     private var skipQuitConfirmation = false
@@ -83,6 +84,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stopGlobalEventMonitoring()
         onboardingWindow?.hide()
         onboardingWindow = nil
+        settingsWindow?.hide()
+        settingsWindow = nil
         NotificationCenter.default.removeObserver(self)
         logger.debug("AppDelegate deinitialized")
     }
@@ -117,6 +120,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let openItem = NSMenuItem(title: "Open Trace", action: #selector(showLauncher), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
+        
+        // Settings
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        menu.addItem(NSMenuItem.separator())
         
         // Check for Updates - Connect directly to Sparkle as per documentation
         let updateItem = NSMenuItem(title: "Check for Updates", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
@@ -209,9 +219,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logger.error("❌ Failed to register hotkey: \(error.localizedDescription)")
         }
     }
-    
-    
-
     
     @objc private func showLauncher() {
         // Capture the current frontmost app before showing the launcher
@@ -332,6 +339,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.showLauncher()
         }
+    }
+    
+    // MARK: - Settings
+    
+    @objc func showSettings() {
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindow()
+        }
+        settingsWindow?.show()
+        logger.notice("✅ Settings window shown")
     }
     
     

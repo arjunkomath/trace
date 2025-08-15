@@ -119,7 +119,7 @@ class LauncherWindow: NSPanel {
         
         // Restore focus to the previously active application
         if let lastApp = PermissionManager.shared.lastActiveApplication {
-            lastApp.activate(options: [.activateIgnoringOtherApps])
+            lastApp.activate()
             logger.debug("🎯 Restored focus to app: \(lastApp.localizedName ?? lastApp.bundleIdentifier ?? "Unknown")")
         }
         

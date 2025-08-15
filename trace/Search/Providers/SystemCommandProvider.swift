@@ -11,12 +11,10 @@ import AppKit
 class SystemCommandProvider: ResultProvider {
     private let clearSearch: () -> Void
     private let onClose: () -> Void
-    private let openSettings: () -> Void
     
-    init(clearSearch: @escaping () -> Void, onClose: @escaping () -> Void, openSettings: @escaping () -> Void) {
+    init(clearSearch: @escaping () -> Void, onClose: @escaping () -> Void) {
         self.clearSearch = clearSearch
         self.onClose = onClose
-        self.openSettings = openSettings
     }
     
     func getResults(for query: String, context: SearchContext) async -> [(SearchResult, Double)] {
@@ -55,9 +53,14 @@ class SystemCommandProvider: ResultProvider {
             title: "Trace Settings",
             subtitle: "Configure hotkeys and preferences",
             icon: "gearshape",
-            shortcut: KeyboardShortcut(key: ",", modifiers: ["⌘"]),
-            operation: createStandardAction(commandId: settingsId, context: context) {
-                self.openSettings()
+            shortcut: nil,
+            operation: createSettingsAction(commandId: settingsId, context: context) {
+                if let appDelegate = NSApp.delegate as? AppDelegate {
+                    appDelegate.showSettings()
+                } else {
+                    // Try alternative approach
+                    NSApp.sendAction(#selector(AppDelegate.showSettings), to: nil, from: nil)
+                }
             }
         )
         
@@ -129,6 +132,17 @@ class SystemCommandProvider: ResultProvider {
                 customAction()
                 clearSearch()
                 onClose()
+            }
+        }
+    }
+    
+    private func createSettingsAction(commandId: String, context: SearchContext, customAction: @escaping () -> Void) -> () -> Void {
+        return {
+            context.services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
+            
+            DispatchQueue.main.async {
+                customAction()
+                // Don't call clearSearch() or onClose() - let LauncherSearchLogic handle it
             }
         }
     }
