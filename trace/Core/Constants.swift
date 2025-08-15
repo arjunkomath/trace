@@ -12,6 +12,15 @@ enum AppConstants {
     /// The app's bundle identifier, dynamically retrieved from the main bundle
     static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.techulus.trace"
     
+    /// Centralized app data directory in Application Support
+    static var appDataDirectory: URL {
+        let fileManager = FileManager.default
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Could not locate Application Support directory")
+        }
+        return appSupport.appendingPathComponent(bundleIdentifier, isDirectory: true)
+    }
+    
     /// App version information
     static let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     static let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"

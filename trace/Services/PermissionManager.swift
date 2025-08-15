@@ -20,7 +20,7 @@ class PermissionManager: ObservableObject {
     @Published private(set) var systemEventsAvailable = false
     
     /// Track the last active application before Trace became frontmost
-    private var lastActiveApplication: NSRunningApplication?
+    internal var lastActiveApplication: NSRunningApplication?
     
     /// Notification observer for app activation
     private var appActivationObserver: Any?

@@ -117,6 +117,12 @@ class LauncherWindow: NSPanel {
         preventAutoClose = false // Reset flag when hiding
         orderOut(nil)
         
+        // Restore focus to the previously active application
+        if let lastApp = PermissionManager.shared.lastActiveApplication {
+            lastApp.activate(options: [.activateIgnoringOtherApps])
+            logger.debug("🎯 Restored focus to app: \(lastApp.localizedName ?? lastApp.bundleIdentifier ?? "Unknown")")
+        }
+        
         logger.debug("✅ LauncherWindow hide completed - isVisible: \(self.isVisible)")
     }
     

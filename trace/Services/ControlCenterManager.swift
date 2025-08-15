@@ -226,6 +226,310 @@ class ControlCenterManager {
             ))
         }
         
+        // Keyboard Settings
+        if matchesQuery(query, terms: [
+            "keyboard", "typing", "shortcuts", "key repeat", "modifier keys", "keyboard settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "keyboard_settings",
+                title: "Keyboard",
+                subtitle: "Configure keyboard and typing preferences",
+                icon: "keyboard",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
+                }
+            ))
+        }
+        
+        // Mouse Settings
+        if matchesQuery(query, terms: [
+            "mouse", "clicking", "scrolling", "pointer", "mouse settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "mouse_settings",
+                title: "Mouse",
+                subtitle: "Configure mouse and pointer preferences",
+                icon: "computermouse",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preference.mouse")
+                }
+            ))
+        }
+        
+        // Trackpad Settings
+        if matchesQuery(query, terms: [
+            "trackpad", "gestures", "tap to click", "tracking speed", "trackpad settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "trackpad_settings",
+                title: "Trackpad",
+                subtitle: "Configure trackpad gestures and preferences",
+                icon: "trackpad",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Trackpad-Settings.extension")
+                }
+            ))
+        }
+        
+        // Display Settings
+        if matchesQuery(query, terms: [
+            "display", "monitor", "resolution", "brightness", "displays", "screen", "display settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "display_settings",
+                title: "Displays",
+                subtitle: "Configure display resolution and arrangement",
+                icon: "display",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Displays-Settings.extension")
+                }
+            ))
+        }
+        
+        // Dock Settings
+        if matchesQuery(query, terms: [
+            "dock", "dock size", "magnification", "hiding", "dock settings", "dock preferences"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "dock_settings",
+                title: "Dock & Menu Bar",
+                subtitle: "Configure Dock appearance and behavior",
+                icon: "dock.rectangle",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preference.dock")
+                }
+            ))
+        }
+        
+        // Date & Time Settings
+        if matchesQuery(query, terms: [
+            "date", "time", "clock", "timezone", "date time", "time zone", "date settings", "time settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "datetime_settings",
+                title: "Date & Time",
+                subtitle: "Set date, time, and time zone",
+                icon: "clock",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Date-Time-Settings.extension")
+                }
+            ))
+        }
+        
+        // Battery Settings
+        if matchesQuery(query, terms: [
+            "battery", "power", "energy", "low power mode", "battery health", "battery settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "battery_settings",
+                title: "Battery",
+                subtitle: "Monitor battery usage and power settings",
+                icon: "battery.100percent",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Battery-Settings.extension")
+                }
+            ))
+        }
+        
+        // Login Items
+        if matchesQuery(query, terms: [
+            "login items", "startup", "launch", "startup items", "login", "startup programs"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "login_items",
+                title: "Login Items",
+                subtitle: "Manage apps that open at login",
+                icon: "person.badge.key",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.LoginItems-Settings.extension")
+                }
+            ))
+        }
+        
+        // Time Machine
+        if matchesQuery(query, terms: [
+            "time machine", "backup", "backups", "restore", "time machine settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "time_machine",
+                title: "Time Machine",
+                subtitle: "Configure automatic backups",
+                icon: "clock.arrow.circlepath",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.TimeMachine-Settings.extension")
+                }
+            ))
+        }
+        
+        // Control Center Settings
+        if matchesQuery(query, terms: [
+            "control center", "menu bar", "control center settings", "menu bar settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "control_center_settings",
+                title: "Control Center",
+                subtitle: "Customize Control Center and menu bar",
+                icon: "switch.2",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Control-Center-Settings.extension")
+                }
+            ))
+        }
+        
+        // Game Center
+        if matchesQuery(query, terms: [
+            "game center", "gaming", "games", "game center settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "game_center",
+                title: "Game Center",
+                subtitle: "Manage Game Center preferences",
+                icon: "gamecontroller",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Game-Center-Settings.extension")
+                }
+            ))
+        }
+        
+        // Extensions
+        if matchesQuery(query, terms: [
+            "extensions", "plugins", "add-ons", "extensions settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "extensions_settings",
+                title: "Extensions",
+                subtitle: "Manage system extensions and plugins",
+                icon: "puzzlepiece.extension",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Extensions-Settings.extension")
+                }
+            ))
+        }
+        
+        // Accessibility
+        if matchesQuery(query, terms: [
+            "accessibility", "voiceover", "zoom", "assistive", "accessibility settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "accessibility_settings",
+                title: "Accessibility",
+                subtitle: "Configure accessibility features",
+                icon: "accessibility",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preference.universalaccess")
+                }
+            ))
+        }
+        
+        // Sidecar
+        if matchesQuery(query, terms: [
+            "sidecar", "ipad", "extended display", "sidecar settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "sidecar_settings",
+                title: "Sidecar",
+                subtitle: "Use iPad as extended display",
+                icon: "ipad.and.arrow.forward",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preference.sidecar")
+                }
+            ))
+        }
+        
+        // Internet Accounts
+        if matchesQuery(query, terms: [
+            "internet accounts", "email", "mail", "accounts", "cloud accounts", "email accounts"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "internet_accounts",
+                title: "Internet Accounts",
+                subtitle: "Add email, contacts, and calendar accounts",
+                icon: "at",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preferences.internetaccounts")
+                }
+            ))
+        }
+        
+        // Wallpaper
+        if matchesQuery(query, terms: [
+            "wallpaper", "background", "desktop background", "wallpaper settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "wallpaper_settings",
+                title: "Wallpaper",
+                subtitle: "Change desktop wallpaper",
+                icon: "photo.on.rectangle",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preferences.wallpaper")
+                }
+            ))
+        }
+        
+        // Passwords & Passkeys
+        if matchesQuery(query, terms: [
+            "passwords", "passkeys", "keychain", "password manager", "passwords settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "passwords_settings",
+                title: "Passwords",
+                subtitle: "Manage passwords and passkeys",
+                icon: "key",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preferences.passkeys")
+                }
+            ))
+        }
+        
+        // Printers & Scanners
+        if matchesQuery(query, terms: [
+            "printers", "scanners", "printing", "scanning", "print", "scan", "printer settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "printers_scanners",
+                title: "Printers & Scanners",
+                subtitle: "Add and manage printers and scanners",
+                icon: "printer",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.preference.printfax")
+                }
+            ))
+        }
+        
+        // Energy Saver
+        if matchesQuery(query, terms: [
+            "energy saver", "power management", "sleep", "energy", "energy settings"
+        ]) {
+            commands.append(ControlCenterCommand(
+                id: "energy_saver",
+                title: "Energy Saver",
+                subtitle: "Configure power management settings",
+                icon: "leaf",
+                category: .systemSettings,
+                action: { [weak self] in
+                    self?.openSystemPreference("x-apple.systempreferences:com.apple.Energy-Saver-Settings.extension")
+                }
+            ))
+        }
+        
         return commands
     }
     

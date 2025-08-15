@@ -13,25 +13,18 @@ class UsageTracker {
     private let saveDebouncer = Debouncer(delay: 1.0)
     
     private var dataFileURL: URL? {
-        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory,
-                                                in: .userDomainMask).first else {
-            logger.error("Failed to get Application Support directory")
-            return nil
-        }
+        let directory = AppConstants.appDataDirectory
         
-        let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
-        
-        if !fileManager.fileExists(atPath: traceDirectory.path) {
+        if !fileManager.fileExists(atPath: directory.path) {
             do {
-                try fileManager.createDirectory(at: traceDirectory,
-                                              withIntermediateDirectories: true)
+                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {
-                logger.error("Failed to create Trace directory: \(error)")
+                logger.error("Failed to create app data directory: \(error)")
                 return nil
             }
         }
         
-        return traceDirectory.appendingPathComponent(fileName)
+        return directory.appendingPathComponent(fileName)
     }
     
     private init() {

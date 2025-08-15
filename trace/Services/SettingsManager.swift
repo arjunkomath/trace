@@ -72,11 +72,7 @@ class SettingsManager: ObservableObject {
     private let settingsURL: URL
     
     private init() {
-        // Create settings directory in Application Support
-        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            fatalError("Could not locate Application Support directory")
-        }
-        let traceSettingsDir = appSupportURL.appendingPathComponent(AppConstants.bundleIdentifier, isDirectory: true)
+        let traceSettingsDir = AppConstants.appDataDirectory
         
         // Ensure directory exists
         try? fileManager.createDirectory(at: traceSettingsDir, withIntermediateDirectories: true)

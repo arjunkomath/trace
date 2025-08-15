@@ -208,43 +208,41 @@ struct GeneralSettingsView: View {
             
             // Settings Import/Export section
             Section {
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Export Settings")
-                                .font(.system(size: 13))
-                            Text("Save all your Trace settings to a file")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button("Export...") {
-                            exportSettings()
-                        }
-                        .buttonStyle(.bordered)
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Export Settings")
+                            .font(.system(size: 13))
+                        Text("Save all your Trace settings to a file")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
                     }
-                    .padding(.vertical, 4)
                     
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Import Settings")
-                                .font(.system(size: 13))
-                            Text("Restore settings from a previously exported file")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button("Import...") {
-                            showingImportAlert = true
-                        }
-                        .buttonStyle(.bordered)
+                    Spacer()
+                    
+                    Button("Export...") {
+                        exportSettings()
                     }
-                    .padding(.vertical, 4)
+                    .buttonStyle(.bordered)
                 }
+                .padding(.vertical, 4)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Import Settings")
+                            .font(.system(size: 13))
+                        Text("Restore settings from a previously exported file")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Import...") {
+                        showingImportAlert = true
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
             } header: {
                 Text("Settings Backup")
             } footer: {

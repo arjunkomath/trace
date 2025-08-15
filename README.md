@@ -128,8 +128,3 @@ generate_appcast --download-url-prefix "https://trace.techulus.xyz/downloads/" \
 
 - **Website**: [trace.techulus.xyz](https://trace.techulus.xyz)
 - **Documentation**: [ARCHITECTURE.md](ARCHITECTURE.md)
-- **Releases**: [GitHub Releases](https://github.com/arjunkomath/trace/releases)
-
----
-
-**License**: MIT • **Author**: [@arjunkomath](https://twitter.com/arjunkomath)

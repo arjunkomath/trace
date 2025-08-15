@@ -12,6 +12,7 @@ struct AboutSettingsView: View {
     @State private var dataPath: String = ""
     @State private var showingResetAlert = false
     @State private var showingCacheRefreshAlert = false
+    @State private var showingUsageResetAlert = false
     
     private var appVersion: String {
         AppConstants.version
@@ -57,7 +58,7 @@ struct AboutSettingsView: View {
                             }
                             
                             if let twitterURL = URL(string: "https://twitter.com/arjunz") {
-                                Link("Twitter", destination: twitterURL)
+                                Link("Twitter / X", destination: twitterURL)
                                     .font(.system(size: 12))
                             }
                         }
@@ -85,7 +86,6 @@ struct AboutSettingsView: View {
                         
                         Button(action: openDataFolder) {
                             HStack(spacing: 4) {
-                                Image(systemName: "folder")
                                 Text("Open")
                             }
                             .font(.system(size: 11))
@@ -95,12 +95,7 @@ struct AboutSettingsView: View {
                     
                 }
                 .padding(.vertical, 4)
-            } header: {
-                Text("Storage")
-            }
             
-            // Reset Section
-            Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Application Cache")
@@ -114,8 +109,7 @@ struct AboutSettingsView: View {
                     
                     Button(action: refreshAppCache) {
                         HStack(spacing: 4) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Refresh")
+                            Text("Reload")
                         }
                         .font(.system(size: 11))
                     }
@@ -136,7 +130,27 @@ struct AboutSettingsView: View {
                     
                     Button(action: resetOnboarding) {
                         HStack(spacing: 4) {
-                            Image(systemName: "graduationcap")
+                            Text("Reset")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Usage Data")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Clear app usage statistics and search history")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: resetUsageData) {
+                        HStack(spacing: 4) {
                             Text("Reset")
                         }
                         .font(.system(size: 11))
@@ -145,7 +159,7 @@ struct AboutSettingsView: View {
                 }
                 .padding(.vertical, 4)
             } header: {
-                Text("Reset")
+                Text("Data")
             }
         }
         .formStyle(.grouped)
@@ -162,15 +176,16 @@ struct AboutSettingsView: View {
         } message: {
             Text("Application cache has been refreshed successfully.")
         }
+        .alert("Usage Data Cleared", isPresented: $showingUsageResetAlert) {
+            Button("OK") { }
+        } message: {
+            Text("All usage statistics and search history have been cleared.")
+        }
     }
     
     private func loadDebugInfo() {
-        // Get data path
-        let fileManager = FileManager.default
-        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
-            dataPath = traceDirectory.path
-        }
+        // Get data path using centralized app data directory
+        dataPath = AppConstants.appDataDirectory.path
     }
     
     private func refreshAppCache() {
@@ -181,23 +196,27 @@ struct AboutSettingsView: View {
     }
     
     private func openDataFolder() {
+        let directory = AppConstants.appDataDirectory
         let fileManager = FileManager.default
-        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let traceDirectory = appSupport.appendingPathComponent("Trace", isDirectory: true)
-            
-            // Create directory if it doesn't exist
-            if !fileManager.fileExists(atPath: traceDirectory.path) {
-                try? fileManager.createDirectory(at: traceDirectory, withIntermediateDirectories: true)
-            }
-            
-            NSWorkspace.shared.open(traceDirectory)
+        
+        // Create directory if it doesn't exist
+        if !fileManager.fileExists(atPath: directory.path) {
+            try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         }
+        
+        NSWorkspace.shared.open(directory)
     }
     
     private func resetOnboarding() {
         // Reset the onboarding flag using SettingsManager
         SettingsManager.shared.updateOnboardingCompleted(false)
         showingResetAlert = true
+    }
+    
+    private func resetUsageData() {
+        // Clear usage data using UsageTracker
+        UsageTracker.shared.clearUsageData()
+        showingUsageResetAlert = true
     }
     
 }
