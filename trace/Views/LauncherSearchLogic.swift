@@ -295,6 +295,9 @@ extension LauncherView {
                     // Keep launcher open and don't clear search - user can see the result
                     // Reset selection to first item
                     selectedIndex = 0
+                } else if result.commandId == "com.trace.command.settings" {
+                    // Don't close launcher
+                    clearSearch()
                 } else {
                     // For other commands, close launcher
                     clearSearch()
