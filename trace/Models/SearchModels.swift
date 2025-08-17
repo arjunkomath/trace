@@ -42,6 +42,7 @@ enum SearchResultType {
     case suggestion
     case math
     case calendar
+    case emoji
     
     var displayName: String {
         switch self {
@@ -63,6 +64,8 @@ enum SearchResultType {
             return "Math"
         case .calendar:
             return "Calendar"
+        case .emoji:
+            return "Emoji"
         }
     }
 }

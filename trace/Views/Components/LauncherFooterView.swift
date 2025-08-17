@@ -115,6 +115,9 @@ struct LauncherFooterView: View {
             
         case .math:
             return "Calculate"
+        
+        case .emoji:
+            return "Copy to Clipboard"
             
         default:
             return "Execute"

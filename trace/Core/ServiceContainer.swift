@@ -21,6 +21,7 @@ class ServiceContainer: ObservableObject {
     private var _networkUtilities: NetworkUtilities?
     private var _calendarManager: CalendarManager?
     private var _settingsManager: SettingsManager?
+    private var _emojiManager: EmojiManager?
     
     // MARK: - Service Accessors
     
@@ -124,6 +125,15 @@ class ServiceContainer: ObservableObject {
         return manager
     }
     
+    var emojiManager: EmojiManager {
+        if let manager = _emojiManager {
+            return manager
+        }
+        let manager = EmojiManager.shared
+        _emojiManager = manager
+        return manager
+    }
+    
     // MARK: - Lifecycle
     
     func shutdown() {
@@ -138,6 +148,7 @@ class ServiceContainer: ObservableObject {
         _networkUtilities = nil
         _calendarManager = nil
         _settingsManager = nil
+        _emojiManager = nil
     }
 }
 

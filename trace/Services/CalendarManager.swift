@@ -151,11 +151,8 @@ class CalendarManager: ObservableObject {
         if !force,
            let lastFetch = lastFetchDate,
            Date().timeIntervalSince(lastFetch) < cacheExpiryInterval {
-            logger.debug("Using cached calendar events")
             return
         }
-        
-        logger.info("Loading calendar events...")
         
         let now = Date()
         let pastDate = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now

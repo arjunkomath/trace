@@ -479,3 +479,41 @@ struct MathCopyCommandAction: DisplayableCommandAction {
         )
     }
 }
+
+struct EmojiCommandAction: DisplayableCommandAction {
+    let id: String
+    let displayName: String
+    let iconName: String?
+    let keyboardShortcut: String?
+    let description: String?
+    let emoji: String
+    let showsLoadingState = false
+    
+    init(
+        id: String,
+        displayName: String,
+        emoji: String,
+        iconName: String? = nil,
+        keyboardShortcut: String? = nil,
+        description: String? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.emoji = emoji
+        self.iconName = iconName
+        self.keyboardShortcut = keyboardShortcut
+        self.description = description
+    }
+    
+    func execute() async -> ActionResult {
+        // Copy emoji to clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(emoji, forType: .string)
+        
+        return .success(
+            message: "\(emoji) copied to clipboard",
+            data: .text(emoji)
+        )
+    }
+}

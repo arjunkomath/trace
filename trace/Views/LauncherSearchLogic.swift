@@ -129,6 +129,7 @@ extension LauncherView {
             WindowManagementProvider(),
             QuickLinksProvider(),
             CalendarResultProvider(),
+            EmojiResultProvider(),
             MathResultProvider(),
             SearchEngineProvider()
         ]
@@ -276,6 +277,11 @@ extension LauncherView {
             // Track calendar event access using the actual event ID
             if let eventId = result.commandId {
                 services.usageTracker.recordUsage(for: eventId, type: UsageType.command)
+            }
+        case .emoji:
+            // Track emoji usage using the prefixed emoji ID
+            if let emojiId = result.commandId {
+                services.usageTracker.recordUsage(for: emojiId, type: UsageType.command)
             }
         case .file, .person, .recent:
             // These types aren't implemented yet, so no tracking for now

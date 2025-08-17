@@ -65,6 +65,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize QuickLink hotkey manager to register saved QuickLink hotkeys
         _ = QuickLinkHotkeyManager.shared
         
+        // Initialize emoji manager and load emoji database
+        _ = EmojiManager.shared
+        EmojiManager.shared.loadEmojis()
+        logger.notice("✅ EmojiManager initialized and loading emojis")
+        
         // Show onboarding if first time user
         if !settingsManager.settings.hasCompletedOnboarding {
             showOnboarding()
