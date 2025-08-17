@@ -28,126 +28,125 @@ struct LauncherView: View {
     let onClose: () -> Void
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Search Input - Fixed height section
-            HStack(spacing: 12) {
-                Image(systemName: "filemenu.and.selection")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary.opacity(0.6))
-                
-                TextField("What would you like to do?", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 18))
-                    .focused($isSearchFocused)
-                    .onChange(of: searchText) { _, newValue in
-                        selectedIndex = 0
-                        
-                        // Cancel any existing search task
-                        currentSearchTask?.cancel()
-                        
-                        // Clear results immediately if search is empty
-                        if newValue.isEmpty {
-                            cachedResults = []
-                        } else {
-                            // Start search immediately
-                            performBackgroundSearch(for: newValue)
-                        }
-                    }
-                
-                if !searchText.isEmpty {
-                    Button(action: { 
-                        clearSearch()
-                        // Restore focus after clearing search
-                        DispatchQueue.main.async {
-                            isSearchFocused = true
-                        }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.secondary.opacity(0.4))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .frame(height: AppConstants.Window.launcherHeight)
-            
-            // Results section - expandable
+        liquidGlassContainer(spacing: 12) {
             VStack(spacing: 0) {
-                if hasResults {
-                    Divider()
-                        .opacity(0.2)
+                // Search Input - Fixed height section
+                HStack(spacing: 12) {
+                    Image(systemName: "filemenu.and.selection")
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary.opacity(0.6))
                     
-                    // Results header
-                    HStack {
-                        Text("Results")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                        Spacer()
+                    TextField("What would you like to do?", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 18))
+                        .focused($isSearchFocused)
+                        .onChange(of: searchText) { _, newValue in
+                            selectedIndex = 0
+                            
+                            // Cancel any existing search task
+                            currentSearchTask?.cancel()
+                            
+                            // Clear results immediately if search is empty
+                            if newValue.isEmpty {
+                                cachedResults = []
+                            } else {
+                                // Start search immediately
+                                performBackgroundSearch(for: newValue)
+                            }
+                        }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: { 
+                            clearSearch()
+                            // Restore focus after clearing search
+                            DispatchQueue.main.async {
+                                isSearchFocused = true
+                            }
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary.opacity(0.4))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .background(Color.primary.opacity(0.02))
-                    
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                ForEach(Array(results.enumerated()), id: \.offset) { index, result in
-                                    Group {
-                                        if ResultsLayout(rawValue: settingsManager.settings.resultsLayout) == .compact {
-                                            CompactResultRowView(
-                                                result: getResultWithLoadingState(result),
-                                                isSelected: index == selectedIndex
-                                            )
-                                        } else {
-                                            ResultRowView(
-                                                result: getResultWithLoadingState(result),
-                                                isSelected: index == selectedIndex
-                                            )
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(height: AppConstants.Window.launcherHeight)
+                
+                // Results section - expandable
+                VStack(spacing: 0) {
+                    if hasResults {
+                        Divider()
+                            .opacity(0.2)
+                        
+                        // Results header
+                        HStack {
+                            Text("Results")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                            Spacer()
+                        }
+                        .background(Color.primary.opacity(0.02))
+                        
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(results.enumerated()), id: \.offset) { index, result in
+                                        Group {
+                                            if ResultsLayout(rawValue: settingsManager.settings.resultsLayout) == .compact {
+                                                CompactResultRowView(
+                                                    result: getResultWithLoadingState(result),
+                                                    isSelected: index == selectedIndex
+                                                )
+                                            } else {
+                                                ResultRowView(
+                                                    result: getResultWithLoadingState(result),
+                                                    isSelected: index == selectedIndex
+                                                )
+                                            }
                                         }
-                                    }
-                                    .id(index)
-                                    .onTapGesture {
-                                        selectedIndex = index
-                                        executeSelectedResult()
+                                        .id(index)
+                                        .onTapGesture {
+                                            selectedIndex = index
+                                            executeSelectedResult()
+                                        }
                                     }
                                 }
                             }
-                        }
-                        .onChange(of: selectedIndex) { _, newIndex in
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                proxy.scrollTo(newIndex, anchor: .center)
+                            .onChange(of: selectedIndex) { _, newIndex in
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo(newIndex, anchor: .center)
+                                }
                             }
                         }
+                        .frame(maxHeight: AppConstants.Window.maxResultsHeight)
+                        
+                        // Footer showing available actions and shortcuts
+                        LauncherFooterView(
+                            selectedResult: selectedIndex < results.count ? results[selectedIndex] : nil,
+                            selectedActionIndex: selectedActionIndex
+                        )
                     }
-                    .frame(maxHeight: AppConstants.Window.maxResultsHeight)
-                    
-                    // Footer showing available actions and shortcuts
-                    LauncherFooterView(
-                        selectedResult: selectedIndex < results.count ? results[selectedIndex] : nil,
-                        selectedActionIndex: selectedActionIndex
-                    )
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: AppConstants.Window.launcherWidth)
+            .liquidGlassEffect(interactive: true)
+            .clipShape(RoundedRectangle(cornerRadius: adaptiveCornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: adaptiveCornerRadius)
+                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.1), lineWidth: 0.5)
+            )
+            .shadow(
+                color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.2),
+                radius: AppConstants.Window.shadowRadius * 0.8,
+                x: AppConstants.Window.shadowOffset.width,
+                y: AppConstants.Window.shadowOffset.height
+            )
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(width: AppConstants.Window.launcherWidth)
-        .background(
-            RoundedRectangle(cornerRadius: AppConstants.Window.cornerRadius)
-                .fill(.regularMaterial)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: AppConstants.Window.cornerRadius))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppConstants.Window.cornerRadius)
-                .stroke(Color.primary.opacity(colorScheme == .dark ? 0.2 : 0.15), lineWidth: 1)
-        )
-        .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.6 : 0.3),
-            radius: AppConstants.Window.shadowRadius,
-            x: AppConstants.Window.shadowOffset.width,
-            y: AppConstants.Window.shadowOffset.height
-        )
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
             clearSearch()

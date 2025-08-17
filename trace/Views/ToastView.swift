@@ -65,13 +65,10 @@ struct ToastView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.regularMaterial)
-        )
+        .liquidGlassEffect(interactive: false)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: adaptiveCornerRadius)
+                .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
         )
         .frame(width: 400)
         .offset(y: isShowing ? 0 : -100)
