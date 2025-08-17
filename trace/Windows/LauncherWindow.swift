@@ -53,6 +53,14 @@ class LauncherWindow: NSPanel {
         let hostingView = NSHostingView(rootView: LauncherView { [weak self] in
             self?.hide()
         })
+        
+        // Configure hosting view for glass effects
+        if #available(macOS 26.0, *) {
+            hostingView.wantsLayer = true
+            hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+            // SwiftUI will handle glass rendering automatically
+        }
+        
         self.hostingView = hostingView
         contentView = hostingView
     }
