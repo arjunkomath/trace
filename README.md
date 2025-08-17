@@ -13,6 +13,8 @@ A SwiftUI-based application launcher that runs as a background service (LSUIElem
 - **Quick Links**: One-key access to your most-used files, folders, and websites
 - **Global Hotkeys**: Customizable shortcuts for launching apps and managing windows
 - **Built-in Calculator**: Perform calculations directly without opening a separate app
+- **Calendar Integration**: Quick access to your calendar events without leaving the launcher
+- **Emoji Picker**: Search and copy from 1550+ emojis with fuzzy search
 - **Native Design**: Beautiful interface that respects your system preferences
 
 ## System Requirements
@@ -47,7 +49,7 @@ Grant when prompted:
 
 - **Language**: Swift 5.9+
 - **Framework**: SwiftUI with AppKit integration
-- **APIs**: Accessibility (AXUIElement), Carbon (EventHotKey), Core Graphics
+- **APIs**: Accessibility (AXUIElement), Carbon (EventHotKey), Core Graphics, EventKit (Calendar)
 - **Dependencies**: Sparkle (auto-updates), SymbolPicker (UI icons)
 
 ### Key Components
@@ -57,6 +59,8 @@ Grant when prompted:
 - `WindowManager`: AXUIElement-based window positioning
 - `HotkeyManager`: Carbon EventHotKey wrapper
 - `ToastManager`: Non-intrusive notification system
+- `CalendarManager`: EventKit integration for calendar access
+- `EmojiManager`: Comprehensive emoji database with search functionality
 
 ## Development
 
@@ -94,20 +98,24 @@ Settings stored in `UserDefaults` and `~/Library/Application Support/Trace/`:
 ## Distribution
 
 ### DMG Creation
+
 ```bash
-brew install create-dmg
+# brew install create-dmg
+
 create-dmg \
     --volname "Trace" \
     --window-pos 200 120 \
-    --window-size 600 400 \
+    --window-size 800 400 \
     --icon-size 100 \
-    --icon "trace.app" 150 185 \
+    --icon "trace.app" 200 170 \
     --hide-extension "trace.app" \
-    --app-drop-link 450 185 \
-    --hdiutil-quiet \
-    "Trace-1.0.0.dmg" \
-    "path/to/trace.app"
+    --app-drop-link 600 170 \
+    --background "background.png" \
+    "Trace-1.3.0.dmg" \
+    "trace.app"
 ```
+
+Once the DMG is created, you can distribute it via your website or GitHub releases.
 
 ### Appcast Generation
 ```bash
