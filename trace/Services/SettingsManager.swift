@@ -36,6 +36,36 @@ struct TraceSettings: Codable {
     var version: String = "1.0"
     var lastModified: Date = Date()
     
+    // Custom decoder to handle backward compatibility
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // flags
+        resultsLayout = try container.decodeIfPresent(String.self, forKey: .resultsLayout) ?? "compact"
+        showMenuBarIcon = try container.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon) ?? true
+        launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+        hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
+        calendarSearchEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarSearchEnabled) ?? false
+        
+        // hotkey
+        mainHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .mainHotkeyKeyCode) ?? 49
+        mainHotkeyModifiers = try container.decodeIfPresent(Int.self, forKey: .mainHotkeyModifiers) ?? 2048
+        
+        // configurations
+        windowHotkeys = try container.decodeIfPresent([String: WindowHotkeyData].self, forKey: .windowHotkeys) ?? [:]
+        appHotkeys = try container.decodeIfPresent([String: AppHotkeyData].self, forKey: .appHotkeys) ?? [:]
+        quickLinks = try container.decodeIfPresent([QuickLinkData].self, forKey: .quickLinks) ?? []
+        quickLinksHasLoadedBefore = try container.decodeIfPresent(Bool.self, forKey: .quickLinksHasLoadedBefore) ?? false
+        
+        // meta
+        version = try container.decodeIfPresent(String.self, forKey: .version) ?? "1.0"
+        lastModified = try container.decodeIfPresent(Date.self, forKey: .lastModified) ?? Date()
+    }
+    
+    init() {
+        // All defaults are set in property declarations above
+    }
+    
     struct WindowHotkeyData: Codable {
         let hotkey: String
         let keyCode: Int
