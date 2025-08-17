@@ -39,6 +39,7 @@ enum AppConstants {
     
     enum Search {
         static let defaultLimit = 10
+        static let calendarResultLimit = 3
         static let refreshInterval: TimeInterval = 60.0
         static let iconSize = CGSize(width: 24, height: 24)
     }

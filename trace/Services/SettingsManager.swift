@@ -16,6 +16,7 @@ struct TraceSettings: Codable {
     var showMenuBarIcon: Bool = true  // Default to true - show menu bar icon
     var launchAtLogin: Bool = false
     var hasCompletedOnboarding: Bool = false
+    var calendarSearchEnabled: Bool = false
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
@@ -146,6 +147,11 @@ class SettingsManager: ObservableObject {
     
     func updateOnboardingCompleted(_ completed: Bool) {
         settings.hasCompletedOnboarding = completed
+        saveSettings()
+    }
+    
+    func updateCalendarSearchEnabled(_ enabled: Bool) {
+        settings.calendarSearchEnabled = enabled
         saveSettings()
     }
     

@@ -385,6 +385,43 @@ struct MathCommandAction: DisplayableCommandAction {
     }
 }
 
+struct CalendarCommandAction: DisplayableCommandAction {
+    let id: String
+    let displayName: String
+    let iconName: String?
+    let keyboardShortcut: String?
+    let description: String?
+    let eventId: String
+    let showsLoadingState = false
+    
+    init(
+        id: String,
+        displayName: String,
+        eventId: String,
+        iconName: String? = nil,
+        keyboardShortcut: String? = nil,
+        description: String? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.eventId = eventId
+        self.iconName = iconName
+        self.keyboardShortcut = keyboardShortcut
+        self.description = description
+    }
+    
+    func execute() async -> ActionResult {
+        let calendarManager = CalendarManager.shared
+        
+        guard let event = calendarManager.getEventById(eventId) else {
+            return .failure(error: "Calendar event not found")
+        }
+        
+        calendarManager.openEvent(event)
+        return .success(message: "Opened \(event.title) in Calendar", data: nil)
+    }
+}
+
 struct MathCopyCommandAction: DisplayableCommandAction {
     let id: String
     let displayName: String

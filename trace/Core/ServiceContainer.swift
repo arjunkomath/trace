@@ -19,6 +19,8 @@ class ServiceContainer: ObservableObject {
     private var _quickLinksManager: QuickLinksManager?
     private var _permissionManager: PermissionManager?
     private var _networkUtilities: NetworkUtilities?
+    private var _calendarManager: CalendarManager?
+    private var _settingsManager: SettingsManager?
     
     // MARK: - Service Accessors
     
@@ -104,6 +106,24 @@ class ServiceContainer: ObservableObject {
         return utilities
     }
     
+    var calendarManager: CalendarManager {
+        if let manager = _calendarManager {
+            return manager
+        }
+        let manager = CalendarManager.shared
+        _calendarManager = manager
+        return manager
+    }
+    
+    var settingsManager: SettingsManager {
+        if let manager = _settingsManager {
+            return manager
+        }
+        let manager = SettingsManager.shared
+        _settingsManager = manager
+        return manager
+    }
+    
     // MARK: - Lifecycle
     
     func shutdown() {
@@ -116,6 +136,8 @@ class ServiceContainer: ObservableObject {
         _quickLinksManager = nil
         _permissionManager = nil
         _networkUtilities = nil
+        _calendarManager = nil
+        _settingsManager = nil
     }
 }
 

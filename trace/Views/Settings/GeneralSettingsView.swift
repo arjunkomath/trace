@@ -30,6 +30,7 @@ struct GeneralSettingsView: View {
     // Permissions states
     @ObservedObject private var permissionManager = PermissionManager.shared
     @State private var accessibilityEnabled = false
+    @State private var calendarEnabled = false
     @State private var checkingPermissions = false
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
@@ -47,6 +48,21 @@ struct GeneralSettingsView: View {
                     action: {
                         openAccessibilitySettings()
                     }
+                )
+                
+                PermissionRow(
+                    title: "Calendar Access",
+                    subtitle: "Required to search calendar events",
+                    icon: "calendar",
+                    status: checkingPermissions ? .checking : (calendarEnabled ? .granted : .denied),
+                    action: {
+                        if calendarEnabled {
+                            openCalendarPrivacySettings()
+                        } else {
+                            requestCalendarPermission()
+                        }
+                    },
+                    buttonTitle: calendarEnabled ? "Open Settings" : "Request Permission"
                 )
                 
                 HStack {
@@ -200,6 +216,32 @@ struct GeneralSettingsView: View {
                         .onChange(of: showMenuBarIcon) { _, newValue in
                             settingsManager.updateShowMenuBarIcon(newValue)
                         }
+                }
+                .padding(.vertical, 4)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Calendar Search")
+                            .font(.system(size: 13))
+                        Text("Search and open calendar events")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: Binding(
+                        get: { settingsManager.settings.calendarSearchEnabled },
+                        set: { newValue in
+                            settingsManager.updateCalendarSearchEnabled(newValue)
+                            if newValue && !calendarEnabled {
+                                requestCalendarPermission()
+                            }
+                        }
+                    ))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .disabled(!calendarEnabled)
                 }
                 .padding(.vertical, 4)
             } header: {
@@ -456,6 +498,9 @@ struct GeneralSettingsView: View {
         
         // Check accessibility permissions with retry mechanism for release builds
         checkAccessibilityPermissions()
+        
+        // Check calendar permissions
+        checkCalendarPermissions()
     }
     
     private func checkAccessibilityPermissions() {
@@ -480,9 +525,45 @@ struct GeneralSettingsView: View {
         }
     }
     
+    /// Checks calendar permissions in the background and updates UI state
+    private func checkCalendarPermissions() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let hasCalendarAccess = self.permissionManager.testCalendarCapability()
+            
+            DispatchQueue.main.async {
+                self.calendarEnabled = hasCalendarAccess
+                self.checkingPermissions = false
+            }
+        }
+    }
+    
+    /// Requests calendar permissions from the user and enables calendar search if granted
+    private func requestCalendarPermission() {
+        Task {
+            checkingPermissions = true
+            let granted = await permissionManager.requestCalendarPermissions()
+            await MainActor.run {
+                self.calendarEnabled = granted
+                self.checkingPermissions = false
+                
+                if granted {
+                    // Automatically enable calendar search when permission is granted
+                    settingsManager.updateCalendarSearchEnabled(true)
+                }
+            }
+        }
+    }
+    
     private func openAccessibilitySettings() {
         // Open System Settings to Accessibility
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    
+    /// Opens System Settings to the Calendar privacy section
+    private func openCalendarPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
             NSWorkspace.shared.open(url)
         }
     }
@@ -526,6 +607,7 @@ struct PermissionRow: View {
     let icon: String
     let status: PermissionStatus
     let action: () -> Void
+    let buttonTitle: String?
     
     var body: some View {
         HStack {
@@ -551,7 +633,7 @@ struct PermissionRow: View {
                 }
                 
                 if status != .granted {
-                    Button("Open Settings") {
+                    Button(buttonTitle ?? "Open Settings") {
                         action()
                     }
                     .font(.system(size: 11))
@@ -560,5 +642,14 @@ struct PermissionRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+    
+    init(title: String, subtitle: String, icon: String, status: PermissionStatus, action: @escaping () -> Void, buttonTitle: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.status = status
+        self.action = action
+        self.buttonTitle = buttonTitle
     }
 }

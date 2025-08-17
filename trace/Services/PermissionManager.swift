@@ -7,6 +7,7 @@
 
 import AppKit
 import ApplicationServices
+import EventKit
 import os.log
 
 /// Capability-based permission system that tests actual functionality instead of relying on system APIs
@@ -18,6 +19,7 @@ class PermissionManager: ObservableObject {
     /// Published properties for SwiftUI views to observe
     @Published var windowManagementAvailable = false
     @Published private(set) var systemEventsAvailable = false
+    @Published private(set) var calendarAvailable = false
     
     /// Track the last active application before Trace became frontmost
     internal var lastActiveApplication: NSRunningApplication?
@@ -300,6 +302,44 @@ class PermissionManager: ObservableObject {
         } else {
             logger.warning("Failed to activate app for window - could not get process ID")
         }
+    }
+    
+    // MARK: - Calendar Permissions
+    
+    /// Tests if we have calendar access permissions
+    func testCalendarCapability() -> Bool {
+        logger.info("Testing calendar capability...")
+        
+        let status = EKEventStore.authorizationStatus(for: .event)
+        logger.info("Current calendar authorization status: \(status.rawValue)")
+        
+        let hasAccess = status == .fullAccess
+        
+        DispatchQueue.main.async {
+            self.calendarAvailable = hasAccess
+        }
+        
+        if hasAccess {
+            logger.info("Calendar access available")
+        } else {
+            logger.warning("Calendar access not available: \(status.rawValue)")
+        }
+        
+        return hasAccess
+    }
+    
+    /// Requests calendar permissions
+    func requestCalendarPermissions() async -> Bool {
+        logger.info("Requesting calendar permissions...")
+        
+        let calendarManager = CalendarManager.shared
+        let granted = await calendarManager.requestAccess()
+        
+        DispatchQueue.main.async {
+            self.calendarAvailable = granted
+        }
+        
+        return granted
     }
     
     // MARK: - UI Helpers

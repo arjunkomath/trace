@@ -128,6 +128,7 @@ extension LauncherView {
             ControlCenterProvider(),
             WindowManagementProvider(),
             QuickLinksProvider(),
+            CalendarResultProvider(),
             MathResultProvider(),
             SearchEngineProvider()
         ]
@@ -271,6 +272,11 @@ extension LauncherView {
             // Track math calculations
             let commandId = result.commandId ?? "com.trace.math.calculation"
             services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
+        case .calendar:
+            // Track calendar event access using the actual event ID
+            if let eventId = result.commandId {
+                services.usageTracker.recordUsage(for: eventId, type: UsageType.command)
+            }
         case .file, .person, .recent:
             // These types aren't implemented yet, so no tracking for now
             break
