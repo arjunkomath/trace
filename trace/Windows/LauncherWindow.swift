@@ -110,17 +110,19 @@ class LauncherWindow: NSPanel {
         }
     }
     
-    func hide() {
+    func hide(restoreFocus: Bool = true) {
         let logger = AppLogger.launcherWindow
-        logger.debug("🙈 LauncherWindow.hide() called")
+        logger.debug("🙈 LauncherWindow.hide() called with restoreFocus: \(restoreFocus)")
         
         preventAutoClose = false // Reset flag when hiding
         orderOut(nil)
         
-        // Restore focus to the previously active application
-        if let lastApp = PermissionManager.shared.lastActiveApplication {
+        // Only restore focus to the previously active application if requested
+        if restoreFocus, let lastApp = PermissionManager.shared.lastActiveApplication {
             lastApp.activate()
             logger.debug("🎯 Restored focus to app: \(lastApp.localizedName ?? lastApp.bundleIdentifier ?? "Unknown")")
+        } else if !restoreFocus {
+            logger.debug("🚫 Skipping focus restoration to allow natural focus change")
         }
         
         logger.debug("✅ LauncherWindow hide completed - isVisible: \(self.isVisible)")

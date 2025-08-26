@@ -278,7 +278,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard globalEventMonitor == nil else { return }
         
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.launcherWindow?.hide()
+            self?.launcherWindow?.hide(restoreFocus: false)
             self?.stopGlobalEventMonitoring()
         }
     }
