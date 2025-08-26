@@ -56,14 +56,14 @@ class SettingsWindow: NSPanel {
         contentView = hostingView
     }
     
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
     
     func show() {
         positionWindow()
         
-        // Show window without activation
-        orderFrontRegardless()
+        // Show window and make it key to allow input focus
+        makeKeyAndOrderFront(nil)
         
         // Make window visible
         setIsVisible(true)
