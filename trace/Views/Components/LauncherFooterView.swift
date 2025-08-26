@@ -75,6 +75,23 @@ struct LauncherFooterView: View {
         }
     }
     
+    private func getWindowActionTitle() -> String {
+        let permissionManager = PermissionManager.shared
+        let capability = permissionManager.testWindowManagementCapability()
+        
+        switch capability {
+        case .available(_, let app):
+            let appName = app.localizedName ?? app.bundleIdentifier ?? "Unknown"
+            return "Move \(appName)"
+        case .permissionDenied:
+            return "Grant Permission"
+        case .noTargetApp:
+            return "No Target App"
+        case .noWindows:
+            return "No Windows"
+        }
+    }
+    
     private func getActionDescription(for result: SearchResult) -> String {
         switch result.type {
         case .application:
@@ -98,7 +115,7 @@ struct LauncherFooterView: View {
             default:
                 // Check for window commands using command ID prefix
                 if commandId.hasPrefix("com.trace.window.") {
-                    return "Move Window"
+                    return getWindowActionTitle()
                 }
                 // Check for system settings commands using command ID prefix
                 if commandId.hasPrefix("com.trace.controlcenter.") {
