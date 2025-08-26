@@ -90,7 +90,14 @@ class AppHotkeyManager {
             // Track usage
             services.usageTracker.recordUsage(for: bundleId)
         } else {
-            logger.warning("⚠️ App not found for bundle ID: \(bundleId)")
+            logger.warning("⚠️ App not found for bundle ID: \(bundleId), removing keybinding")
+            
+            // Remove the keybinding since the app no longer exists
+            unregisterHotkey(for: bundleId)
+            settingsManager.removeAppHotkey(for: bundleId)
+            
+            // Show toast notification to inform user
+            ToastManager.shared.showWarning("Removed hotkey for missing app")
         }
     }
     
