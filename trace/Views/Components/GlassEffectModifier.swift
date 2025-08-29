@@ -9,17 +9,14 @@ import SwiftUI
 
 extension View {
     @ViewBuilder
-    func liquidGlassEffect(
-        interactive: Bool = true,
-        isEnabled: Bool = true
-    ) -> some View {
+    func liquidGlassEffect(interactive: Bool = true) -> some View {
         let cornerRadius = self.adaptiveCornerRadius
         let shape = RoundedRectangle(cornerRadius: cornerRadius)
         if #available(macOS 26.0, *) {
             if interactive {
-                self.glassEffect(.regular.interactive(), in: shape, isEnabled: isEnabled)
+                self.glassEffect(.regular.interactive(), in: shape)
             } else {
-                self.glassEffect(.regular, in: shape, isEnabled: isEnabled)
+                self.glassEffect(.regular, in: shape)
             }
         } else {
             self.background(
@@ -66,29 +63,18 @@ extension View {
 
 struct LiquidGlassModifier: ViewModifier {
     let interactive: Bool
-    let shape: AnyShape
-    let isEnabled: Bool
     
-    init<S: Shape>(interactive: Bool = true, in shape: S = RoundedRectangle(cornerRadius: 16), isEnabled: Bool = true) {
+    init(interactive: Bool = true) {
         self.interactive = interactive
-        self.shape = AnyShape(shape)
-        self.isEnabled = isEnabled
     }
     
     func body(content: Content) -> some View {
-        content.liquidGlassEffect(
-            interactive: interactive,
-            isEnabled: isEnabled
-        )
+        content.liquidGlassEffect(interactive: interactive)
     }
 }
 
 extension View {
-    func liquidGlass<S: Shape>(
-        interactive: Bool = true,
-        in shape: S = RoundedRectangle(cornerRadius: 16),
-        isEnabled: Bool = true
-    ) -> some View {
-        modifier(LiquidGlassModifier(interactive: interactive, in: shape, isEnabled: isEnabled))
+    func liquidGlass(interactive: Bool = true) -> some View {
+        modifier(LiquidGlassModifier(interactive: interactive))
     }
 }
