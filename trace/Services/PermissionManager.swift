@@ -207,6 +207,9 @@ class PermissionManager: ObservableObject {
                 app.activate(options: [.activateIgnoringOtherApps])
                 logger.debug("Restored focus to app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
                 
+                // Clear lastActiveApplication to prevent double focus restoration when clicking elsewhere
+                lastActiveApplication = nil
+                
                 onSuccess()
             } else {
                 onFailure(.operationFailed)

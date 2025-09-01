@@ -355,13 +355,35 @@ class WindowManager: ObservableObject {
         
         guard let positionValue = AXValueCreate(.cgPoint, &origin),
               let sizeValue = AXValueCreate(.cgSize, &size) else {
+            logger.error("Failed to create AXValue for position or size")
             return false
         }
         
         let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
         let sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
         
-        return positionResult == .success && sizeResult == .success
+        // Log individual operation results for debugging
+        if positionResult != .success {
+            logger.debug("Position setting failed with result: \(positionResult.rawValue)")
+        } else {
+            logger.debug("Position set successfully to (\(origin.x), \(origin.y))")
+        }
+        
+        if sizeResult != .success {
+            logger.debug("Size setting failed with result: \(sizeResult.rawValue)")
+        } else {
+            logger.debug("Size set successfully to \(size.width)x\(size.height)")
+        }
+        
+        // Consider operation successful if at least one change succeeded
+        // Many apps have restrictions on either position or size changes
+        let atLeastOneSucceeded = (positionResult == .success) || (sizeResult == .success)
+        
+        if !atLeastOneSucceeded {
+            logger.warning("Both position and size setting failed")
+        }
+        
+        return atLeastOneSucceeded
     }
     
     private func toggleFullScreen(_ window: AXUIElement) -> Bool {
