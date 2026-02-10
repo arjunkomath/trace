@@ -119,7 +119,7 @@ class WindowManagementProvider: ResultProvider {
         case .bottomHalf: return "rectangle.split.1x2"
         case .topLeft, .topRight, .bottomLeft, .bottomRight: return "rectangle.split.2x2"
         case .firstThird, .centerThird, .lastThird: return "rectangle.split.3x1"
-        case .firstTwoThirds, .lastTwoThirds, .centerTwoThirds: return "rectangle.split.3x1"
+        case .firstTwoThirds, .lastTwoThirds, .centerThreeFourths: return "rectangle.split.3x1"
         case .maximize: return "arrow.up.left.and.arrow.down.right"
         case .fullScreen: return "rectangle.fill"
         case .almostMaximize: return "macwindow"

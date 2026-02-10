@@ -26,7 +26,7 @@ enum WindowPosition: String, CaseIterable {
     case lastThird = "last-third"
     case firstTwoThirds = "first-two-thirds"
     case lastTwoThirds = "last-two-thirds"
-    case centerTwoThirds = "center-two-thirds"
+    case centerThreeFourths = "center-three-fourths"
     case maximize = "maximize"
     case fullScreen = "full-screen"
     case almostMaximize = "almost-maximize"
@@ -52,7 +52,7 @@ enum WindowPosition: String, CaseIterable {
         case .lastThird: return "Last Third"
         case .firstTwoThirds: return "First Two Thirds"
         case .lastTwoThirds: return "Last Two Thirds"
-        case .centerTwoThirds: return "Center Two Thirds"
+        case .centerThreeFourths: return "Center Three Fourths"
         case .maximize: return "Maximize"
         case .fullScreen: return "Full Screen"
         case .almostMaximize: return "Almost Maximize"
@@ -80,7 +80,7 @@ enum WindowPosition: String, CaseIterable {
         case .lastThird: return "Move window to last third of screen"
         case .firstTwoThirds: return "Move window to first two thirds of screen"
         case .lastTwoThirds: return "Move window to last two thirds of screen"
-        case .centerTwoThirds: return "Center window at two thirds of screen"
+        case .centerThreeFourths: return "Center window at three fourths of screen"
         case .maximize: return "Maximize window to full screen"
         case .fullScreen: return "Enter native macOS full screen mode"
         case .almostMaximize: return "Maximize with small margins"
@@ -259,8 +259,8 @@ class WindowManager: ObservableObject {
                 height: screenFrame.height
             )
 
-        case .centerTwoThirds:
-            let width = screenFrame.width * 2 / 3
+        case .centerThreeFourths:
+            let width = screenFrame.width * 3 / 4
             return CGRect(
                 x: screenFrame.origin.x + (screenFrame.width - width) / 2,
                 y: screenFrame.origin.y,
