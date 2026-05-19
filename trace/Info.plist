@@ -31,7 +31,7 @@
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>LSMinimumSystemVersion</key>
-    <string>15.5</string>
+    <string>26.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSAccentColorName</key>

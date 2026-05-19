@@ -44,10 +44,6 @@ struct OnboardingView: View {
     
     var body: some View {
         ZStack {
-            // Backdrop
-            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
-                .ignoresSafeArea()
-            
             VStack(spacing: 0) {
                 // Main content area
                 VStack(spacing: 32) {
@@ -152,13 +148,10 @@ struct OnboardingView: View {
             }
         }
         .frame(width: 500, height: 400)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.regularMaterial)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .liquidGlassEffect(interactive: false)
+        .clipShape(RoundedRectangle(cornerRadius: adaptiveCornerRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: adaptiveCornerRadius)
                 .stroke(Color.primary.opacity(colorScheme == .dark ? 0.2 : 0.15), lineWidth: 1)
         )
         .onAppear {

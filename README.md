@@ -19,7 +19,7 @@ A SwiftUI-based application launcher that runs as a background service (LSUIElem
 
 ## System Requirements
 
-- **macOS**: 15.5 or later
+- **macOS**: 26.0 or later
 - **Architecture**: Apple Silicon or Intel
 - **Permissions**: Accessibility API, Apple Events
 

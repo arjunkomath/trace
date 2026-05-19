@@ -35,6 +35,7 @@ struct WindowCommandRow: View {
     @State private var isRecordingHotkey = false
     @State private var assignedHotkey: String = ""
     @State private var eventMonitor: Any?
+    @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
         HStack {
@@ -76,7 +77,7 @@ struct WindowCommandRow: View {
                     if isRecordingHotkey {
                         Text("Press keys...")
                             .font(.system(size: 11))
-                            .foregroundColor(.blue)
+                            .foregroundColor(traceTheme.accentForeground)
                     } else if assignedHotkey.isEmpty {
                         Text("Set Hotkey")
                             .font(.system(size: 11))

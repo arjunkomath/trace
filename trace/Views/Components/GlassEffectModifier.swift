@@ -12,26 +12,15 @@ extension View {
     func liquidGlassEffect(interactive: Bool = true) -> some View {
         let cornerRadius = self.adaptiveCornerRadius
         let shape = RoundedRectangle(cornerRadius: cornerRadius)
-        if #available(macOS 26.0, *) {
-            if interactive {
-                self.glassEffect(.regular.interactive(), in: shape)
-            } else {
-                self.glassEffect(.regular, in: shape)
-            }
+        if interactive {
+            self.glassEffect(.regular.interactive(), in: shape)
         } else {
-            self.background(
-                shape
-                    .fill(.regularMaterial)
-            )
+            self.glassEffect(.regular, in: shape)
         }
     }
     
     var adaptiveCornerRadius: CGFloat {
-        if #available(macOS 26.0, *) {
-            return 26
-        } else {
-            return 16
-        }
+        26
     }
     
     @ViewBuilder
@@ -39,11 +28,7 @@ extension View {
         spacing: CGFloat = 0,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) {
-                content()
-            }
-        } else {
+        GlassEffectContainer(spacing: spacing) {
             content()
         }
     }
@@ -53,11 +38,7 @@ extension View {
         _ id: ID,
         in namespace: Namespace.ID
     ) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffectID(id, in: namespace)
-        } else {
-            self
-        }
+        self.glassEffectID(id, in: namespace)
     }
 }
 

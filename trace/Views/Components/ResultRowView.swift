@@ -11,6 +11,7 @@ struct ResultRowView: View {
     let result: SearchResult
     let isSelected: Bool
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.traceTheme) private var traceTheme
     @State private var isHovered = false
     
     var body: some View {
@@ -33,19 +34,19 @@ struct ResultRowView: View {
                         .frame(width: 24, height: 24)
                 }
             }
-            .foregroundColor(isSelected ? .white : (isHovered ? .primary : .secondary))
+            .foregroundColor(isSelected ? traceTheme.onAccent : (isHovered ? traceTheme.accentForeground : .secondary))
             .frame(width: 28, height: 28)
             
             // Text
             VStack(alignment: .leading, spacing: 2) {
                 Text(result.title)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .primary)
+                    .foregroundColor(isSelected ? traceTheme.onAccent : .primary)
                 
                 if let subtitle = result.subtitle {
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundColor(isSelected ? .white.opacity(0.7) : .secondary)
+                        .foregroundColor(isSelected ? traceTheme.onAccent.opacity(0.72) : .secondary)
                 }
             }
             
@@ -55,17 +56,17 @@ struct ResultRowView: View {
             if let accessory = result.accessory {
                 if accessory.isIndicatorDot {
                     Circle()
-                        .fill(accessory.color)
+                        .fill(accessoryDisplayColor(accessory))
                         .frame(width: 6, height: 6)
                 } else if let displayText = accessory.displayText {
                     Text(displayText)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(isSelected ? .white : accessory.color)
+                        .foregroundColor(isSelected ? traceTheme.onAccent : accessoryDisplayColor(accessory))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(accessory.color.opacity(isSelected ? 0.3 : 0.15))
+                                .fill(isSelected ? traceTheme.onAccent.opacity(0.18) : accessoryDisplayColor(accessory).opacity(0.15))
                         )
                 }
             }
@@ -75,11 +76,11 @@ struct ResultRowView: View {
                 ProgressView()
                     .frame(width: 10, height: 10)
                     .scaleEffect(0.5)
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isSelected ? traceTheme.onAccent : .secondary)
             } else {
                 Text(result.type.displayName)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                    .foregroundColor(isSelected ? traceTheme.onAccent.opacity(0.8) : .secondary)
                 
                 // Shortcut
                 if let shortcut = result.shortcut {
@@ -90,11 +91,20 @@ struct ResultRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            isSelected ? (colorScheme == .dark ? Color.white.opacity(0.1) : Color.accentColor.opacity(0.8)) : 
-            (isHovered ? Color.primary.opacity(0.05) : Color.clear)
+            isSelected ? traceTheme.accentFill :
+            (isHovered ? traceTheme.accentFillMuted : Color.clear)
         )
         .onHover { hovering in
             isHovered = hovering
+        }
+    }
+    
+    private func accessoryDisplayColor(_ accessory: SearchResultAccessory) -> Color {
+        switch accessory {
+        case .count:
+            return traceTheme.accentForeground
+        default:
+            return accessory.color
         }
     }
 }

@@ -13,6 +13,8 @@ struct SettingsView: View {
     @State private var launchAtLogin: Bool = false
     @State private var currentKeyCombo: String = "⌥Space"
     @State private var isRecording: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var settingsManager = SettingsManager.shared
     
     private let logger = AppLogger.settingsView
     
@@ -61,6 +63,7 @@ struct SettingsView: View {
                     .tag(4)
             }
         .frame(width: AppConstants.Window.settingsWidth, height: AppConstants.Window.settingsHeight)
+        .traceThemed(accent: settingsManager.selectedAccent, colorScheme: colorScheme)
         .onAppear {
             logger.debug("Settings view appeared")
             loadSettings()

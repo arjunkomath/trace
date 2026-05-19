@@ -27,6 +27,10 @@ struct LauncherView: View {
     
     let onClose: () -> Void
     
+    private var theme: TraceTheme {
+        TraceTheme(accent: settingsManager.selectedAccent, colorScheme: colorScheme)
+    }
+    
     var body: some View {
         liquidGlassContainer(spacing: 12) {
             VStack(spacing: 0) {
@@ -34,7 +38,7 @@ struct LauncherView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "filemenu.and.selection")
                         .font(.system(size: 16))
-                        .foregroundColor(.secondary.opacity(0.6))
+                        .foregroundColor(theme.accentForeground.opacity(0.7))
                     
                     TextField("What would you like to do?", text: $searchText)
                         .textFieldStyle(.plain)
@@ -65,7 +69,7 @@ struct LauncherView: View {
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 14))
-                                .foregroundColor(.secondary.opacity(0.4))
+                                .foregroundColor(theme.accentForeground.opacity(0.45))
                         }
                         .buttonStyle(.plain)
                     }
@@ -78,18 +82,18 @@ struct LauncherView: View {
                 VStack(spacing: 0) {
                     if hasResults {
                         Divider()
-                            .opacity(0.2)
+                            .overlay(theme.accentBorder)
+                            .opacity(0.45)
                         
                         // Results header
                         HStack {
                             Text("Results")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(theme.accentForeground.opacity(0.8))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                             Spacer()
                         }
-                        .background(Color.primary.opacity(0.02))
                         
                         ScrollViewReader { proxy in
                             ScrollView {
@@ -134,11 +138,15 @@ struct LauncherView: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: AppConstants.Window.launcherWidth)
+            .background(
+                RoundedRectangle(cornerRadius: adaptiveCornerRadius)
+                    .fill(theme.accentGlassTint)
+            )
             .liquidGlassEffect(interactive: true)
             .clipShape(RoundedRectangle(cornerRadius: adaptiveCornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: adaptiveCornerRadius)
-                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.15 : 0.1), lineWidth: 0.5)
+                    .stroke(theme.accentBorder, lineWidth: 0.5)
             )
             .shadow(
                 color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.2),
@@ -147,6 +155,7 @@ struct LauncherView: View {
                 y: AppConstants.Window.shadowOffset.height
             )
         }
+        .traceThemed(accent: settingsManager.selectedAccent, colorScheme: colorScheme)
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
             clearSearch()

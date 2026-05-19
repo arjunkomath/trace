@@ -146,6 +146,7 @@ struct AppHotkeyRow: View {
     @State private var isRecordingHotkey = false
     @State private var eventMonitor: Any?
     @State private var appIcon: NSImage?
+    @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
         HStack {
@@ -193,7 +194,7 @@ struct AppHotkeyRow: View {
                     if isRecordingHotkey {
                         Text("Press keys...")
                             .font(.system(size: 11))
-                            .foregroundColor(.blue)
+                            .foregroundColor(traceTheme.accentForeground)
                     } else if assignedHotkey.isEmpty {
                         Text("Set Hotkey")
                             .font(.system(size: 11))

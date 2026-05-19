@@ -16,6 +16,8 @@ struct GeneralSettingsView: View {
     @Binding var isRecording: Bool
     @State private var resultsLayout: ResultsLayout = .compact
     @State private var showMenuBarIcon: Bool = true
+    @State private var accentColor: TraceAccent = .system
+    @State private var hoveredAccent: TraceAccent?
     @State private var eventMonitor: Any?
     @State private var showingRestartAlert = false
     @State private var showingExportSuccessAlert = false
@@ -26,6 +28,8 @@ struct GeneralSettingsView: View {
     @State private var importOverwriteExisting = false
     @State private var importError: String?
     @ObservedObject private var settingsManager = SettingsManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.traceTheme) private var traceTheme
     
     // Permissions states
     @ObservedObject private var permissionManager = PermissionManager.shared
@@ -141,7 +145,7 @@ struct GeneralSettingsView: View {
                                 if isRecording {
                                     Text("Press keys...")
                                         .font(.system(size: 11))
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(traceTheme.accentForeground)
                                 } else {
                                     KeyBindingView(keyCombo: currentKeyCombo, size: .small)
                                 }
@@ -196,6 +200,69 @@ struct GeneralSettingsView: View {
                     .onChange(of: resultsLayout) { _, newValue in
                         settingsManager.updateResultsLayout(newValue.rawValue)
                     }
+                }
+                .padding(.vertical, 4)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Accent Color")
+                            .font(.system(size: 13))
+                        Text("Tint Trace foregrounds and Liquid Glass surfaces")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 10) {
+                        ForEach(TraceAccent.allCases) { accent in
+                            let isActive = (hoveredAccent ?? accentColor) == accent
+                            
+                            Button {
+                                accentColor = accent
+                                settingsManager.updateAccentColor(accent)
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(accent.color(for: colorScheme))
+                                        .frame(width: 18, height: 18)
+                                    
+                                    if accentColor == accent {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(TraceTheme(accent: accent, colorScheme: colorScheme).onAccent)
+                                    }
+                                }
+                                .frame(width: 26, height: 26)
+                                .background(
+                                    Circle()
+                                        .fill(accentColor == accent ? traceTheme.accentFillMuted : Color.clear)
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(accentColor == accent ? traceTheme.accentBorder : Color.secondary.opacity(0.18), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(accent.displayName))
+                            .frame(width: 30, height: 30)
+                            .overlay(alignment: .bottom) {
+                                Text(accent.displayName)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .frame(width: 64)
+                                    .opacity(isActive ? 1 : 0)
+                                    .offset(y: 19)
+                            }
+                            .onHover { isHovered in
+                                hoveredAccent = isHovered ? accent : (hoveredAccent == accent ? nil : hoveredAccent)
+                            }
+                            .animation(.easeOut(duration: 0.12), value: hoveredAccent?.rawValue)
+                            .animation(.easeOut(duration: 0.12), value: accentColor.rawValue)
+                        }
+                    }
+                    .frame(width: 350, height: 50, alignment: .topTrailing)
                 }
                 .padding(.vertical, 4)
                 
@@ -298,6 +365,7 @@ struct GeneralSettingsView: View {
             // Load settings from SettingsManager
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
+            accentColor = settingsManager.selectedAccent
             
             // Check permissions
             checkPermissions()

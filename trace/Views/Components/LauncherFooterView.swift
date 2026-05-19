@@ -11,6 +11,7 @@ struct LauncherFooterView: View {
     let selectedResult: SearchResult?
     let selectedActionIndex: Int
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.traceTheme) private var traceTheme
     
     init(selectedResult: SearchResult?, selectedActionIndex: Int = 0) {
         self.selectedResult = selectedResult
@@ -36,12 +37,12 @@ struct LauncherFooterView: View {
                                     KeyBindingView(keys: ["↩"], isSelected: false, size: .small)
                                 }
                             }
-                            .foregroundColor(index == selectedActionIndex ? .primary : .secondary)
+                            .foregroundColor(index == selectedActionIndex ? traceTheme.accentForeground : .secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(index == selectedActionIndex ? Color.accentColor.opacity(0.1) : Color.clear)
+                                    .fill(index == selectedActionIndex ? traceTheme.accentFillMuted : Color.clear)
                             )
                         }
                         
@@ -62,14 +63,10 @@ struct LauncherFooterView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(
-                Rectangle()
-                    .fill(Color.primary.opacity(0.02))
-            )
             .overlay(
                 Rectangle()
                     .frame(height: 0.5)
-                    .foregroundColor(Color.primary.opacity(0.15)),
+                    .foregroundColor(traceTheme.accentBorder),
                 alignment: .top
             )
         }
@@ -141,4 +138,3 @@ struct LauncherFooterView: View {
         }
     }
 }
-

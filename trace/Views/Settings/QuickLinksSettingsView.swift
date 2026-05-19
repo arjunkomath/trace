@@ -15,6 +15,7 @@ struct QuickLinksSettingsView: View {
     @State private var editingQuickLink: QuickLink?
     @State private var showingAddSheet = false
     @State private var showingAddWebLinkSheet = false
+    @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
         Form {
@@ -51,9 +52,9 @@ struct QuickLinksSettingsView: View {
                         Button(action: { showingAddWebLinkSheet = true }) {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.accentColor)
+                                    .foregroundColor(traceTheme.accentForeground)
                                 Text("Add Web Link")
-                                    .foregroundColor(.accentColor)
+                                    .foregroundColor(traceTheme.accentForeground)
                             }
                         }
                         .buttonStyle(.plain)
@@ -65,9 +66,9 @@ struct QuickLinksSettingsView: View {
                         Button(action: addFileLink) {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.accentColor)
+                                    .foregroundColor(traceTheme.accentForeground)
                                 Text("Add File / Folder Link")
-                                    .foregroundColor(.accentColor)
+                                    .foregroundColor(traceTheme.accentForeground)
                             }
                         }
                         .buttonStyle(.plain)
@@ -120,6 +121,7 @@ struct QuickLinkRowView: View {
     let quickLink: QuickLink
     let onEdit: () -> Void
     let onDelete: (() -> Void)?
+    @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
         HStack {
@@ -127,7 +129,7 @@ struct QuickLinkRowView: View {
             HStack(spacing: 12) {
                 Image(systemName: quickLink.systemIconName)
                     .font(.system(size: 16))
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(traceTheme.accentForeground)
                     .frame(width: 24, height: 24)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -174,6 +176,7 @@ struct QuickLinkRowView: View {
 struct AddWebLinkView: View {
     @ObservedObject var quickLinksManager: QuickLinksManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.traceTheme) private var traceTheme
     
     @State private var name = ""
     @State private var url = ""
@@ -234,7 +237,7 @@ struct AddWebLinkView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: iconName)
                                     .font(.system(size: 16))
-                                    .foregroundColor(.accentColor)
+                                    .foregroundColor(traceTheme.accentForeground)
                                     .frame(width: 20)
                                 
                                 Text(iconName)
@@ -295,6 +298,7 @@ struct AddWebLinkView: View {
 struct EditQuickLinkView: View {
     @ObservedObject var quickLinksManager: QuickLinksManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.traceTheme) private var traceTheme
     
     @State private var quickLink: QuickLink
     @State private var keywordsText: String
@@ -374,7 +378,7 @@ struct EditQuickLinkView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: quickLink.iconName ?? quickLink.systemIconName)
                                     .font(.system(size: 16))
-                                    .foregroundColor(.accentColor)
+                                    .foregroundColor(traceTheme.accentForeground)
                                     .frame(width: 20)
                                 
                                 Text(quickLink.iconName ?? quickLink.systemIconName)
@@ -417,7 +421,7 @@ struct EditQuickLinkView: View {
                                     if isRecordingHotkey {
                                         Text("Press keys...")
                                             .font(.system(size: 11))
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(traceTheme.accentForeground)
                                     } else if quickLink.hotkey?.isEmpty != false {
                                         Text("Set Hotkey")
                                             .font(.system(size: 11))

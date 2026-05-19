@@ -190,7 +190,7 @@ enum SearchResultAccessory {
         case .badge:
             return .secondary
         case .count:
-            return .accentColor
+            return .secondary
         case .status(_, let color):
             return color
         }

@@ -14,7 +14,7 @@ Main application controller that manages:
 ### LauncherWindow/LauncherView
 The main search interface:
 - Borderless floating window positioned in upper-center of screen
-- Uses `.regularMaterial` for translucent background
+- Uses Liquid Glass for translucent background
 - Displays search results with app icons and type badges
 - Always includes Google search as fallback result
 
@@ -103,7 +103,7 @@ Adaptive result display system:
 
 - User preferences: `@AppStorage` for persistence
 - Hotkey settings: Stored in UserDefaults with keys "hotkey_keyCode" and "hotkey_modifiers"
-- Launch at login: SMAppService.mainApp for macOS 15.5+
+- Launch at login: SMAppService.mainApp for macOS 26+
 
 ## Window Management
 
@@ -131,7 +131,6 @@ trace/
 │   │   ├── KeyBindingView.swift
 │   │   ├── LauncherFooterView.swift
 │   │   ├── ResultRowView.swift
-│   │   └── VisualEffectView.swift
 │   ├── Settings/        # Settings sub-views
 │   │   ├── AboutSettingsView.swift
 │   │   ├── AppHotkeysSettingsView.swift

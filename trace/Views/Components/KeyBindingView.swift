@@ -14,6 +14,7 @@ struct KeyBindingView: View {
     let size: KeyBindingSize
     
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.traceTheme) private var traceTheme
     
     enum KeyBindingSize {
         case small
@@ -93,7 +94,7 @@ struct KeyBindingView: View {
     
     private var foregroundColor: Color {
         if isSelected {
-            return .white.opacity(0.7)
+            return traceTheme.onAccent.opacity(0.75)
         } else {
             return .primary
         }
@@ -101,17 +102,17 @@ struct KeyBindingView: View {
     
     private var backgroundColor: Color {
         if isSelected {
-            return Color.white.opacity(0.2)
+            return traceTheme.onAccent.opacity(0.18)
         } else {
-            return colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+            return traceTheme.accentFillMuted
         }
     }
     
     private var borderColor: Color {
         if isSelected {
-            return Color.white.opacity(0.3)
+            return traceTheme.onAccent.opacity(0.28)
         } else {
-            return colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.15)
+            return traceTheme.accentBorder
         }
     }
     

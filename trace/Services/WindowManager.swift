@@ -276,8 +276,8 @@ class WindowManager: ObservableObject {
             return screenFrame
             
         case .almostMaximize:
-            let width = screenFrame.width * 0.95
-            let height = screenFrame.height * 0.95
+            let width = screenFrame.width * 0.90
+            let height = screenFrame.height * 0.90
             return CGRect(
                 x: screenFrame.origin.x + (screenFrame.width - width) / 2,
                 y: screenFrame.origin.y + (screenFrame.height - height) / 2 + 25,

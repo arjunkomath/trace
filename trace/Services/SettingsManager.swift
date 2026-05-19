@@ -17,6 +17,7 @@ struct TraceSettings: Codable {
     var launchAtLogin: Bool = false
     var hasCompletedOnboarding: Bool = false
     var calendarSearchEnabled: Bool = false
+    var accentColor: String = TraceAccent.system.rawValue
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
@@ -46,6 +47,7 @@ struct TraceSettings: Codable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
         calendarSearchEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarSearchEnabled) ?? false
+        accentColor = try container.decodeIfPresent(String.self, forKey: .accentColor) ?? TraceAccent.system.rawValue
         
         // hotkey
         mainHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .mainHotkeyKeyCode) ?? 49
@@ -185,6 +187,15 @@ class SettingsManager: ObservableObject {
         saveSettings()
     }
     
+    var selectedAccent: TraceAccent {
+        TraceAccent(rawValue: settings.accentColor) ?? .system
+    }
+    
+    func updateAccentColor(_ accent: TraceAccent) {
+        settings.accentColor = accent.rawValue
+        saveSettings()
+    }
+    
     // MARK: - Main Hotkey
     
     func updateMainHotkey(keyCode: Int, modifiers: Int) {
@@ -318,6 +329,10 @@ class SettingsManager: ObservableObject {
             // General settings - only update if current values are defaults
             if settings.resultsLayout == "compact" {
                 settings.resultsLayout = importedSettings.resultsLayout
+            }
+            
+            if settings.accentColor == TraceAccent.system.rawValue {
+                settings.accentColor = importedSettings.accentColor
             }
             
             // Main hotkey - only update if current is default
