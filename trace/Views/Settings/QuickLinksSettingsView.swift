@@ -18,32 +18,42 @@ struct QuickLinksSettingsView: View {
     @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
-        Form {
-            // System Folders Section
-            Section {
-                ForEach(quickLinksManager.quickLinks.filter { $0.isSystemDefault }) { quickLink in
+        NativeSettingsPane {
+            NativeSettingsSection("System Folders") {
+                let systemLinks = quickLinksManager.quickLinks.filter { $0.isSystemDefault }
+                ForEach(Array(systemLinks.enumerated()), id: \.element.id) { index, quickLink in
                     QuickLinkRowView(
                         quickLink: quickLink,
                         onEdit: { editingQuickLink = quickLink },
                         onDelete: nil // System defaults cannot be deleted
                     )
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .frame(minHeight: 54)
+                    
+                    if index < systemLinks.count - 1 {
+                        NativeSettingsDivider()
+                    }
                 }
-            } header: {
-                Text("System Folders")
             } footer: {
                 Text("Default macOS folders that are always available. You can customize their hotkeys but cannot delete them.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
             }
             
-            // Custom Quick Links Section
-            Section {
-                ForEach(quickLinksManager.quickLinks.filter { !$0.isSystemDefault }) { quickLink in
+            NativeSettingsSection("Custom Quick Links") {
+                let customLinks = quickLinksManager.quickLinks.filter { !$0.isSystemDefault }
+                ForEach(Array(customLinks.enumerated()), id: \.element.id) { index, quickLink in
                     QuickLinkRowView(
                         quickLink: quickLink,
                         onEdit: { editingQuickLink = quickLink },
                         onDelete: { deleteQuickLink(quickLink) }
                     )
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .frame(minHeight: 54)
+                    
+                    if index < customLinks.count - 1 || !customLinks.isEmpty {
+                        NativeSettingsDivider()
+                    }
                 }
                 
                 // Add buttons
@@ -76,16 +86,12 @@ struct QuickLinksSettingsView: View {
                         Spacer()
                     }
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Custom Quick Links")
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
             } footer: {
                 Text("Create shortcuts to websites and files you access frequently. They'll appear in search results when you type relevant keywords.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
             }
         }
-        .formStyle(.grouped)
         .sheet(item: $editingQuickLink) { quickLink in
             EditQuickLinkView(quickLink: quickLink, quickLinksManager: quickLinksManager)
         }

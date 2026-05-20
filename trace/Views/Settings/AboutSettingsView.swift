@@ -23,8 +23,8 @@ struct AboutSettingsView: View {
     }
     
     var body: some View {
-        Form {
-            Section {
+        NativeSettingsPane {
+            NativeSettingsSection("") {
                 VStack(spacing: 6) {
                     // App Icon and Info
                     VStack(spacing: 6) {
@@ -68,101 +68,59 @@ struct AboutSettingsView: View {
                 .padding(.vertical, 16)
             }
             
-            // Data Storage Section
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Storage Path
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Data Location")
-                                .font(.system(size: 13, weight: .medium))
-                            Text(dataPath)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(.secondary)
-                                .textSelection(.enabled)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: openDataFolder) {
-                            HStack(spacing: 4) {
-                                Text("Open")
-                            }
+            NativeSettingsSection("Data") {
+                NativeSettingsRow(
+                    title: "Data Location",
+                    subtitle: dataPath,
+                    minHeight: 66
+                ) {
+                    Button(action: openDataFolder) {
+                        Text("Open")
                             .font(.system(size: 11))
-                        }
-                        .buttonStyle(.bordered)
                     }
-                    
+                    .buttonStyle(.bordered)
                 }
-                .padding(.vertical, 4)
-            
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Application Cache")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Refresh discovered apps and icons")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+                
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Application Cache",
+                    subtitle: "Refresh discovered apps and icons"
+                ) {
                     Button(action: refreshAppCache) {
-                        HStack(spacing: 4) {
-                            Text("Reload")
-                        }
-                        .font(.system(size: 11))
+                        Text("Reload")
+                            .font(.system(size: 11))
                     }
                     .buttonStyle(.bordered)
                 }
-                .padding(.vertical, 4)
                 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Reset Onboarding")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Show welcome tutorial on next app launch")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Reset Onboarding",
+                    subtitle: "Show welcome tutorial on next app launch"
+                ) {
                     Button(action: resetOnboarding) {
-                        HStack(spacing: 4) {
-                            Text("Reset")
-                        }
-                        .font(.system(size: 11))
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .padding(.vertical, 4)
-                
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Usage Data")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Clear app usage statistics and search history")
+                        Text("Reset")
                             .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: resetUsageData) {
-                        HStack(spacing: 4) {
-                            Text("Reset")
-                        }
-                        .font(.system(size: 11))
                     }
                     .buttonStyle(.bordered)
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Data")
+                
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Usage Data",
+                    subtitle: "Clear app usage statistics and search history"
+                ) {
+                    Button(action: resetUsageData) {
+                        Text("Reset")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
         }
-        .formStyle(.grouped)
         .onAppear {
             loadDebugInfo()
         }

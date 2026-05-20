@@ -11,22 +11,19 @@ import ApplicationServices
 
 struct WindowManagementSettingsView: View {
     var body: some View {
-        Form {
-            // Window Management Commands List
-            Section {
+        NativeSettingsPane {
+            NativeSettingsSection("Window Hotkeys") {
                 ForEach(Array(WindowPosition.allCases.enumerated()), id: \.offset) { index, position in
                     WindowCommandRow(position: position)
-                        .padding(.vertical, 2)
+                    
+                    if index < WindowPosition.allCases.count - 1 {
+                        NativeSettingsDivider()
+                    }
                 }
-            } header: {
-                Text("Window Hotkeys")
             } footer: {
                 Text("Assign keyboard shortcuts to window management commands. Permissions will be requested when first used.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
             }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -38,8 +35,7 @@ struct WindowCommandRow: View {
     @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
-        HStack {
-            // Window position icon and info
+        HStack(alignment: .center, spacing: 16) {
             HStack(spacing: 12) {
                 Image(systemName: getWindowIcon(for: position))
                     .font(.system(size: 16))
@@ -90,16 +86,13 @@ struct WindowCommandRow: View {
                             .foregroundColor(.secondary.opacity(0.6))
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.1))
-                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(minHeight: 54)
         .onAppear {
             loadHotkey()
         }

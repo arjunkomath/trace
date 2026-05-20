@@ -41,9 +41,8 @@ struct GeneralSettingsView: View {
     let onHotkeyReset: () -> Void
     
     var body: some View {
-        Form {
-            // Permissions section
-            Section {
+        NativeSettingsPane {
+            NativeSettingsSection("Permissions") {
                 PermissionRow(
                     title: "Accessibility Access",
                     subtitle: "Required for window management and global hotkeys",
@@ -69,6 +68,8 @@ struct GeneralSettingsView: View {
                     buttonTitle: calendarEnabled ? "Open Settings" : "Request Permission"
                 )
                 
+                NativeSettingsDivider()
+                
                 HStack {
                     Text("Permission status is checked automatically when this tab opens.")
                         .font(.system(size: 11))
@@ -87,28 +88,18 @@ struct GeneralSettingsView: View {
                     .buttonStyle(.bordered)
                     .disabled(checkingPermissions)
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Permissions")
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .frame(minHeight: 44)
             } footer: {
                 Text("These permissions help Trace work seamlessly with macOS. Click 'Open Settings' to grant missing permissions.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
             }
             
-            // Startup section
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Launch at Login")
-                            .font(.system(size: 13))
-                        Text("Start Trace when you log in to your Mac")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+            NativeSettingsSection("Startup") {
+                NativeSettingsRow(
+                    title: "Launch at Login",
+                    subtitle: "Start Trace when you log in to your Mac"
+                ) {
                     Toggle("", isOn: $launchAtLogin)
                         .toggleStyle(.switch)
                         .labelsHidden()
@@ -116,25 +107,14 @@ struct GeneralSettingsView: View {
                             onLaunchAtLoginChange(newValue)
                         }
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Startup")
             }
             
-            // Hotkey section
-            Section {
+            NativeSettingsSection("Hotkey") {
                 VStack(spacing: 8) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Quick Launch")
-                                .font(.system(size: 13))
-                            Text("Keyboard shortcut to open Trace")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
+                    NativeSettingsRow(
+                        title: "Quick Launch",
+                        subtitle: "Keyboard shortcut to open Trace"
+                    ) {
                         Button(action: {
                             if !isRecording {
                                 isRecording = true
@@ -150,18 +130,14 @@ struct GeneralSettingsView: View {
                                     KeyBindingView(keyCombo: currentKeyCombo, size: .small)
                                 }
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.secondary.opacity(0.1))
-                            )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .padding(.vertical, 4)
                     
                     if currentKeyCombo != "⌥Space" {
+                        NativeSettingsDivider()
+                        
                         HStack {
                             Spacer()
                             Button("Reset to Default") {
@@ -173,23 +149,13 @@ struct GeneralSettingsView: View {
                         }
                     }
                 }
-            } header: {
-                Text("Hotkey")
             }
             
-            // Interface section
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Results Layout")
-                            .font(.system(size: 13))
-                        Text("Choose how search results are displayed")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+            NativeSettingsSection("Interface") {
+                NativeSettingsRow(
+                    title: "Results Layout",
+                    subtitle: "Choose how search results are displayed"
+                ) {
                     Picker("", selection: $resultsLayout) {
                         ForEach(ResultsLayout.allCases, id: \.self) { layout in
                             Text(layout.displayName).tag(layout)
@@ -201,20 +167,15 @@ struct GeneralSettingsView: View {
                         settingsManager.updateResultsLayout(newValue.rawValue)
                     }
                 }
-                .padding(.vertical, 4)
                 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Accent Color")
-                            .font(.system(size: 13))
-                        Text("Tint Trace foregrounds and Liquid Glass surfaces")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 10) {
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Accent Color",
+                    subtitle: "Tint Trace foregrounds and Liquid Glass surfaces",
+                    minHeight: 66
+                ) {
+                    HStack(spacing: 6) {
                         ForEach(TraceAccent.allCases) { accent in
                             let isActive = (hoveredAccent ?? accentColor) == accent
                             
@@ -225,7 +186,7 @@ struct GeneralSettingsView: View {
                                 ZStack {
                                     Circle()
                                         .fill(accent.color(for: colorScheme))
-                                        .frame(width: 18, height: 18)
+                                        .frame(width: 16, height: 16)
                                     
                                     if accentColor == accent {
                                         Image(systemName: "checkmark")
@@ -233,7 +194,7 @@ struct GeneralSettingsView: View {
                                             .foregroundColor(TraceTheme(accent: accent, colorScheme: colorScheme).onAccent)
                                     }
                                 }
-                                .frame(width: 26, height: 26)
+                                .frame(width: 24, height: 24)
                                 .background(
                                     Circle()
                                         .fill(accentColor == accent ? traceTheme.accentFillMuted : Color.clear)
@@ -245,7 +206,7 @@ struct GeneralSettingsView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(Text(accent.displayName))
-                            .frame(width: 30, height: 30)
+                            .frame(width: 26, height: 26)
                             .overlay(alignment: .bottom) {
                                 Text(accent.displayName)
                                     .font(.system(size: 11))
@@ -262,21 +223,15 @@ struct GeneralSettingsView: View {
                             .animation(.easeOut(duration: 0.12), value: accentColor.rawValue)
                         }
                     }
-                    .frame(width: 350, height: 50, alignment: .topTrailing)
+                    .frame(width: 292, height: 44, alignment: .topTrailing)
                 }
-                .padding(.vertical, 4)
                 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Show Menu Bar Icon")
-                            .font(.system(size: 13))
-                        Text("Display Trace icon in the menu bar")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Show Menu Bar Icon",
+                    subtitle: "Display Trace icon in the menu bar"
+                ) {
                     Toggle("", isOn: $showMenuBarIcon)
                         .toggleStyle(.switch)
                         .labelsHidden()
@@ -284,19 +239,13 @@ struct GeneralSettingsView: View {
                             settingsManager.updateShowMenuBarIcon(newValue)
                         }
                 }
-                .padding(.vertical, 4)
                 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Calendar Search")
-                            .font(.system(size: 13))
-                        Text("Search and open calendar events")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Calendar Search",
+                    subtitle: "Search and open calendar events"
+                ) {
                     Toggle("", isOn: Binding(
                         get: { settingsManager.settings.calendarSearchEnabled },
                         set: { newValue in
@@ -310,57 +259,34 @@ struct GeneralSettingsView: View {
                     .labelsHidden()
                     .disabled(!calendarEnabled)
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Interface")
             }
             
-            // Settings Import/Export section
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Export Settings")
-                            .font(.system(size: 13))
-                        Text("Save all your Trace settings to a file")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+            NativeSettingsSection("Settings Backup") {
+                NativeSettingsRow(
+                    title: "Export Settings",
+                    subtitle: "Save all your Trace settings to a file"
+                ) {
                     Button("Export...") {
                         exportSettings()
                     }
                     .buttonStyle(.bordered)
                 }
-                .padding(.vertical, 4)
                 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Import Settings")
-                            .font(.system(size: 13))
-                        Text("Restore settings from a previously exported file")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+                NativeSettingsDivider()
+                
+                NativeSettingsRow(
+                    title: "Import Settings",
+                    subtitle: "Restore settings from a previously exported file"
+                ) {
                     Button("Import...") {
                         showingImportAlert = true
                     }
                     .buttonStyle(.bordered)
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Settings Backup")
             } footer: {
                 Text("Export includes hotkeys, custom folders, app preferences, and usage statistics.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
             }
         }
-        .formStyle(.grouped)
         .onAppear {
             // Load settings from SettingsManager
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
@@ -678,7 +604,7 @@ struct PermissionRow: View {
     let buttonTitle: String?
     
     var body: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 13))
@@ -709,7 +635,9 @@ struct PermissionRow: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(minHeight: 54)
     }
     
     init(title: String, subtitle: String, icon: String, status: PermissionStatus, action: @escaping () -> Void, buttonTitle: String? = nil) {

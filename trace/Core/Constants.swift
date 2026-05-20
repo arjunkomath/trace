@@ -33,8 +33,8 @@ enum AppConstants {
         static let shadowOffset = CGSize(width: 0, height: 6)
         static let searchPadding: CGFloat = 30
         
-        static let settingsWidth: CGFloat = 720
-        static let settingsHeight: CGFloat = 650
+        static let settingsWidth: CGFloat = 780
+        static let settingsHeight: CGFloat = 720
     }
     
     enum Search {

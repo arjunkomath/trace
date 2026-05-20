@@ -85,14 +85,14 @@ struct TraceTheme {
     
     var accentFill: Color {
         if accent == .clear {
-            return colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.08)
+            return Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.16)
         }
         return accentForeground.opacity(colorScheme == .dark ? 0.34 : 0.78)
     }
     
     var accentFillMuted: Color {
         if accent == .clear {
-            return colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.05)
+            return Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.07)
         }
         return accentForeground.opacity(colorScheme == .dark ? 0.16 : 0.12)
     }
@@ -106,7 +106,7 @@ struct TraceTheme {
     
     var accentBorder: Color {
         if accent == .clear {
-            return colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.10)
+            return Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.12)
         }
         return accentForeground.opacity(colorScheme == .dark ? 0.34 : 0.22)
     }
@@ -119,6 +119,49 @@ struct TraceTheme {
             return Color.black.opacity(0.82)
         }
         return .white
+    }
+}
+
+final class AppearanceManager: ObservableObject {
+    static let shared = AppearanceManager()
+    
+    @Published private(set) var colorScheme: ColorScheme
+    
+    private let appearanceNotification = Notification.Name("AppleInterfaceThemeChangedNotification")
+    
+    private init() {
+        colorScheme = Self.currentColorScheme
+        
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(systemAppearanceDidChange),
+            name: appearanceNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(systemAppearanceDidChange),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+    
+    deinit {
+        DistributedNotificationCenter.default().removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    private static var currentColorScheme: ColorScheme {
+        let appearance = NSApp.effectiveAppearance
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
+        return match == .darkAqua ? .dark : .light
+    }
+    
+    @objc private func systemAppearanceDidChange() {
+        DispatchQueue.main.async {
+            self.colorScheme = Self.currentColorScheme
+        }
     }
 }
 
@@ -138,10 +181,12 @@ extension View {
     func traceThemed(accent: TraceAccent, colorScheme: ColorScheme) -> some View {
         let theme = TraceTheme(accent: accent, colorScheme: colorScheme)
         if accent.appliesAccent {
-            environment(\.traceTheme, theme)
+            environment(\.colorScheme, colorScheme)
+                .environment(\.traceTheme, theme)
                 .tint(theme.accentForeground)
         } else {
-            environment(\.traceTheme, theme)
+            environment(\.colorScheme, colorScheme)
+                .environment(\.traceTheme, theme)
         }
     }
 }

@@ -33,8 +33,8 @@ struct AppHotkeysSettingsView: View {
     }
     
     var body: some View {
-        Form {
-            Section {
+        NativeSettingsPane {
+            NativeSettingsSection("Application Hotkeys") {
                 // Search Field
                 HStack {
                     Image(systemName: "filemenu.and.selection")
@@ -54,7 +54,10 @@ struct AppHotkeysSettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                
+                NativeSettingsDivider()
                 
                 // Apps List
                 if isLoading {
@@ -71,25 +74,26 @@ struct AppHotkeysSettingsView: View {
                     }
                     .padding(.vertical, 20)
                 } else {
-                    ForEach(filteredApps, id: \.bundleIdentifier) { app in
+                    ForEach(Array(filteredApps.enumerated()), id: \.element.bundleIdentifier) { index, app in
                         AppHotkeyRow(
                             app: app,
                             assignedHotkey: configuredHotkeys[app.bundleIdentifier] ?? ""
                         ) { hotkey, keyCode, modifiers in
                             updateHotkey(for: app, hotkey: hotkey, keyCode: keyCode, modifiers: modifiers)
                         }
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .frame(minHeight: 54)
+                        
+                        if index < filteredApps.count - 1 {
+                            NativeSettingsDivider()
+                        }
                     }
                 }
-            } header: {
-                Text("Application Hotkeys")
             } footer: {
                 Text("Assign global keyboard shortcuts to launch your favorite applications instantly.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
             }
         }
-        .formStyle(.grouped)
         .onAppear {
             loadApps()
             loadConfiguredHotkeys()
@@ -207,14 +211,9 @@ struct AppHotkeyRow: View {
                             .foregroundColor(.secondary.opacity(0.6))
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.1))
-                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .onAppear {
             loadAppIcon()

@@ -8,13 +8,18 @@
 import Cocoa
 import SwiftUI
 
-class SettingsWindow: NSPanel {
+class SettingsWindow: NSWindow {
     private var hostingView: NSHostingView<SettingsView>?
     
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 450, height: 500),
-            styleMask: [.titled, .closable, .nonactivatingPanel],
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: AppConstants.Window.settingsWidth,
+                height: AppConstants.Window.settingsHeight
+            ),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -24,34 +29,37 @@ class SettingsWindow: NSPanel {
     }
     
     private func setupWindow() {
-        // Window configuration for settings overlay
         isReleasedWhenClosed = false
-        isFloatingPanel = true
-        level = .statusBar
+        level = .normal
         title = "Trace Settings"
-        isMovableByWindowBackground = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        titleVisibility = .hidden
+        minSize = NSSize(width: 700, height: 560)
+        setContentSize(NSSize(
+            width: AppConstants.Window.settingsWidth,
+            height: AppConstants.Window.settingsHeight
+        ))
+        center()
         
-        // Enable transparency and material effect
+        isMovableByWindowBackground = true
+        collectionBehavior = [.managed, .fullScreenAuxiliary]
+        
         isOpaque = false
-        backgroundColor = .clear
+        backgroundColor = .windowBackgroundColor
         hasShadow = true
         
-        // Standard window behavior but non-activating
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
-        
-        // Corner radius for modern look
         if #available(macOS 11.0, *) {
             titlebarSeparatorStyle = .none
+            toolbarStyle = .unified
         }
+        
+        titlebarAppearsTransparent = true
     }
     
     private func setupContent() {
         let settingsView = SettingsView()
         
         let hostingView = NSHostingView(rootView: settingsView)
-        hostingView.layer?.backgroundColor = .clear
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         self.hostingView = hostingView
         contentView = hostingView
     }
@@ -60,30 +68,13 @@ class SettingsWindow: NSPanel {
     override var canBecomeMain: Bool { true }
     
     func show() {
-        positionWindow()
-        
-        // Show window and make it key to allow input focus
+        NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
-        
-        // Make window visible
         setIsVisible(true)
     }
     
     func hide() {
         orderOut(nil)
         setIsVisible(false)
-    }
-    
-    private func positionWindow() {
-        guard let screen = NSScreen.main else { return }
-        
-        let screenFrame = screen.visibleFrame
-        let windowFrame = frame
-        
-        // Center the window on screen
-        let x = screenFrame.midX - windowFrame.width / 2
-        let y = screenFrame.midY - windowFrame.height / 2
-        
-        setFrameOrigin(NSPoint(x: x, y: y))
     }
 }

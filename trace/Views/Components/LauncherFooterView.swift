@@ -13,6 +13,11 @@ struct LauncherFooterView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.traceTheme) private var traceTheme
     
+    private enum FooterActionTone {
+        case primary
+        case secondary
+    }
+    
     init(selectedResult: SearchResult?, selectedActionIndex: Int = 0) {
         self.selectedResult = selectedResult
         self.selectedActionIndex = selectedActionIndex
@@ -20,56 +25,119 @@ struct LauncherFooterView: View {
     
     var body: some View {
         if let result = selectedResult {
-            HStack(spacing: 12) {
+            HStack {
+                Spacer(minLength: 0)
                 
-                Spacer()
-                
-                // Show all actions with selection highlighting
-                if result.hasMultipleActions {
-                    HStack(spacing: 2) {
-                        ForEach(Array(result.allActions.enumerated()), id: \.offset) { index, action in
-                            HStack(spacing: 4) {
-                                Text(action.displayName)
-                                    .font(.system(size: 12, weight: .medium))
-                                
-                                // Show return symbol for selected action
-                                if index == selectedActionIndex {
-                                    KeyBindingView(keys: ["↩"], isSelected: false, size: .small)
-                                }
-                            }
-                            .foregroundColor(index == selectedActionIndex ? traceTheme.accentForeground : .secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(index == selectedActionIndex ? traceTheme.accentFillMuted : Color.clear)
-                            )
-                        }
+                HStack(spacing: 8) {
+                    footerAction(
+                        title: primaryActionTitle(for: result),
+                        keys: ["↩"],
+                        tone: .primary
+                    )
+                    
+                    if result.hasMultipleActions {
+                        Divider()
+                            .frame(height: 16)
+                            .overlay(traceTheme.accentBorder.opacity(0.58))
                         
-                        KeyBindingView(keys: ["TAB"], isSelected: false, size: .small)
-                            .padding(.leading, 8)
-                    }
-                } else {
-                    // Default action on the right side for single actions
-                    HStack(spacing: 6) {
-                        Text(getActionDescription(for: result))
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.vertical, 3)
-                            .foregroundColor(.secondary)
-                        
-                        KeyBindingView(keys: ["↩"], isSelected: false, size: .small)
+                        footerAction(
+                            title: "Actions",
+                            keys: ["TAB"],
+                            tone: .secondary
+                        )
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(floatingBarBackground)
+                .overlay(
+                    Capsule()
+                        .stroke(floatingBarBorder, lineWidth: 0.75)
+                )
+                .shadow(
+                    color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.09),
+                    radius: 8,
+                    x: 0,
+                    y: 3
+                )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .overlay(
-                Rectangle()
-                    .frame(height: 0.5)
-                    .foregroundColor(traceTheme.accentBorder),
-                alignment: .top
-            )
+            .padding(.trailing, 12)
+            .padding(.leading, 26)
+            .padding(.top, 6)
+            .padding(.bottom, 14)
         }
+    }
+    
+    private func footerAction(title: String, keys: [String], tone: FooterActionTone) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: tone == .primary ? 12 : 11, weight: tone == .primary ? .medium : .regular))
+                .foregroundColor(tone == .primary ? traceTheme.accentForeground : .secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.86)
+            
+            footerKeyBinding(keys: keys)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    
+    private func footerKeyBinding(keys: [String]) -> some View {
+        HStack(spacing: 3) {
+            ForEach(keys.indices, id: \.self) { index in
+                Text(keys[index])
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(traceTheme.accentForeground.opacity(0.72))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, keys[index].count > 1 ? 6 : 5)
+                    .frame(height: 18)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(keyCapFill)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(keyCapBorder, lineWidth: 0.8)
+                    )
+            }
+        }
+        .fixedSize()
+    }
+    
+    private var floatingBarBackground: some View {
+        Capsule()
+            .fill(.regularMaterial)
+            .overlay(
+                Capsule()
+                    .fill(traceTheme.accentForeground.opacity(colorScheme == .dark ? 0.10 : 0.055))
+            )
+    }
+    
+    private var floatingBarBorder: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.14)
+            : traceTheme.accentForeground.opacity(0.16)
+    }
+    
+    private var keyCapFill: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.08)
+            : traceTheme.accentForeground.opacity(0.08)
+    }
+    
+    private var keyCapBorder: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.16)
+            : traceTheme.accentForeground.opacity(0.22)
+    }
+    
+    private func primaryActionTitle(for result: SearchResult) -> String {
+        if result.hasMultipleActions, result.allActions.indices.contains(selectedActionIndex) {
+            return result.allActions[selectedActionIndex].displayName
+        }
+        
+        return getActionDescription(for: result)
     }
     
     private func getWindowActionTitle() -> String {

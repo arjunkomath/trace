@@ -15,10 +15,10 @@ struct LauncherView: View {
     @State var selectedIndex = 0
     @State var selectedActionIndex = 0 // Track which action is selected
     @FocusState private var isSearchFocused: Bool
-    @Environment(\.colorScheme) var colorScheme
     @Environment(\.openSettings) var openSettings
     @ObservedObject var services = ServiceContainer.shared
     @ObservedObject var settingsManager = SettingsManager.shared
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State var cachedResults: [SearchResult] = [] // Background-computed results
     @State var currentSearchTask: Task<Void, Never>? // Track current search task
     @StateObject var actionExecutor = ActionExecutor() // Handle async actions
@@ -27,8 +27,12 @@ struct LauncherView: View {
     
     let onClose: () -> Void
     
+    private var effectiveColorScheme: ColorScheme {
+        appearanceManager.colorScheme
+    }
+    
     private var theme: TraceTheme {
-        TraceTheme(accent: settingsManager.selectedAccent, colorScheme: colorScheme)
+        TraceTheme(accent: settingsManager.selectedAccent, colorScheme: effectiveColorScheme)
     }
     
     var body: some View {
@@ -149,13 +153,14 @@ struct LauncherView: View {
                     .stroke(theme.accentBorder, lineWidth: 0.5)
             )
             .shadow(
-                color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.2),
+                color: Color.black.opacity(effectiveColorScheme == .dark ? 0.4 : 0.2),
                 radius: AppConstants.Window.shadowRadius * 0.8,
                 x: AppConstants.Window.shadowOffset.width,
                 y: AppConstants.Window.shadowOffset.height
             )
         }
-        .traceThemed(accent: settingsManager.selectedAccent, colorScheme: colorScheme)
+        .traceThemed(accent: settingsManager.selectedAccent, colorScheme: effectiveColorScheme)
+        .preferredColorScheme(effectiveColorScheme)
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
             clearSearch()
