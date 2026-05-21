@@ -11,6 +11,8 @@ import os.log
 // MARK: - Settings Data Structures
 
 struct TraceSettings: Codable {
+    static let defaultLauncherVerticalPositionRatio = 0.78
+    
     // General Settings
     var resultsLayout: String = "compact"
     var showMenuBarIcon: Bool = true  // Default to true - show menu bar icon
@@ -18,6 +20,7 @@ struct TraceSettings: Codable {
     var hasCompletedOnboarding: Bool = false
     var calendarSearchEnabled: Bool = false
     var accentColor: String = TraceAccent.system.rawValue
+    var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
@@ -48,6 +51,9 @@ struct TraceSettings: Codable {
         hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
         calendarSearchEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarSearchEnabled) ?? false
         accentColor = try container.decodeIfPresent(String.self, forKey: .accentColor) ?? TraceAccent.system.rawValue
+        launcherVerticalPositionRatio = Self.clampLauncherVerticalPositionRatio(
+            try container.decodeIfPresent(Double.self, forKey: .launcherVerticalPositionRatio) ?? Self.defaultLauncherVerticalPositionRatio
+        )
         
         // hotkey
         mainHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .mainHotkeyKeyCode) ?? 49
@@ -66,6 +72,10 @@ struct TraceSettings: Codable {
     
     init() {
         // All defaults are set in property declarations above
+    }
+    
+    static func clampLauncherVerticalPositionRatio(_ ratio: Double) -> Double {
+        min(max(ratio, 0), 1)
     }
     
     struct WindowHotkeyData: Codable {
@@ -193,6 +203,14 @@ class SettingsManager: ObservableObject {
     
     func updateAccentColor(_ accent: TraceAccent) {
         settings.accentColor = accent.rawValue
+        saveSettings()
+    }
+    
+    func updateLauncherVerticalPositionRatio(_ ratio: Double) {
+        let clampedRatio = TraceSettings.clampLauncherVerticalPositionRatio(ratio)
+        guard abs(settings.launcherVerticalPositionRatio - clampedRatio) > 0.0001 else { return }
+        
+        settings.launcherVerticalPositionRatio = clampedRatio
         saveSettings()
     }
     
@@ -333,6 +351,10 @@ class SettingsManager: ObservableObject {
             
             if settings.accentColor == TraceAccent.system.rawValue {
                 settings.accentColor = importedSettings.accentColor
+            }
+            
+            if settings.launcherVerticalPositionRatio == TraceSettings.defaultLauncherVerticalPositionRatio {
+                settings.launcherVerticalPositionRatio = importedSettings.launcherVerticalPositionRatio
             }
             
             // Main hotkey - only update if current is default

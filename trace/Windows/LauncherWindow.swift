@@ -11,6 +11,9 @@ import SwiftUI
 class LauncherWindow: NSPanel {
     private var hostingView: NSHostingView<LauncherView>?
     private var preventAutoClose = false
+    private let settingsManager = SettingsManager.shared
+    private var isApplyingSavedPosition = false
+    private var savePositionWorkItem: DispatchWorkItem?
     
     init() {
         super.init(
@@ -22,6 +25,12 @@ class LauncherWindow: NSPanel {
         
         setupWindow()
         setupContent()
+        setupPositionPersistence()
+    }
+    
+    deinit {
+        savePositionWorkItem?.cancel()
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupWindow() {
@@ -35,7 +44,8 @@ class LauncherWindow: NSPanel {
         hasShadow = false
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
-        isMovableByWindowBackground = false
+        isMovable = true
+        isMovableByWindowBackground = true
         
         // Essential collection behaviors for full-screen overlay
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -79,11 +89,19 @@ class LauncherWindow: NSPanel {
         NotificationCenter.default.post(name: .launcherWindowDidBecomeKey, object: self)
     }
     
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        guard let screen = screen ?? self.screen ?? NSScreen.main else {
+            return super.constrainFrameRect(frameRect, to: screen)
+        }
+        
+        return horizontallyCenteredFrame(frameRect, on: screen)
+    }
+    
     func show() {
         let logger = AppLogger.launcherWindow
         logger.debug("🚪 LauncherWindow.show() called")
         
-        centerOnScreen()
+        positionOnScreen()
         
         // Activate the app to ensure the window can become visible
         logger.debug("🎯 Activating app for launcher visibility")
@@ -136,16 +154,102 @@ class LauncherWindow: NSPanel {
         preventAutoClose = prevent
     }
     
-    private func centerOnScreen() {
+    private func setupPositionPersistence() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidMove),
+            name: NSWindow.didMoveNotification,
+            object: self
+        )
+    }
+    
+    private func positionOnScreen() {
         guard let screen = NSScreen.main else { return }
         
+        let nextFrame = frame(
+            on: screen,
+            verticalPositionRatio: settingsManager.settings.launcherVerticalPositionRatio
+        )
+        
+        isApplyingSavedPosition = true
+        setFrame(nextFrame, display: false)
+        DispatchQueue.main.async { [weak self] in
+            self?.isApplyingSavedPosition = false
+        }
+    }
+    
+    @objc private func windowDidMove() {
+        guard isVisible, !isApplyingSavedPosition else { return }
+        guard let screen = screen ?? NSScreen.main else { return }
+        
+        let constrainedFrame = horizontallyCenteredFrame(frame, on: screen)
+        if frame.origin != constrainedFrame.origin {
+            isApplyingSavedPosition = true
+            setFrameOrigin(constrainedFrame.origin)
+            DispatchQueue.main.async { [weak self] in
+                self?.isApplyingSavedPosition = false
+            }
+        }
+        
+        schedulePositionSave(for: constrainedFrame, on: screen)
+    }
+    
+    private func frame(on screen: NSScreen, verticalPositionRatio: Double) -> NSRect {
+        var nextFrame = frame
         let screenFrame = screen.visibleFrame
-        let windowFrame = frame
+        let clampedRatio = TraceSettings.clampLauncherVerticalPositionRatio(verticalPositionRatio)
+        let centerY = screenFrame.minY + (screenFrame.height * CGFloat(clampedRatio))
         
-        let x = screenFrame.midX - windowFrame.width / 2
-        let y = screenFrame.midY - (windowFrame.height / 2) + (windowFrame.height * 2)
+        nextFrame.origin.x = screenFrame.midX - nextFrame.width / 2
+        nextFrame.origin.y = centerY - nextFrame.height / 2
+        nextFrame.origin.y = clamp(
+            nextFrame.origin.y,
+            min: screenFrame.minY,
+            max: screenFrame.maxY - nextFrame.height
+        )
         
-        setFrameOrigin(NSPoint(x: x, y: y))
+        return nextFrame
+    }
+    
+    private func horizontallyCenteredFrame(_ frameRect: NSRect, on screen: NSScreen) -> NSRect {
+        var constrainedFrame = frameRect
+        let screenFrame = screen.visibleFrame
+        
+        constrainedFrame.origin.x = screenFrame.midX - constrainedFrame.width / 2
+        constrainedFrame.origin.y = clamp(
+            constrainedFrame.origin.y,
+            min: screenFrame.minY,
+            max: screenFrame.maxY - constrainedFrame.height
+        )
+        
+        return constrainedFrame
+    }
+    
+    private func schedulePositionSave(for frame: NSRect, on screen: NSScreen) {
+        let ratio = verticalPositionRatio(for: frame, on: screen)
+        
+        savePositionWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.settingsManager.updateLauncherVerticalPositionRatio(ratio)
+        }
+        
+        savePositionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+    }
+    
+    private func verticalPositionRatio(for frame: NSRect, on screen: NSScreen) -> Double {
+        let screenFrame = screen.visibleFrame
+        guard screenFrame.height > 0 else {
+            return TraceSettings.defaultLauncherVerticalPositionRatio
+        }
+        
+        let ratio = Double((frame.midY - screenFrame.minY) / screenFrame.height)
+        return TraceSettings.clampLauncherVerticalPositionRatio(ratio)
+    }
+    
+    private func clamp(_ value: CGFloat, min minValue: CGFloat, max maxValue: CGFloat) -> CGFloat {
+        guard minValue <= maxValue else { return minValue }
+        return Swift.min(Swift.max(value, minValue), maxValue)
     }
     
 }
