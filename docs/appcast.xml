@@ -3,6 +3,15 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.6.0</title>
+            <pubDate>Thu, 21 May 2026 22:13:51 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>25</sparkle:version>
+            <sparkle:shortVersionString>1.6.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.6.0.dmg" length="2834182" type="application/octet-stream" sparkle:edSignature="TFh7pfUmhxbh062TZr2cpn09XnFTlXIPXu1FBE7qLJAVwe/AcqkYIeGkL6dv+6xQEKifEGncV+pn8e+amKRzAw=="/>
+        </item>
+        <item>
             <title>1.5.0</title>
             <pubDate>Tue, 10 Feb 2026 19:10:59 +1100</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
