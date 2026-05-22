@@ -24,17 +24,17 @@ struct LauncherView: View {
     @StateObject var actionExecutor = ActionExecutor() // Handle async actions
     @StateObject var eventPublisher = ResultEventPublisher() // Event publisher for result updates
     @State var cancellables = Set<AnyCancellable>() // Combine cancellables
-    
+
     let onClose: () -> Void
-    
+
     private var effectiveColorScheme: ColorScheme {
         appearanceManager.colorScheme
     }
-    
+
     private var theme: TraceTheme {
         TraceTheme(accent: settingsManager.selectedAccent, colorScheme: effectiveColorScheme)
     }
-    
+
     var body: some View {
         liquidGlassContainer(spacing: 12) {
             VStack(spacing: 0) {
@@ -43,17 +43,17 @@ struct LauncherView: View {
                     Image(systemName: "filemenu.and.selection")
                         .font(.system(size: 16))
                         .foregroundColor(theme.accentForeground.opacity(0.7))
-                    
+
                     TextField("What would you like to do?", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 18))
                         .focused($isSearchFocused)
                         .onChange(of: searchText) { _, newValue in
                             selectedIndex = 0
-                            
+
                             // Cancel any existing search task
                             currentSearchTask?.cancel()
-                            
+
                             // Clear results immediately if search is empty
                             if newValue.isEmpty {
                                 cachedResults = []
@@ -62,9 +62,9 @@ struct LauncherView: View {
                                 performBackgroundSearch(for: newValue)
                             }
                         }
-                    
+
                     if !searchText.isEmpty {
-                        Button(action: { 
+                        Button(action: {
                             clearSearch()
                             // Restore focus after clearing search
                             DispatchQueue.main.async {
@@ -81,14 +81,14 @@ struct LauncherView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .frame(height: AppConstants.Window.launcherHeight)
-                
+
                 // Results section - expandable
                 VStack(spacing: 0) {
                     if hasResults {
                         Divider()
                             .overlay(theme.accentBorder)
                             .opacity(0.45)
-                        
+
                         // Results header
                         HStack {
                             Text("Results")
@@ -98,7 +98,7 @@ struct LauncherView: View {
                                 .padding(.vertical, 8)
                             Spacer()
                         }
-                        
+
                         ScrollViewReader { proxy in
                             ScrollView {
                                 VStack(spacing: 0) {
@@ -131,7 +131,7 @@ struct LauncherView: View {
                             }
                         }
                         .frame(maxHeight: AppConstants.Window.maxResultsHeight)
-                        
+
                         // Footer showing available actions and shortcuts
                         LauncherFooterView(
                             selectedResult: selectedIndex < results.count ? results[selectedIndex] : nil,
@@ -164,6 +164,7 @@ struct LauncherView: View {
         .padding(AppConstants.Window.searchPadding)
         .onAppear {
             clearSearch()
+            services.appSearchManager.refreshIfStale()
             setupResultEventHandling()
             // Set focus immediately
             isSearchFocused = true
@@ -175,6 +176,7 @@ struct LauncherView: View {
         .onReceive(NotificationCenter.default.publisher(for: .launcherWindowDidBecomeKey)) { _ in
             // Additional focus attempt when window becomes key
             DispatchQueue.main.async {
+                services.appSearchManager.refreshIfStale()
                 isSearchFocused = true
             }
         }

@@ -8,29 +8,33 @@
 import Foundation
 import AppKit
 import Cocoa
+import CoreServices
 import Ifrit
 
 class AppSearchManager: ObservableObject {
-    
+
     private let logger = AppLogger.appSearchManager
     private weak var usageTracker: UsageTracker?
-    
+
     private var apps: [String: Application] = [:] // bundleId -> Application
     private var appsByName: [String: Set<String>] = [:] // lowercase name -> bundle IDs
     private let iconQueue = DispatchQueue(label: "com.trace.appsearch.icons", qos: .utility)
     private var iconCache: [String: NSImage] = [:] // bundleId -> NSImage cache
     private let iconCacheQueue = DispatchQueue(label: "com.trace.appsearch.iconcache", attributes: .concurrent)
-    private var fileSystemWatcher: Any?
-    private var refreshTimer: Timer?
+    private var fileSystemEventStream: FSEventStreamRef?
+    private var scheduledRefreshWorkItem: DispatchWorkItem?
+    private var currentLoadTask: Task<Void, Never>?
+    private var refreshGeneration = 0
     private var isLoading = false
-    
+    private var lastDiscoveryDate: Date?
+
     // Running apps tracking
     private var runningApps: Set<String> = [] // Set of running app bundle IDs
     private let runningAppsQueue = DispatchQueue(label: "com.trace.appsearch.runningapps", attributes: .concurrent)
     private var workspaceObservers: [Any] = [] // Store notification observers for cleanup
-    
+
     private let applicationPaths = AppConstants.Paths.applications
-    
+
     // Ifrit fuzzy search instance with optimized settings
     private let fuse = Fuse(
         location: 0,
@@ -38,74 +42,74 @@ class AppSearchManager: ObservableObject {
         threshold: 0.35,  // More lenient for typos
         isCaseSensitive: false
     )
-    
+
     init(usageTracker: UsageTracker? = nil) {
         self.usageTracker = usageTracker
         setupRunningAppsMonitoring()
-        loadAppsInBackground()
+        loadAppsInBackground(reason: .initial)
         setupFileSystemWatcher()
     }
-    
+
     deinit {
         stopFileSystemWatcher()
         cleanupRunningAppsMonitoring()
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
     }
-    
+
     // MARK: - Public API
-    
+
     func searchApps(query: String, limit: Int = AppConstants.Search.defaultLimit) -> [Application] {
         guard !query.isEmpty else { return [] }
-        
+
         var scoredResults: [(Application, Double)] = []
-        
+
         // Get usage scores for all apps
         let usageScores = usageTracker?.getAllUsageScores() ?? [:]
-        
+
         // Use Ifrit's weighted multi-field search for better results
         let allApps = Array(apps.values)
-        
+
         // Search across all apps using Ifrit's weighted properties
         let searchResults = fuse.searchSync(query, in: allApps, by: \Application.properties)
-        
+
         // Process search results
         for result in searchResults {
             guard result.index < allApps.count else { continue }
             let app = allApps[result.index]
-            
+
             // Convert Ifrit score (0 = perfect, 1 = no match) to our system (1 = perfect, 0 = no match)
             let matchScore = 1.0 - result.diffScore
-            
+
             // Skip poor matches
             guard matchScore > 0.2 else { continue }
-            
+
             // Combine with usage score
             let usageScore = usageScores[app.bundleIdentifier] ?? 0.0
             let normalizedUsage = normalizeUsageScore(usageScore)
-            
+
             // Weight: 60% match quality, 40% usage frequency - give more weight to usage
             let combinedScore = (matchScore * 0.6) + (normalizedUsage * 0.4)
-            
+
             scoredResults.append((app, combinedScore))
-            
+
             // Limit results for performance
             if scoredResults.count >= limit * 2 {
                 break
             }
         }
-        
+
         // Sort by combined score and return top results
         return scoredResults
             .sorted { $0.1 > $1.1 || ($0.1 == $1.1 && $0.0.displayName.localizedCaseInsensitiveCompare($1.0.displayName) == .orderedAscending) }
             .prefix(limit)
             .map { $0.0 }
     }
-    
+
     @MainActor
     func getAppIcon(for app: Application) async -> NSImage? {
         let bundleId = app.bundleIdentifier
-        
+
         // Check cache first (concurrent read)
         let cachedIcon = await withCheckedContinuation { continuation in
             iconCacheQueue.async { [weak self] in
@@ -113,22 +117,22 @@ class AppSearchManager: ObservableObject {
                 continuation.resume(returning: icon)
             }
         }
-        
+
         if let cachedIcon = cachedIcon {
             return cachedIcon
         }
-        
+
         // Load icon asynchronously
         return await withCheckedContinuation { continuation in
             iconQueue.async { [weak self] in
                 let icon = NSWorkspace.shared.icon(forFile: app.url.path)
                 icon.size = AppConstants.Search.iconSize
-                
+
                 // Store in concurrent cache
                 self?.iconCacheQueue.async(flags: .barrier) {
                     self?.iconCache[bundleId] = icon
                 }
-                
+
                 // Also update the app's icon property for direct access
                 Task { @MainActor in
                     self?.apps[bundleId]?.icon = icon
@@ -137,8 +141,8 @@ class AppSearchManager: ObservableObject {
             }
         }
     }
-    
-    
+
+
     func launchApp(_ app: Application) {
         let configuration = NSWorkspace.OpenConfiguration()
         NSWorkspace.shared.openApplication(at: app.url, configuration: configuration) { [weak self] runningApp, error in
@@ -151,58 +155,108 @@ class AppSearchManager: ObservableObject {
             }
         }
     }
-    
+
     func getApp(by bundleIdentifier: String) -> Application? {
         return apps[bundleIdentifier]
     }
-    
+
     // MARK: - App Discovery
-    
-    private func loadAppsInBackground() {
-        guard !isLoading else { return }
-        isLoading = true
-        
-        Task { [weak self] in
-            await self?.discoverApps()
+
+    private enum DiscoveryReason {
+        case initial
+        case scheduled
+        case applicationDirectoryChanged
+        case manual
+
+        var cancelsCurrentLoad: Bool {
+            switch self {
+            case .initial, .scheduled:
+                return false
+            case .applicationDirectoryChanged, .manual:
+                return true
+            }
+        }
+
+        var refreshesIconCache: Bool {
+            switch self {
+            case .initial, .scheduled:
+                return false
+            case .applicationDirectoryChanged, .manual:
+                return true
+            }
         }
     }
-    
-    private func discoverApps() async {
+
+    private func loadAppsInBackground(reason: DiscoveryReason) {
+        if isLoading {
+            guard reason.cancelsCurrentLoad else { return }
+            logger.info("Restarting application discovery after a new refresh request")
+            currentLoadTask?.cancel()
+        }
+
+        if reason.refreshesIconCache {
+            clearIconCache()
+            updateRunningAppsCache()
+        }
+
+        isLoading = true
+        refreshGeneration += 1
+        let generation = refreshGeneration
+
+        currentLoadTask = Task { [weak self] in
+            await self?.discoverApps(generation: generation)
+        }
+    }
+
+    private func discoverApps(generation: Int) async {
         var discoveredApps: [String: Application] = [:]
-        
+
         // Use TaskGroup for concurrent directory scanning
         await withTaskGroup(of: [Application].self) { group in
             for path in applicationPaths {
                 group.addTask { [weak self] in
+                    guard !Task.isCancelled else { return [] }
+
                     let expandedPath = NSString(string: path).expandingTildeInPath
-                    
+
                     // Check if directory exists before scanning
                     let fileManager = FileManager.default
                     guard fileManager.fileExists(atPath: expandedPath) else {
                         self?.logger.debug("Directory does not exist, skipping: \(expandedPath)")
                         return []
                     }
-                    
+
                     // Adjust max depth based on directory type
                     let maxDepth = self?.getMaxDepthForPath(expandedPath) ?? 2
                     return await self?.scanDirectory(at: expandedPath, depth: 0, maxDepth: maxDepth) ?? []
                 }
             }
-            
+
             // Collect results from all tasks
             for await apps in group {
+                guard !Task.isCancelled else { continue }
+
                 for app in apps {
                     discoveredApps[app.bundleIdentifier] = app
                 }
             }
         }
-        
+
+        let appsToCache = discoveredApps
+        let wasCancelled = Task.isCancelled
         await MainActor.run { [weak self] in
-            self?.updateAppsCache(discoveredApps)
-            self?.isLoading = false
+            guard let self, generation == self.refreshGeneration else { return }
+
+            if !wasCancelled {
+                self.updateAppsCache(appsToCache)
+                self.lastDiscoveryDate = Date()
+            }
+
+            self.isLoading = false
+            self.currentLoadTask = nil
         }
     }
-    
+
     private func getMaxDepthForPath(_ path: String) -> Int {
         // Limit depth for certain directories to improve performance
         if path.contains("/usr/local") || path.contains("/opt") {
@@ -214,18 +268,18 @@ class AppSearchManager: ObservableObject {
         }
         return 2 // Default depth
     }
-    
+
     private func scanDirectory(at path: String) async -> [Application] {
         return await scanDirectory(at: path, depth: 0, maxDepth: 2)
     }
-    
+
     private func scanDirectory(at path: String, depth: Int, maxDepth: Int) async -> [Application] {
         let fileManager = FileManager.default
         var apps: [Application] = []
-        
+
         // Prevent scanning too deeply to avoid performance issues
-        guard depth <= maxDepth else { return apps }
-        
+        guard depth <= maxDepth, !Task.isCancelled else { return apps }
+
         // Skip certain directories that shouldn't contain apps or might cause issues
         let skipPatterns = ["node_modules", ".git", ".Trash", "Caches", "Logs", "tmp"]
         for pattern in skipPatterns {
@@ -233,15 +287,17 @@ class AppSearchManager: ObservableObject {
                 return apps
             }
         }
-        
+
         do {
             let contents = try fileManager.contentsOfDirectory(
                 at: URL(fileURLWithPath: path),
                 includingPropertiesForKeys: [.isApplicationKey, .contentModificationDateKey, .isDirectoryKey],
                 options: [] // Don't skip hidden files - some system apps are symlinks that appear "hidden"
             )
-            
+
             for url in contents {
+                guard !Task.isCancelled else { break }
+
                 if url.pathExtension == "app" {
                     if let app = createApp(from: url) {
                         apps.append(app)
@@ -266,39 +322,39 @@ class AppSearchManager: ObservableObject {
                 logger.debug("Failed to scan directory \(path): \(error.localizedDescription)")
             }
         }
-        
+
         return apps
     }
-    
+
     private func createApp(from url: URL) -> Application? {
         // Resolve symlinks first - important for system apps like Safari
         let resolvedURL = url.resolvingSymlinksInPath()
-        
+
         guard let bundle = Bundle(url: resolvedURL) else {
             logger.debug("Failed to create Bundle for: \(resolvedURL.path) (original: \(url.path))")
             return nil
         }
-        
+
         guard let bundleId = bundle.bundleIdentifier else {
             logger.debug("No bundle identifier for: \(url.path)")
             return nil
         }
-        
+
         // Filter out Trace app itself from the cache
         guard bundleId != AppConstants.bundleIdentifier else {
             return nil
         }
-        
+
         let displayName = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? url.deletingPathExtension().lastPathComponent
-        
+
         let name = url.deletingPathExtension().lastPathComponent
-        
+
         // Extract description and keywords for better search
         let description = extractAppDescription(from: bundle)
         let keywords = extractAppKeywords(from: bundle, name: name, displayName: displayName)
-        
+
         let lastModified: Date
         do {
             let resourceValues = try url.resourceValues(forKeys: [.contentModificationDateKey])
@@ -307,7 +363,7 @@ class AppSearchManager: ObservableObject {
             lastModified = Date.distantPast
             logger.warning("Failed to get modification date for \(url.path): \(error.localizedDescription)")
         }
-        
+
         return Application(
             id: bundleId,
             name: name,
@@ -320,25 +376,25 @@ class AppSearchManager: ObservableObject {
             icon: nil
         )
     }
-    
+
     private func extractAppDescription(from bundle: Bundle) -> String? {
         // Try various description keys from Info.plist
         let description = bundle.object(forInfoDictionaryKey: "CFBundleGetInfoString") as? String
             ?? bundle.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-        
+
         // Clean up the description if found
         return description?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
     private func extractAppKeywords(from bundle: Bundle, name: String, displayName: String) -> [String] {
         var keywords: Set<String> = []
-        
+
         // Add basic names
         keywords.insert(name.lowercased())
         keywords.insert(displayName.lowercased())
-        
+
         // Add bundle identifier components once
         if let bundleId = bundle.bundleIdentifier {
             let components = bundleId.components(separatedBy: ".").compactMap { component -> String? in
@@ -347,15 +403,15 @@ class AppSearchManager: ObservableObject {
             }
             keywords.formUnion(components)
         }
-        
+
         // Add category-based keywords
         if let category = bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String {
             keywords.formUnion(categoryToKeywords(category))
         }
-        
+
         return Array(keywords).filter { !$0.isEmpty }
     }
-    
+
     private func categoryToKeywords(_ category: String) -> [String] {
         let categoryKeywords: [String: [String]] = [
             "public.app-category.utilities": ["utility", "utilities", "tool", "tools"],
@@ -373,41 +429,47 @@ class AppSearchManager: ObservableObject {
             "public.app-category.social-networking": ["social", "network", "communication"],
             "public.app-category.travel": ["travel", "maps", "navigation"]
         ]
-        
+
         return categoryKeywords[category] ?? []
     }
-    
-    
+
+
     private func normalizeUsageScore(_ score: Double) -> Double {
         // More aggressive normalization that better rewards frequently used items
         // Usage of 1 = 0.1, Usage of 5 = 0.35, Usage of 10 = 0.55, Usage of 20 = 0.75, Usage of 50+ = 1.0
         if score <= 0 { return 0 }
         if score >= 50 { return 1.0 }
-        
+
         // Use logarithmic scale for better differentiation
         return min(log10(score + 1) / log10(51), 1.0)
     }
-    
+
     private func updateAppsCache(_ newApps: [String: Application]) {
         apps = newApps
         rebuildNameIndex()
-        
+
         logger.info("Loaded \(self.apps.count) applications")
     }
-    
+
+    private func clearIconCache() {
+        iconCacheQueue.async(flags: .barrier) { [weak self] in
+            self?.iconCache.removeAll()
+        }
+    }
+
     private func rebuildNameIndex() {
         appsByName.removeAll()
-        
+
         for (bundleId, app) in apps {
             var searchableTerms = Set<String>()
-            
+
             // Add basic names
             searchableTerms.insert(app.name.lowercased())
             searchableTerms.insert(app.displayName.lowercased())
-            
+
             // Add keywords to searchable terms
             searchableTerms.formUnion(app.keywords)
-            
+
             // Add description words if available (limit to prevent index explosion)
             if let description = app.description {
                 let descriptionWords = description.lowercased()
@@ -416,11 +478,11 @@ class AppSearchManager: ObservableObject {
                     .prefix(5) // Limit to first 5 meaningful words
                 searchableTerms.formUnion(descriptionWords)
             }
-            
+
             // Create index entries for all searchable terms
             for term in searchableTerms.filter({ !$0.isEmpty }) {
                 appsByName[term, default: Set<String>()].insert(bundleId)
-                
+
                 // Limited prefix indexing to reduce memory usage
                 if term.count > 3 && term.count <= 8 {
                     for i in 3...min(term.count, 6) { // Reduced from 10 to 6
@@ -431,38 +493,112 @@ class AppSearchManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - File System Monitoring
-    
+
     private func setupFileSystemWatcher() {
-        // For now, use timer-based monitoring for reliability
-        // FSEvents can be implemented later if needed
-        setupTimerBasedWatcher()
+        setupApplicationDirectoryWatcher()
     }
-    
-    private func setupTimerBasedWatcher() {
-        refreshTimer?.invalidate()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: AppConstants.Search.refreshInterval, repeats: true) { [weak self] _ in
-            self?.loadAppsInBackground()
+
+    private func setupApplicationDirectoryWatcher() {
+        let watchedPaths = applicationPaths
+            .map { NSString(string: $0).expandingTildeInPath }
+            .filter { FileManager.default.fileExists(atPath: $0) }
+
+        guard !watchedPaths.isEmpty else {
+            logger.warning("No application directories available for file-system watching")
+            return
+        }
+
+        var context = FSEventStreamContext(
+            version: 0,
+            info: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+
+        let callback: FSEventStreamCallback = { _, callbackInfo, _, _, _, _ in
+            guard let callbackInfo else { return }
+
+            let manager = Unmanaged<AppSearchManager>
+                .fromOpaque(callbackInfo)
+                .takeUnretainedValue()
+            manager.handleApplicationDirectoryChanged()
+        }
+
+        let flags = FSEventStreamCreateFlags(
+            kFSEventStreamCreateFlagUseCFTypes |
+            kFSEventStreamCreateFlagWatchRoot
+        )
+
+        guard let stream = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            callback,
+            &context,
+            watchedPaths as CFArray,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            AppConstants.Search.appDirectoryChangeDebounce,
+            flags
+        ) else {
+            logger.warning("Failed to create application directory watcher")
+            return
+        }
+
+        fileSystemEventStream = stream
+        FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
+
+        if FSEventStreamStart(stream) {
+            logger.info("Application directory watcher setup for \(watchedPaths.count) paths")
+        } else {
+            logger.warning("Failed to start application directory watcher")
+            FSEventStreamInvalidate(stream)
+            fileSystemEventStream = nil
         }
     }
-    
-    private func stopFileSystemWatcher() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+
+    private func handleApplicationDirectoryChanged() {
+        DispatchQueue.main.async { [weak self] in
+            self?.scheduleApplicationDiscovery(reason: .applicationDirectoryChanged)
+        }
     }
-    
-    
+
+    private func scheduleApplicationDiscovery(reason: DiscoveryReason) {
+        scheduledRefreshWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.loadAppsInBackground(reason: reason)
+        }
+
+        scheduledRefreshWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + AppConstants.Search.appDirectoryChangeDebounce,
+            execute: workItem
+        )
+    }
+
+    private func stopFileSystemWatcher() {
+        scheduledRefreshWorkItem?.cancel()
+        scheduledRefreshWorkItem = nil
+
+        if let fileSystemEventStream {
+            FSEventStreamStop(fileSystemEventStream)
+            FSEventStreamInvalidate(fileSystemEventStream)
+            self.fileSystemEventStream = nil
+        }
+    }
+
+
     // MARK: - Running Apps Monitoring
-    
+
     private func setupRunningAppsMonitoring() {
         // Initial population of running apps cache
         updateRunningAppsCache()
-        
+
         // Set up workspace notifications
         let workspace = NSWorkspace.shared
         let notificationCenter = workspace.notificationCenter
-        
+
         // Listen for app launches
         let launchObserver = notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
@@ -474,7 +610,7 @@ class AppSearchManager: ObservableObject {
                 self?.addRunningApp(bundleId)
             }
         }
-        
+
         // Listen for app terminations
         let terminateObserver = notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
@@ -486,11 +622,11 @@ class AppSearchManager: ObservableObject {
                 self?.removeRunningApp(bundleId)
             }
         }
-        
+
         workspaceObservers = [launchObserver, terminateObserver]
         logger.info("✅ Running apps monitoring setup complete")
     }
-    
+
     private func cleanupRunningAppsMonitoring() {
         let notificationCenter = NSWorkspace.shared.notificationCenter
         for observer in workspaceObservers {
@@ -499,16 +635,16 @@ class AppSearchManager: ObservableObject {
         workspaceObservers.removeAll()
         logger.info("🧹 Running apps monitoring cleanup complete")
     }
-    
+
     private func updateRunningAppsCache() {
         let currentRunningApps = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
-        
+
         runningAppsQueue.async(flags: .barrier) {
             self.runningApps = currentRunningApps
             self.logger.info("🔄 Running apps cache updated: \(currentRunningApps.count) apps")
         }
     }
-    
+
     private func addRunningApp(_ bundleId: String) {
         runningAppsQueue.async(flags: .barrier) {
             let wasInserted = self.runningApps.insert(bundleId).inserted
@@ -517,7 +653,7 @@ class AppSearchManager: ObservableObject {
             }
         }
     }
-    
+
     private func removeRunningApp(_ bundleId: String) {
         runningAppsQueue.async(flags: .barrier) {
             let wasRemoved = self.runningApps.remove(bundleId) != nil
@@ -526,32 +662,43 @@ class AppSearchManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Running Apps Detection
-    
+
     func isAppRunning(bundleIdentifier: String) -> Bool {
         return runningAppsQueue.sync {
             return runningApps.contains(bundleIdentifier)
         }
     }
-    
+
     func getRunningAppBundleIds() -> Set<String> {
         return runningAppsQueue.sync {
             return runningApps
         }
     }
-    
+
     /// Manually refresh the application cache by rediscovering all apps
     func refreshCache() {
-        logger.info("🔄 Manual cache refresh requested")
-        loadAppsInBackground()
+        logger.info("🔄 Manual application refresh requested")
+        loadAppsInBackground(reason: .manual)
     }
-    
+
+    func refreshIfStale(maxAge: TimeInterval = AppConstants.Search.launcherRefreshStaleness) {
+        guard !isLoading else { return }
+
+        if let lastDiscoveryDate,
+           Date().timeIntervalSince(lastDiscoveryDate) < maxAge {
+            return
+        }
+
+        loadAppsInBackground(reason: .scheduled)
+    }
+
     // MARK: - Lifecycle Management
-    
+
     func shutdown() {
         stopFileSystemWatcher()
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        currentLoadTask?.cancel()
+        currentLoadTask = nil
     }
 }
