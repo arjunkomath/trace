@@ -31,9 +31,22 @@
 		5567D2AC2E4469D500536CFF /* trace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = trace.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		55E09B492FC27CA900D7CCD0 /* Exceptions for "trace" folder in "trace" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5567D2AB2E4469D500536CFF /* trace */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5567D2AE2E4469D500536CFF /* trace */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				55E09B492FC27CA900D7CCD0 /* Exceptions for "trace" folder in "trace" target */,
+			);
 			path = trace;
 			sourceTree = "<group>";
 		};
@@ -106,7 +119,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 1640;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					5567D2AB2E4469D500536CFF = {
 						CreatedOnToolsVersion = 16.4;
@@ -192,6 +205,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = H78GYE72WQ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -217,6 +231,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -256,6 +271,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = H78GYE72WQ;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -274,6 +290,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -288,6 +305,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 26;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = H78GYE72WQ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -320,6 +338,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 26;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = H78GYE72WQ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
