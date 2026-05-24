@@ -94,7 +94,7 @@ struct KeyBindingView: View {
     
     private var foregroundColor: Color {
         if isSelected {
-            return traceTheme.onAccent.opacity(0.75)
+            return traceTheme.onAccent
         } else {
             return .primary
         }

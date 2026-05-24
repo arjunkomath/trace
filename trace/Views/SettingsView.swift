@@ -310,7 +310,7 @@ private struct SettingsTopTabButton: View {
                 Image(systemName: section.systemImage)
                     .font(.system(size: 24, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(isSelected ? traceTheme.accentForeground : section.iconColor)
+                    .foregroundStyle(isSelected ? traceTheme.accentForegroundSecondary : section.iconColor)
                     .frame(width: 30, height: 28)
 
                 Text(section.tabTitle)

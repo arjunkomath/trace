@@ -87,7 +87,7 @@ struct LauncherFooterView: View {
             ForEach(keys.indices, id: \.self) { index in
                 Text(keys[index])
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(traceTheme.accentForeground.opacity(0.72))
+                    .foregroundColor(traceTheme.accentForegroundSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .padding(.horizontal, keys[index].count > 1 ? 6 : 5)
@@ -110,26 +110,26 @@ struct LauncherFooterView: View {
             .fill(.regularMaterial)
             .overlay(
                 Capsule()
-                    .fill(traceTheme.accentForeground.opacity(colorScheme == .dark ? 0.10 : 0.055))
+                    .fill(traceTheme.accentGlassTint)
             )
     }
     
     private var floatingBarBorder: Color {
         colorScheme == .dark
             ? Color.white.opacity(0.14)
-            : traceTheme.accentForeground.opacity(0.16)
+            : traceTheme.accentBorder
     }
     
     private var keyCapFill: Color {
         colorScheme == .dark
             ? Color.white.opacity(0.08)
-            : traceTheme.accentForeground.opacity(0.08)
+            : traceTheme.accentFillMuted
     }
     
     private var keyCapBorder: Color {
         colorScheme == .dark
             ? Color.white.opacity(0.16)
-            : traceTheme.accentForeground.opacity(0.22)
+            : traceTheme.accentBorder
     }
     
     private func primaryActionTitle(for result: SearchResult) -> String {

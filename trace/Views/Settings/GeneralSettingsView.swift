@@ -191,7 +191,7 @@ struct GeneralSettingsView: View {
                                     if accentColor == accent {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 9, weight: .bold))
-                                            .foregroundColor(TraceTheme(accent: accent, colorScheme: colorScheme).onAccent)
+                                            .foregroundColor(TraceTheme(accent: accent, colorScheme: colorScheme).onRawAccent)
                                     }
                                 }
                                 .frame(width: 24, height: 24)

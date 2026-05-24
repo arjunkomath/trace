@@ -46,7 +46,7 @@ struct ResultRowView: View {
                 if let subtitle = result.subtitle {
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundColor(isSelected ? traceTheme.onAccent.opacity(0.72) : .secondary)
+                        .foregroundColor(isSelected ? traceTheme.onAccentSecondary : .secondary)
                 }
             }
             
@@ -80,7 +80,7 @@ struct ResultRowView: View {
             } else {
                 Text(result.type.displayName)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? traceTheme.onAccent.opacity(0.8) : .secondary)
+                    .foregroundColor(isSelected ? traceTheme.onAccentSecondary : .secondary)
                 
                 // Shortcut
                 if let shortcut = result.shortcut {

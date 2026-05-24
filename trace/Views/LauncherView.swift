@@ -42,7 +42,7 @@ struct LauncherView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "filemenu.and.selection")
                         .font(.system(size: 16))
-                        .foregroundColor(theme.accentForeground.opacity(0.7))
+                        .foregroundColor(theme.accentForegroundSecondary)
 
                     TextField("What would you like to do?", text: $searchText)
                         .textFieldStyle(.plain)
@@ -73,7 +73,7 @@ struct LauncherView: View {
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 14))
-                                .foregroundColor(theme.accentForeground.opacity(0.45))
+                                .foregroundColor(theme.accentForegroundSecondary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -93,7 +93,7 @@ struct LauncherView: View {
                         HStack {
                             Text("Results")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(theme.accentForeground.opacity(0.8))
+                                .foregroundColor(theme.accentForegroundSecondary)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                             Spacer()
