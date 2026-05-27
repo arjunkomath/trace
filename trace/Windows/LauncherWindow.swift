@@ -137,6 +137,7 @@ class LauncherWindow: NSPanel {
         logger.debug("🙈 LauncherWindow.hide() called with restoreFocus: \(restoreFocus)")
         
         preventAutoClose = false // Reset flag when hiding
+        NotificationCenter.default.post(name: .launcherWindowWillHide, object: self)
         orderOut(nil)
         
         // Only restore focus to the previously active application if requested
@@ -259,4 +260,5 @@ class LauncherWindow: NSPanel {
 extension Notification.Name {
     static let launcherWindowDidBecomeKey = Notification.Name("launcherWindowDidBecomeKey")
     static let shouldFocusSearchField = Notification.Name("shouldFocusSearchField")
+    static let launcherWindowWillHide = Notification.Name("launcherWindowWillHide")
 }

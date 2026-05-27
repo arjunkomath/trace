@@ -24,6 +24,8 @@ struct LauncherView: View {
     @StateObject var actionExecutor = ActionExecutor() // Handle async actions
     @StateObject var eventPublisher = ResultEventPublisher() // Event publisher for result updates
     @State var cancellables = Set<AnyCancellable>() // Combine cancellables
+    @State var passiveUsageRefreshTask: Task<Void, Never>?
+    @State var focusedUsagePollingTask: Task<Void, Never>?
 
     let onClose: () -> Void
 
@@ -50,6 +52,7 @@ struct LauncherView: View {
                         .focused($isSearchFocused)
                         .onChange(of: searchText) { _, newValue in
                             selectedIndex = 0
+                            selectedActionIndex = 0
 
                             // Cancel any existing search task
                             currentSearchTask?.cancel()
@@ -57,6 +60,7 @@ struct LauncherView: View {
                             // Clear results immediately if search is empty
                             if newValue.isEmpty {
                                 cachedResults = []
+                                cancelUsageSampling()
                             } else {
                                 // Start search immediately
                                 performBackgroundSearch(for: newValue)
@@ -119,6 +123,7 @@ struct LauncherView: View {
                                         .id(index)
                                         .onTapGesture {
                                             selectedIndex = index
+                                            selectedActionIndex = 0
                                             executeSelectedResult()
                                         }
                                     }
@@ -128,6 +133,7 @@ struct LauncherView: View {
                                 withAnimation(.easeOut(duration: 0.2)) {
                                     proxy.scrollTo(newIndex, anchor: .center)
                                 }
+                                restartFocusedUsagePolling()
                             }
                         }
                         .frame(maxHeight: AppConstants.Window.maxResultsHeight)
@@ -177,11 +183,16 @@ struct LauncherView: View {
             // Additional focus attempt when window becomes key
             DispatchQueue.main.async {
                 services.appSearchManager.refreshIfStale()
+                refreshUsageBadgesForVisibleResults()
                 isSearchFocused = true
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .launcherWindowWillHide)) { _ in
+            cancelUsageSampling()
+        }
         .onDisappear {
             currentSearchTask?.cancel()
+            cancelUsageSampling()
             cancellables.removeAll()
         }
         .onKeyPress(.escape) {

@@ -34,20 +34,20 @@ struct CompactResultRowView: View {
                         .frame(width: 20, height: 20)
                 }
             }
-            .foregroundColor(isSelected ? traceTheme.onAccent : (isHovered ? traceTheme.accentForeground : .secondary))
+            .foregroundColor(isSelected ? traceTheme.selectedRowForeground : (isHovered ? traceTheme.accentForeground : .secondary))
             .frame(width: 24, height: 24)
             
             // Title
             Text(result.title)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isSelected ? traceTheme.onAccent : .primary)
+                .foregroundColor(isSelected ? traceTheme.selectedRowForeground : .primary)
                 .lineLimit(1)
             
             // Subtitle (inline)
             if let subtitle = result.subtitle {
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundColor(isSelected ? traceTheme.onAccentSecondary : .secondary)
+                    .foregroundColor(isSelected ? traceTheme.selectedRowForegroundSecondary : .secondary)
                     .lineLimit(1)
             }
             
@@ -55,20 +55,28 @@ struct CompactResultRowView: View {
             
             // Accessory (running indicator, badge, etc.)
             if let accessory = result.accessory {
-                if accessory.isIndicatorDot {
+                if case .resourceUsage(let snapshot) = accessory {
+                    ResourceUsageBadgeView(
+                        snapshot: snapshot,
+                        isSelected: isSelected,
+                        size: .compact
+                    )
+                } else if accessory.isIndicatorDot {
                     Circle()
                         .fill(accessoryDisplayColor(accessory))
                         .frame(width: 5, height: 5)
-                } else if let displayText = accessory.displayText {
+                } else if let displayText = accessory.compactDisplayText {
                     Text(displayText)
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(isSelected ? traceTheme.onAccent : accessoryDisplayColor(accessory))
+                        .foregroundColor(isSelected ? traceTheme.selectedRowForeground : accessoryDisplayColor(accessory))
+                        .lineLimit(1)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(isSelected ? traceTheme.onAccent.opacity(0.18) : accessoryDisplayColor(accessory).opacity(0.15))
+                                .fill(isSelected ? traceTheme.selectedRowForeground.opacity(0.18) : accessoryDisplayColor(accessory).opacity(0.15))
                         )
+                        .layoutPriority(1)
                 }
             }
             
@@ -77,11 +85,11 @@ struct CompactResultRowView: View {
                 ProgressView()
                     .frame(width: 8, height: 8)
                     .scaleEffect(0.4)
-                    .foregroundColor(isSelected ? traceTheme.onAccent : .secondary)
+                    .foregroundColor(isSelected ? traceTheme.selectedRowForeground : .secondary)
             } else {
                 Text(result.type.displayName)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isSelected ? traceTheme.onAccentSecondary : .secondary)
+                    .foregroundColor(isSelected ? traceTheme.selectedRowForegroundSecondary : .secondary)
                 
                 // Shortcut
                 if let shortcut = result.shortcut {

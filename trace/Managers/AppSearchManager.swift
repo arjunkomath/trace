@@ -9,6 +9,7 @@ import Foundation
 import AppKit
 import Cocoa
 import CoreServices
+import Darwin
 import Ifrit
 
 class AppSearchManager: ObservableObject {
@@ -29,7 +30,7 @@ class AppSearchManager: ObservableObject {
     private var lastDiscoveryDate: Date?
 
     // Running apps tracking
-    private var runningApps: Set<String> = [] // Set of running app bundle IDs
+    private var runningApps: [String: RunningApplicationInfo] = [:] // bundleId -> running app info
     private let runningAppsQueue = DispatchQueue(label: "com.trace.appsearch.runningapps", attributes: .concurrent)
     private var workspaceObservers: [Any] = [] // Store notification observers for cleanup
 
@@ -605,9 +606,8 @@ class AppSearchManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-               let bundleId = app.bundleIdentifier {
-                self?.addRunningApp(bundleId)
+            if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+                self?.addRunningApp(app)
             }
         }
 
@@ -619,7 +619,7 @@ class AppSearchManager: ObservableObject {
         ) { [weak self] notification in
             if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                let bundleId = app.bundleIdentifier {
-                self?.removeRunningApp(bundleId)
+                self?.removeRunningApp(bundleId, processIdentifier: app.processIdentifier)
             }
         }
 
@@ -637,7 +637,16 @@ class AppSearchManager: ObservableObject {
     }
 
     private func updateRunningAppsCache() {
-        let currentRunningApps = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
+        var currentRunningApps: [String: RunningApplicationInfo] = [:]
+
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bundleId = app.bundleIdentifier else { continue }
+
+            currentRunningApps[bundleId] = RunningApplicationInfo(
+                bundleIdentifier: bundleId,
+                processIdentifier: app.processIdentifier
+            )
+        }
 
         runningAppsQueue.async(flags: .barrier) {
             self.runningApps = currentRunningApps
@@ -645,21 +654,33 @@ class AppSearchManager: ObservableObject {
         }
     }
 
-    private func addRunningApp(_ bundleId: String) {
+    private func addRunningApp(_ app: NSRunningApplication) {
+        guard let bundleId = app.bundleIdentifier else { return }
+
+        let runningAppInfo = RunningApplicationInfo(
+            bundleIdentifier: bundleId,
+            processIdentifier: app.processIdentifier
+        )
+
         runningAppsQueue.async(flags: .barrier) {
-            let wasInserted = self.runningApps.insert(bundleId).inserted
+            let wasInserted = self.runningApps[bundleId] == nil
+            self.runningApps[bundleId] = runningAppInfo
+
             if wasInserted {
                 self.logger.info("🚀 App launched: \(bundleId)")
             }
         }
     }
 
-    private func removeRunningApp(_ bundleId: String) {
+    private func removeRunningApp(_ bundleId: String, processIdentifier: pid_t) {
         runningAppsQueue.async(flags: .barrier) {
-            let wasRemoved = self.runningApps.remove(bundleId) != nil
+            let wasRemoved = self.runningApps.removeValue(forKey: bundleId) != nil
+
             if wasRemoved {
                 self.logger.info("🛑 App terminated: \(bundleId)")
             }
+
+            ServiceContainer.shared.processUsageMonitor.clearSnapshots(for: [processIdentifier])
         }
     }
 
@@ -667,13 +688,19 @@ class AppSearchManager: ObservableObject {
 
     func isAppRunning(bundleIdentifier: String) -> Bool {
         return runningAppsQueue.sync {
-            return runningApps.contains(bundleIdentifier)
+            return runningApps[bundleIdentifier] != nil
         }
     }
 
     func getRunningAppBundleIds() -> Set<String> {
         return runningAppsQueue.sync {
-            return runningApps
+            return Set(runningApps.keys)
+        }
+    }
+
+    func getRunningAppInfo(bundleIdentifier: String) -> RunningApplicationInfo? {
+        return runningAppsQueue.sync {
+            return runningApps[bundleIdentifier]
         }
     }
 

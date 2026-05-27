@@ -302,6 +302,47 @@ struct InstantCommandAction: DisplayableCommandAction {
     }
 }
 
+struct QuitApplicationCommandAction: DisplayableCommandAction {
+    let id: String
+    let displayName: String
+    let iconName: String?
+    let keyboardShortcut: String?
+    let description: String?
+    let bundleIdentifier: String
+    let processIdentifier: pid_t
+    let applicationName: String
+    let showsLoadingState = false
+
+    init(
+        bundleIdentifier: String,
+        processIdentifier: pid_t,
+        applicationName: String
+    ) {
+        self.id = "\(bundleIdentifier).quit"
+        self.displayName = "Quit \(applicationName)"
+        self.iconName = "xmark.circle"
+        self.keyboardShortcut = nil
+        self.description = "Quit the running application"
+        self.bundleIdentifier = bundleIdentifier
+        self.processIdentifier = processIdentifier
+        self.applicationName = applicationName
+    }
+
+    func execute() async -> ActionResult {
+        await MainActor.run {
+            guard let runningApplication = NSRunningApplication(processIdentifier: processIdentifier) else {
+                return .failure(error: "\(applicationName) is no longer running")
+            }
+
+            guard runningApplication.terminate() else {
+                return .failure(error: "Could not quit \(applicationName)")
+            }
+
+            return .success(message: nil, data: nil)
+        }
+    }
+}
+
 struct URLCommandAction: DisplayableCommandAction {
     let id: String
     let displayName: String

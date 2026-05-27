@@ -15,6 +15,9 @@ class AppResultProvider: ResultProvider {
         var results: [(SearchResult, Double)] = []
         
         for app in apps {
+            let runningAppInfo = context.services.appSearchManager.getRunningAppInfo(
+                bundleIdentifier: app.bundleIdentifier
+            )
             let shortcut: KeyboardShortcut? = {
                 if let hotkeyString = context.services.appHotkeyManager.getHotkey(for: app.bundleIdentifier), !hotkeyString.isEmpty {
                     return KeyboardShortcut(keyCombo: hotkeyString)
@@ -22,7 +25,7 @@ class AppResultProvider: ResultProvider {
                 return nil
             }()
             
-            let accessory: SearchResultAccessory? = context.runningApps.contains(app.bundleIdentifier) ? .runningIndicator : nil
+            let accessory: SearchResultAccessory? = runningAppInfo == nil ? nil : .runningIndicator
             
             let launchAction = InstantCommandAction(
                 id: app.bundleIdentifier,
@@ -32,6 +35,23 @@ class AppResultProvider: ResultProvider {
                     context.services.appSearchManager.launchApp(app)
                 }
             )
+
+            let commandAction: CommandAction
+            if let runningAppInfo {
+                let quitAction = QuitApplicationCommandAction(
+                    bundleIdentifier: app.bundleIdentifier,
+                    processIdentifier: runningAppInfo.processIdentifier,
+                    applicationName: app.displayName
+                )
+
+                commandAction = MultiCommandAction(
+                    id: app.bundleIdentifier,
+                    primaryAction: launchAction,
+                    secondaryActions: [quitAction]
+                )
+            } else {
+                commandAction = launchAction
+            }
             
             let result = SearchResult(
                 title: app.displayName,
@@ -43,7 +63,7 @@ class AppResultProvider: ResultProvider {
                 lastUsed: nil,
                 commandId: app.bundleIdentifier,
                 accessory: accessory,
-                commandAction: launchAction
+                commandAction: commandAction
             )
             
             let matchScore = FuzzyMatcher.match(query: query, text: app.displayName.lowercased())

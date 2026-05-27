@@ -37,4 +37,5 @@ enum AppLogger {
     static let quickLinkHotkeyManager = logger(for: "QuickLinkHotkeyManager")
     static let permissionManager = logger(for: "PermissionManager")
     static let controlCenterManager = logger(for: "ControlCenterManager")
+    static let processUsageMonitor = logger(for: "ProcessUsageMonitor")
 }

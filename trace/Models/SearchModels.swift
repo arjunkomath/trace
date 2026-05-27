@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import Darwin
 import Ifrit
 
 enum ResultsLayout: String, CaseIterable {
@@ -155,6 +156,22 @@ struct SearchResult: Identifiable {
         self.accessory = accessory
         self.commandAction = commandAction
     }
+
+    func replacingAccessory(_ accessory: SearchResultAccessory?) -> SearchResult {
+        SearchResult(
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            type: type,
+            category: category,
+            shortcut: shortcut,
+            lastUsed: lastUsed,
+            commandId: commandId,
+            isLoading: isLoading,
+            accessory: accessory,
+            commandAction: commandAction
+        )
+    }
 }
 
 enum SearchIcon {
@@ -166,6 +183,7 @@ enum SearchIcon {
 
 enum SearchResultAccessory {
     case runningIndicator // Green dot for running apps
+    case resourceUsage(ProcessUsageSnapshot) // CPU and memory for running apps
     case badge(String) // Text badge with custom string
     case count(Int) // Number badge
     case status(String, Color) // Status with custom text and color
@@ -174,6 +192,8 @@ enum SearchResultAccessory {
         switch self {
         case .runningIndicator:
             return nil
+        case .resourceUsage(let snapshot):
+            return snapshot.normalDisplayText
         case .badge(let text):
             return text
         case .count(let number):
@@ -182,11 +202,22 @@ enum SearchResultAccessory {
             return text
         }
     }
+
+    var compactDisplayText: String? {
+        switch self {
+        case .resourceUsage(let snapshot):
+            return snapshot.compactDisplayText
+        default:
+            return displayText
+        }
+    }
     
     var color: Color {
         switch self {
         case .runningIndicator:
             return .green
+        case .resourceUsage:
+            return .secondary
         case .badge:
             return .secondary
         case .count:
@@ -275,4 +306,9 @@ struct Application: Identifiable, Hashable, Searchable {
     static func == (lhs: Application, rhs: Application) -> Bool {
         lhs.bundleIdentifier == rhs.bundleIdentifier
     }
+}
+
+struct RunningApplicationInfo: Hashable {
+    let bundleIdentifier: String
+    let processIdentifier: pid_t
 }

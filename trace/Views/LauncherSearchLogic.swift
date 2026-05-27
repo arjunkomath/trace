@@ -98,6 +98,7 @@ extension LauncherView {
                 // Only update if the query is still current
                 if self.searchText == query {
                     self.cachedResults = searchResults
+                    self.refreshUsageBadgesForVisibleResults()
                 }
             }
         }
@@ -235,9 +236,11 @@ extension LauncherView {
     /// Clear search state and reset UI
     func clearSearch() {
         currentSearchTask?.cancel()
+        cancelUsageSampling()
         searchText = ""
         cachedResults = []
         selectedIndex = 0
+        selectedActionIndex = 0
     }
     
     /// Get result with current loading state
@@ -292,11 +295,17 @@ extension LauncherView {
         
         // For multi-action results, execute the selected action
         if result.hasMultipleActions {
-            let selectedAction = result.allActions[selectedActionIndex]
+            let selectedAction = result.allActions[
+                min(selectedActionIndex, result.allActions.count - 1)
+            ]
             actionExecutor.executeAction(by: selectedAction.id, from: commandAction) { success in
-                // For multi-action results, always keep launcher open
-                // User can dismiss with ESC when done
-                selectedIndex = 0
+                if success, result.type == .application {
+                    clearSearch()
+                    onClose()
+                } else {
+                    selectedIndex = 0
+                    selectedActionIndex = 0
+                }
             }
         } else {
             // Single action - execute normally

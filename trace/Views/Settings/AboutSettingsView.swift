@@ -36,19 +36,13 @@ struct AboutSettingsView: View {
                             Text("Version \(appVersion) (\(buildNumber))")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
-
-                            Text("Spotlight alternative and shortcut toolkit for macOS")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
                         }
                     }
 
 
                     // Developer Info and Links
                     VStack(spacing: 8) {
-                        Text("Created by Arjun Komath & Claude")
+                        Text("Created by Arjun Komath")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
 

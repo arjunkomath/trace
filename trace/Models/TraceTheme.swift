@@ -140,6 +140,22 @@ struct TraceTheme {
         ))
     }
 
+    var selectedRowForeground: Color {
+        guard accent != .clear else {
+            return onAccent
+        }
+
+        return Color(nsColor: .alternateSelectedControlTextColor)
+    }
+
+    var selectedRowForegroundSecondary: Color {
+        guard accent != .clear else {
+            return onAccentSecondary
+        }
+
+        return Color(nsColor: .alternateSelectedControlTextColor).opacity(0.86)
+    }
+
     private var selectedAccentFillSurface: TraceThemeResolvedColor {
         TraceThemeContrast.selectedFillSurface(for: accent, colorScheme: colorScheme)
     }

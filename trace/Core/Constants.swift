@@ -43,6 +43,10 @@ enum AppConstants {
         static let emojiResultLimit = 5
         static let appDirectoryChangeDebounce: TimeInterval = 1.5
         static let launcherRefreshStaleness: TimeInterval = 60.0
+        static let usagePassiveRefreshStaleness: TimeInterval = 15.0
+        static let usagePassiveRefreshDebounceNanoseconds: UInt64 = 250_000_000
+        static let usageFocusedStartDelayNanoseconds: UInt64 = 250_000_000
+        static let usageFocusedPollingIntervalNanoseconds: UInt64 = 1_000_000_000
         static let iconSize = CGSize(width: 24, height: 24)
     }
 
