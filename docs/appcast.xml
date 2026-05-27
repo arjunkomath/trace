@@ -3,6 +3,20 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.8.0</title>
+            <pubDate>Wed, 27 May 2026 20:16:23 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>27</sparkle:version>
+            <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.8.0.dmg" length="2995781" type="application/octet-stream" sparkle:edSignature="V8WaohXeZ0lhYJGr8vXi9PwKgyo7+SwbWEfwmCFVYeW9HMYDUuV6xE3mznadcIOqLm3eWVjvY78AS5nOH1cvBg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace27-26.delta" sparkle:deltaFrom="26" length="465986" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="DxxrIo2yhmUTNnMiye0HAn1XFmDFd+joHocFL5MBGlvi8l0XQmWWlka++m5hLHm7QTIqvFSXae/tgjijsSZvAw=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace27-25.delta" sparkle:deltaFrom="25" length="525762" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="hDNNEtqJ75Gww0Ic1fW6AcYTdIwEUICuUKeQ/scUFnJQsarupsA1nspzLOajtA86dahrGgk4V+W/nv/0JwHVAg=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace27-24.delta" sparkle:deltaFrom="24" length="950322" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="eTYdLykakYCxM/3BFZS1qwBN9C9dKmfsbxT8U8ZZutshjiFNaTRQIIGsvaFy46Do/G4jnN2iK3cT3u6zXRG4Aw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.7.0</title>
             <pubDate>Sun, 24 May 2026 10:29:27 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
