@@ -30,6 +30,11 @@ class SystemCommandProvider: ResultProvider {
             results.append(refreshAppsResult)
         }
 
+        // Caffeinate command
+        if let caffeinateResult = createCaffeinateCommand(query: query, context: context) {
+            results.append(caffeinateResult)
+        }
+
         // Quit command
         if let quitResult = createQuitCommand(query: query, context: context) {
             results.append(quitResult)
@@ -102,6 +107,46 @@ class SystemCommandProvider: ResultProvider {
         return (refreshResult, refreshScore)
     }
 
+    private func createCaffeinateCommand(query: String, context: SearchContext) -> (SearchResult, Double)? {
+        let caffeinateMatchScore = matchesSearchTerms(query: query, terms: [
+            "caffeinate", "start caffeinate", "stop caffeinate", "toggle caffeinate",
+            "keep awake", "stay awake", "prevent sleep", "disable sleep",
+            "display awake", "keep display awake", "keep mac awake", "sleep"
+        ])
+
+        let caffeinateId = "com.trace.command.caffeinate"
+        let caffeinateUsageScore = context.usageScores[caffeinateId] ?? 0.0
+
+        guard let caffeinateScore = calculateUnifiedScore(matchScore: caffeinateMatchScore, usageScore: caffeinateUsageScore) else {
+            return nil
+        }
+
+        let isActive = context.services.caffeinateManager.isActive
+        let flags = context.services.settingsManager.settings.caffeinateFlags
+        let title = isActive ? "Stop Caffeinate" : "Start Caffeinate"
+        let subtitle = isActive ? "Allow your Mac to sleep normally" : "Run /usr/bin/caffeinate \(flags)"
+        let icon = isActive ? "cup.and.saucer.fill" : "cup.and.saucer"
+
+        let caffeinateResult = createSystemCommand(
+            commandId: caffeinateId,
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            accessory: isActive ? .status("On", .green) : nil,
+            operation: createStandardAction(commandId: caffeinateId, context: context) {
+                let manager = context.services.caffeinateManager
+                if manager.isActive {
+                    manager.stop()
+                    ToastManager.shared.showInfo("Caffeinate stopped")
+                } else if manager.start() {
+                    ToastManager.shared.showSuccess("Caffeinate started")
+                }
+            }
+        )
+
+        return (caffeinateResult, caffeinateScore)
+    }
+
     private func createQuitCommand(query: String, context: SearchContext) -> (SearchResult, Double)? {
         let quitMatchScore = matchesSearchTerms(query: query, terms: [
             "quit trace", "quit", "exit", "close", "terminate", "stop", "end", "application"
@@ -136,6 +181,7 @@ class SystemCommandProvider: ResultProvider {
         subtitle: String,
         icon: String,
         shortcut: KeyboardShortcut? = nil,
+        accessory: SearchResultAccessory? = nil,
         operation: @escaping () -> Void
     ) -> SearchResult {
         let commandAction = InstantCommandAction(
@@ -154,7 +200,7 @@ class SystemCommandProvider: ResultProvider {
             shortcut: shortcut,
             lastUsed: nil,
             commandId: commandId,
-            accessory: nil,
+            accessory: accessory,
             commandAction: commandAction
         )
     }

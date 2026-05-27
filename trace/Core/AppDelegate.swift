@@ -32,6 +32,7 @@ extension NSEvent.ModifierFlags {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = AppLogger.appDelegate
     private let settingsManager = SettingsManager.shared
+    private let caffeinateManager = ServiceContainer.shared.caffeinateManager
     
     private var launcherWindow: LauncherWindow?
     private var settingsWindow: SettingsWindow?
@@ -55,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupLauncherWindow()
         setupHotkey()
         setupMenuBar()
+        setupCaffeinateObservation()
         
         // Initialize window hotkey manager to register saved hotkeys
         _ = WindowHotkeyManager.shared
@@ -103,15 +105,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "filemenu.and.selection", accessibilityDescription: "Trace")
-            button.image?.size = NSSize(width: 18, height: 18)
-            button.image?.isTemplate = true
-            button.toolTip = "Trace - Click to open launcher"
             button.action = #selector(statusItemClicked)
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         
+        updateStatusItemAppearance()
         setupMenuBarMenu()
     }
     
@@ -130,6 +129,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: "")
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let caffeinateTitle = caffeinateManager.isActive ? "Stop Caffeinate" : "Start Caffeinate"
+        let caffeinateItem = NSMenuItem(title: caffeinateTitle, action: #selector(toggleCaffeinate), keyEquivalent: "")
+        caffeinateItem.target = self
+        caffeinateItem.state = caffeinateManager.isActive ? .on : .off
+        caffeinateItem.image = NSImage(systemSymbolName: caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: caffeinateTitle)
+        menu.addItem(caffeinateItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -176,6 +184,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 setupMenuBar()
             } else {
                 // Refresh the menu to update hotkey display
+                updateStatusItemAppearance()
                 setupMenuBarMenu()
             }
         } else {
@@ -188,6 +197,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func quitFromMenu() {
         NSApp.terminate(nil)
+    }
+
+    @objc private func toggleCaffeinate() {
+        if caffeinateManager.isActive {
+            caffeinateManager.stop()
+            ToastManager.shared.showInfo("Caffeinate stopped")
+        } else if caffeinateManager.start() {
+            ToastManager.shared.showSuccess("Caffeinate started")
+        }
+    }
+
+    @objc private func caffeinateStatusChanged() {
+        guard statusItem != nil else { return }
+
+        updateStatusItemAppearance()
+        setupMenuBarMenu()
     }
     
     @objc private func reportIssue() {
@@ -203,6 +228,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupLauncherWindow() {
         launcherWindow = LauncherWindow()
+    }
+
+    private func setupCaffeinateObservation() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(caffeinateStatusChanged),
+            name: CaffeinateManager.statusDidChangeNotification,
+            object: nil
+        )
+    }
+
+    private func updateStatusItemAppearance() {
+        guard let button = statusItem?.button else { return }
+
+        let isCaffeinateActive = caffeinateManager.isActive
+        let symbolName = isCaffeinateActive ? "cup.and.saucer.fill" : "filemenu.and.selection"
+        let description = isCaffeinateActive ? "Trace Caffeinate On" : "Trace"
+
+        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description)
+        button.image?.size = NSSize(width: 18, height: 18)
+        button.image?.isTemplate = true
+        button.toolTip = isCaffeinateActive ? "Trace - Caffeinate is on" : "Trace - Click to open launcher"
     }
     
     private func setupHotkey() {
@@ -291,6 +338,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        caffeinateManager.stop()
         hotkeyManager?.unregisterHotkey()
         stopGlobalEventMonitoring()
     }

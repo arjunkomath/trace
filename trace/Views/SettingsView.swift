@@ -11,6 +11,7 @@ import Carbon
 
 private enum TraceSettingsSection: String, CaseIterable, Identifiable {
     case general
+    case caffeinate
     case windowHotkeys
     case appHotkeys
     case quickLinks
@@ -22,6 +23,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .caffeinate:
+            return "Caffeinate"
         case .windowHotkeys:
             return "Window Management"
         case .appHotkeys:
@@ -37,6 +40,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .caffeinate:
+            return "Caffeinate"
         case .windowHotkeys:
             return "Windows"
         case .appHotkeys:
@@ -52,6 +57,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "Permissions, startup, appearance, and backups"
+        case .caffeinate:
+            return "Keep your Mac awake"
         case .windowHotkeys:
             return "Shortcuts for arranging windows"
         case .appHotkeys:
@@ -67,6 +74,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "gearshape"
+        case .caffeinate:
+            return "cup.and.saucer"
         case .windowHotkeys:
             return "macwindow"
         case .appHotkeys:
@@ -82,6 +91,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return Color(nsColor: .systemGray)
+        case .caffeinate:
+            return Color(nsColor: .systemBrown)
         case .windowHotkeys:
             return Color(nsColor: .systemBlue)
         case .appHotkeys:
@@ -145,6 +156,8 @@ struct SettingsView: View {
                 onHotkeyRecord: handleHotkeyRecord,
                 onHotkeyReset: handleHotkeyReset
             )
+        case .caffeinate:
+            CaffeinateSettingsView()
         case .windowHotkeys:
             WindowManagementSettingsView()
         case .appHotkeys:

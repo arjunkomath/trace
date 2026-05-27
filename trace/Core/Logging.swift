@@ -38,4 +38,5 @@ enum AppLogger {
     static let permissionManager = logger(for: "PermissionManager")
     static let controlCenterManager = logger(for: "ControlCenterManager")
     static let processUsageMonitor = logger(for: "ProcessUsageMonitor")
+    static let caffeinateManager = logger(for: "CaffeinateManager")
 }

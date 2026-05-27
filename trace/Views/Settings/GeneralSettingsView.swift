@@ -42,6 +42,66 @@ struct GeneralSettingsView: View {
     
     var body: some View {
         NativeSettingsPane {
+            NativeSettingsSection("Hotkey") {
+                VStack(spacing: 8) {
+                    NativeSettingsRow(
+                        title: "Quick Launch",
+                        subtitle: "Keyboard shortcut to open Trace"
+                    ) {
+                        Button(action: {
+                            if !isRecording {
+                                isRecording = true
+                                startRecording()
+                            }
+                        }) {
+                            HStack(spacing: 8) {
+                                if isRecording {
+                                    Text("Press keys...")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(traceTheme.accentForeground)
+                                } else {
+                                    KeyBindingView(keyCombo: currentKeyCombo, size: .small)
+                                }
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+
+                    if currentKeyCombo != "⌥Space" {
+                        NativeSettingsDivider()
+
+                        HStack {
+                            Spacer()
+                            Button("Reset to Default") {
+                                onHotkeyReset()
+                                showingRestartAlert = true
+                            }
+                            .buttonStyle(.link)
+                            .font(.system(size: 11))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.top, 2)
+                        .padding(.bottom, 7)
+                        .frame(minHeight: 32)
+                    }
+                }
+            }
+
+            NativeSettingsSection("Startup") {
+                NativeSettingsRow(
+                    title: "Launch at Login",
+                    subtitle: "Start Trace when you log in to your Mac"
+                ) {
+                    Toggle("", isOn: $launchAtLogin)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            onLaunchAtLoginChange(newValue)
+                        }
+                }
+            }
+
             NativeSettingsSection("Permissions") {
                 PermissionRow(
                     title: "Accessibility Access",
@@ -94,63 +154,7 @@ struct GeneralSettingsView: View {
             } footer: {
                 Text("These permissions help Trace work seamlessly with macOS. Click 'Open Settings' to grant missing permissions.")
             }
-            
-            NativeSettingsSection("Startup") {
-                NativeSettingsRow(
-                    title: "Launch at Login",
-                    subtitle: "Start Trace when you log in to your Mac"
-                ) {
-                    Toggle("", isOn: $launchAtLogin)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                        .onChange(of: launchAtLogin) { _, newValue in
-                            onLaunchAtLoginChange(newValue)
-                        }
-                }
-            }
-            
-            NativeSettingsSection("Hotkey") {
-                VStack(spacing: 8) {
-                    NativeSettingsRow(
-                        title: "Quick Launch",
-                        subtitle: "Keyboard shortcut to open Trace"
-                    ) {
-                        Button(action: {
-                            if !isRecording {
-                                isRecording = true
-                                startRecording()
-                            }
-                        }) {
-                            HStack(spacing: 8) {
-                                if isRecording {
-                                    Text("Press keys...")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(traceTheme.accentForeground)
-                                } else {
-                                    KeyBindingView(keyCombo: currentKeyCombo, size: .small)
-                                }
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                    
-                    if currentKeyCombo != "⌥Space" {
-                        NativeSettingsDivider()
-                        
-                        HStack {
-                            Spacer()
-                            Button("Reset to Default") {
-                                onHotkeyReset()
-                                showingRestartAlert = true
-                            }
-                            .buttonStyle(.link)
-                            .font(.system(size: 11))
-                        }
-                    }
-                }
-            }
-            
+
             NativeSettingsSection("Interface") {
                 NativeSettingsRow(
                     title: "Results Layout",

@@ -21,6 +21,7 @@ struct TraceSettings: Codable {
     var calendarSearchEnabled: Bool = false
     var accentColor: String = TraceAccent.system.rawValue
     var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
+    var caffeinateFlags: String = CaffeinateManager.defaultFlags
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
@@ -54,6 +55,7 @@ struct TraceSettings: Codable {
         launcherVerticalPositionRatio = Self.clampLauncherVerticalPositionRatio(
             try container.decodeIfPresent(Double.self, forKey: .launcherVerticalPositionRatio) ?? Self.defaultLauncherVerticalPositionRatio
         )
+        caffeinateFlags = try container.decodeIfPresent(String.self, forKey: .caffeinateFlags) ?? CaffeinateManager.defaultFlags
         
         // hotkey
         mainHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .mainHotkeyKeyCode) ?? 49
@@ -213,6 +215,13 @@ class SettingsManager: ObservableObject {
         settings.launcherVerticalPositionRatio = clampedRatio
         saveSettings()
     }
+
+    func updateCaffeinateFlags(_ flags: String) {
+        guard settings.caffeinateFlags != flags else { return }
+
+        settings.caffeinateFlags = flags
+        saveSettings()
+    }
     
     // MARK: - Main Hotkey
     
@@ -356,7 +365,7 @@ class SettingsManager: ObservableObject {
             if settings.launcherVerticalPositionRatio == TraceSettings.defaultLauncherVerticalPositionRatio {
                 settings.launcherVerticalPositionRatio = importedSettings.launcherVerticalPositionRatio
             }
-            
+
             // Main hotkey - only update if current is default
             if settings.mainHotkeyKeyCode == 49 && settings.mainHotkeyModifiers == 2048 {
                 settings.mainHotkeyKeyCode = importedSettings.mainHotkeyKeyCode

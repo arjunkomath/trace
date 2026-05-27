@@ -23,6 +23,7 @@ class ServiceContainer: ObservableObject {
     private var _settingsManager: SettingsManager?
     private var _emojiManager: EmojiManager?
     private var _processUsageMonitor: ProcessUsageMonitor?
+    private var _caffeinateManager: CaffeinateManager?
     
     // MARK: - Service Accessors
     
@@ -143,6 +144,15 @@ class ServiceContainer: ObservableObject {
         _processUsageMonitor = monitor
         return monitor
     }
+
+    var caffeinateManager: CaffeinateManager {
+        if let manager = _caffeinateManager {
+            return manager
+        }
+        let manager = CaffeinateManager()
+        _caffeinateManager = manager
+        return manager
+    }
     
     // MARK: - Lifecycle
     
@@ -160,6 +170,8 @@ class ServiceContainer: ObservableObject {
         _settingsManager = nil
         _emojiManager = nil
         _processUsageMonitor = nil
+        _caffeinateManager?.stop()
+        _caffeinateManager = nil
     }
 }
 
