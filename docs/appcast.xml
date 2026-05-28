@@ -3,6 +3,21 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.9.0</title>
+            <pubDate>Thu, 28 May 2026 20:19:50 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>28</sparkle:version>
+            <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.9.0.dmg" length="2996992" type="application/octet-stream" sparkle:edSignature="qA6kNEy6DD7aEk/bem1m+G/CPNxv35R4JzvGPfZ+HeEtTRJ0vFon5NgfjwuIF7kU4WZ23/LwxN+2heKR0JwABg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace28-27.delta" sparkle:deltaFrom="27" length="209422" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="HrfXfrVvn6vPz+7xAlbZxTHkrkUGJs3u0YQvWE0OJf2ubdbKqdkSYQs3RzX9LPJPUYoWYhczUhYzuPL2PpwRDQ=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace28-26.delta" sparkle:deltaFrom="26" length="466450" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="ngBkOxSzp1Voz+euxVH/4I1YsK9ZEF8oEp050dT42FKONqGfdVHhMCmPiXrQX4DaHHMGpT/7O5cZqda644Y2Aw=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace28-25.delta" sparkle:deltaFrom="25" length="527658" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="p1jRp53iZ1QF2mA/GKs3cuJELf4RGv6gBsILGzo+/Za7aHp8W+dkdSHlACH6fEuQtYfZVwKvzqsrABONz7d5Cg=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace28-24.delta" sparkle:deltaFrom="24" length="949394" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="+r2FEuICX703CCFjBXCxnqt3GdTcLlpv3euCu0jUJkh6ACE8RQ94r/UBCrzJi7xgnSLU7CjS7ZZmy8ifICUpAQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.8.0</title>
             <pubDate>Wed, 27 May 2026 20:16:23 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
@@ -28,42 +43,6 @@
                 <enclosure url="https://trace.techulus.xyz/downloads/trace26-25.delta" sparkle:deltaFrom="25" length="285782" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="egc7AyI5Ckr0M1jI1bWTB35U5TVFJqNvjws5sq7hhW9IovEywYL6MWPqXZORTG8IplYw7Y6vu5gbEhc6JTB7CA=="/>
                 <enclosure url="https://trace.techulus.xyz/downloads/trace26-24.delta" sparkle:deltaFrom="24" length="796938" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="oSXWuG8Raa1cL+U3JsV+Zn2etrDupci/zjKsS19lsy+h/iy99JLbksAFwjw5ByH8hyVb6RTumrFWDylStzVlCw=="/>
             </sparkle:deltas>
-        </item>
-        <item>
-            <title>1.6.0</title>
-            <pubDate>Thu, 21 May 2026 22:13:51 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>25</sparkle:version>
-            <sparkle:shortVersionString>1.6.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.6.0.dmg" length="2834182" type="application/octet-stream" sparkle:edSignature="TFh7pfUmhxbh062TZr2cpn09XnFTlXIPXu1FBE7qLJAVwe/AcqkYIeGkL6dv+6xQEKifEGncV+pn8e+amKRzAw=="/>
-        </item>
-        <item>
-            <title>1.5.0</title>
-            <pubDate>Tue, 10 Feb 2026 19:10:59 +1100</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>24</sparkle:version>
-            <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.5.0.dmg" length="2765679" type="application/octet-stream" sparkle:edSignature="ZKKVCO9YtB6R6pDZ1pyztXyZT54VfE5HpFUCM3FoZLXrY/hiVBpTZ3/OF6VL6w9dxvrmoyUFam0E8sQZ8K1rDg=="/>
-        </item>
-        <item>
-            <title>1.4.0</title>
-            <pubDate>Tue, 16 Sep 2025 21:38:22 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>23</sparkle:version>
-            <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.4.0.dmg" length="2740007" type="application/octet-stream" sparkle:edSignature="/BzO2IPAsgqdeg8iNAvaC4Fm4lJpSybh0PBzY78tDOH2p8vMLsGDTH6rVnkWDSnWTYrDc6uyYzaalZOOWsOEAA=="/>
-        </item>
-        <item>
-            <title>1.3.4</title>
-            <pubDate>Mon, 01 Sep 2025 22:22:40 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>22</sparkle:version>
-            <sparkle:shortVersionString>1.3.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.3.4.dmg" length="2796116" type="application/octet-stream" sparkle:edSignature="uJ2YkONnXWh7RPKEXs0YLlGvcbwlxq4FRObJs/ri33uKt/yMacSiiC9Wc43rgNdnUTiKX3IHI2WoY6nBHgW7DA=="/>
         </item>
     </channel>
 </rss>
