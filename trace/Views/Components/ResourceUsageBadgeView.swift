@@ -84,7 +84,7 @@ struct ResourceUsageBadgeView: View {
 
             usageMetric(
                 icon: "memorychip",
-                value: snapshot.residentMemoryDisplayText,
+                value: snapshot.memoryDisplayText,
                 accessibilityLabel: "Memory"
             )
         }
@@ -103,10 +103,10 @@ struct ResourceUsageBadgeView: View {
 
     private var accessibilityText: String {
         if let cpuDisplayText = snapshot.cpuDisplayText {
-            return "CPU \(cpuDisplayText), memory \(snapshot.residentMemoryDisplayText)"
+            return "CPU \(cpuDisplayText), memory \(snapshot.memoryDisplayText)"
         }
 
-        return "Memory \(snapshot.residentMemoryDisplayText)"
+        return "Memory \(snapshot.memoryDisplayText)"
     }
 
     private func usageMetric(icon: String, value: String, accessibilityLabel: String) -> some View {

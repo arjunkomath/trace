@@ -12,26 +12,27 @@ struct ProcessUsageSnapshot: Equatable {
     let bundleIdentifier: String
     let processIdentifier: pid_t
     let cpuPercent: Double?
-    let residentMemoryBytes: UInt64
+    let memoryFootprintBytes: UInt64
     let sampledAt: Date
 
     var cpuDisplayText: String? {
         guard let cpuPercent else { return nil }
+        let displayPercent = max(0, cpuPercent)
 
-        if cpuPercent >= 0.05, cpuPercent < 1 {
-            return "<1%"
+        if displayPercent < 10 {
+            return String(format: "%.1f%%", displayPercent)
         }
 
-        return "\(max(0, Int(cpuPercent.rounded())))%"
+        return "\(Int(displayPercent.rounded()))%"
     }
 
-    var residentMemoryMegabytes: Int {
+    var memoryMegabytes: Int {
         let megabyte = UInt64(1024 * 1024)
-        return Int((residentMemoryBytes + megabyte - 1) / megabyte)
+        return Int((memoryFootprintBytes + megabyte - 1) / megabyte)
     }
 
-    var residentMemoryDisplayText: String {
-        let megabytes = residentMemoryMegabytes
+    var memoryDisplayText: String {
+        let megabytes = memoryMegabytes
 
         guard megabytes > 1000 else {
             return "\(megabytes) MB"
@@ -49,27 +50,38 @@ struct ProcessUsageSnapshot: Equatable {
 
     var normalDisplayText: String {
         if let cpuDisplayText {
-            return "CPU \(cpuDisplayText) · \(residentMemoryDisplayText)"
+            return "CPU \(cpuDisplayText) · \(memoryDisplayText)"
         }
 
-        return residentMemoryDisplayText
+        return memoryDisplayText
     }
 
     var compactDisplayText: String {
         if let cpuDisplayText {
-            return "\(cpuDisplayText) · \(residentMemoryDisplayText)"
+            return "\(cpuDisplayText) · \(memoryDisplayText)"
         }
 
-        return residentMemoryDisplayText
+        return memoryDisplayText
     }
 }
 
 final class ProcessUsageMonitor {
+    private static let minimumCPUCalculationInterval: TimeInterval = 0.5
+
     private struct RawProcessSample {
-        let cumulativeCPUTime: TimeInterval
-        let residentMemoryBytes: UInt64
+        let cumulativeCPUTimeByProcess: [ProcessIdentity: TimeInterval]
+        let memoryFootprintBytes: UInt64
         let sampledAt: Date
         let processCount: Int
+        let sampleSources: Set<ProcessUsageSampleSource>
+
+        var cumulativeCPUTime: TimeInterval {
+            cumulativeCPUTimeByProcess.values.reduce(0, +)
+        }
+
+        var sampleSourceDescription: String {
+            sampleSources.map(\.rawValue).sorted().joined(separator: ",")
+        }
     }
 
     private struct CPUCalculation {
@@ -78,16 +90,15 @@ final class ProcessUsageMonitor {
         let cpuTime: TimeInterval
     }
 
-    private struct ProcessGroupCacheEntry {
-        let processIdentifiers: [pid_t]
-        let cachedAt: Date
-    }
-
     private let logger = AppLogger.processUsageMonitor
+    private let sampler: ProcessUsageSampling
     private let queue = DispatchQueue(label: "com.trace.process-usage-monitor", qos: .utility)
     private var lastSamples: [pid_t: RawProcessSample] = [:]
     private var cachedSnapshots: [pid_t: ProcessUsageSnapshot] = [:]
-    private var processGroupCache: [pid_t: ProcessGroupCacheEntry] = [:]
+
+    init(sampler: ProcessUsageSampling = DarwinProcessUsageSampler()) {
+        self.sampler = sampler
+    }
 
     func cachedSnapshot(for processIdentifier: pid_t, maxAge: TimeInterval? = nil) -> ProcessUsageSnapshot? {
         queue.sync {
@@ -120,7 +131,6 @@ final class ProcessUsageMonitor {
 
                 let snapshot = self.sampleLocked(
                     for: runningApp,
-                    aggregatesHelpers: force,
                     shouldLogDebug: force
                 )
                 continuation.resume(returning: snapshot)
@@ -152,21 +162,15 @@ final class ProcessUsageMonitor {
             for processIdentifier in processIdentifiers {
                 self.lastSamples.removeValue(forKey: processIdentifier)
                 self.cachedSnapshots.removeValue(forKey: processIdentifier)
-                self.processGroupCache.removeValue(forKey: processIdentifier)
             }
         }
     }
 
     private func sampleLocked(
         for runningApp: RunningApplicationInfo,
-        aggregatesHelpers: Bool = false,
         shouldLogDebug: Bool = false
     ) -> ProcessUsageSnapshot? {
-        let processIdentifiers = aggregatesHelpers
-            ? processGroupProcessIdentifiers(for: runningApp.processIdentifier)
-            : [runningApp.processIdentifier]
-
-        guard let rawSample = Self.readProcessSample(processIdentifiers: processIdentifiers) else {
+        guard let rawSample = readProcessSample(processIdentifier: runningApp.processIdentifier) else {
             lastSamples.removeValue(forKey: runningApp.processIdentifier)
             cachedSnapshots.removeValue(forKey: runningApp.processIdentifier)
             logger.debug("Failed to read process usage for pid \(runningApp.processIdentifier)")
@@ -182,7 +186,7 @@ final class ProcessUsageMonitor {
             bundleIdentifier: runningApp.bundleIdentifier,
             processIdentifier: runningApp.processIdentifier,
             cpuPercent: cpuPercent,
-            residentMemoryBytes: rawSample.residentMemoryBytes,
+            memoryFootprintBytes: rawSample.memoryFootprintBytes,
             sampledAt: rawSample.sampledAt
         )
 
@@ -202,23 +206,6 @@ final class ProcessUsageMonitor {
         return snapshot
     }
 
-    private func processGroupProcessIdentifiers(for rootProcessIdentifier: pid_t) -> [pid_t] {
-        let now = Date()
-
-        if let cacheEntry = processGroupCache[rootProcessIdentifier],
-           now.timeIntervalSince(cacheEntry.cachedAt) < 5 {
-            return cacheEntry.processIdentifiers
-        }
-
-        let processIdentifiers = Self.descendantProcessIdentifiers(rootProcessIdentifier: rootProcessIdentifier)
-        processGroupCache[rootProcessIdentifier] = ProcessGroupCacheEntry(
-            processIdentifiers: processIdentifiers,
-            cachedAt: now
-        )
-
-        return processIdentifiers
-    }
-
     #if DEBUG
     private func logDebugSample(
         runningApp: RunningApplicationInfo,
@@ -226,7 +213,7 @@ final class ProcessUsageMonitor {
         currentSample: RawProcessSample,
         cpuCalculation: CPUCalculation?
     ) {
-        let memoryMegabytes = currentSample.residentMemoryBytes / UInt64(1024 * 1024)
+        let memoryMegabytes = currentSample.memoryFootprintBytes / UInt64(1024 * 1024)
 
         guard let previousSample, let cpuCalculation else {
             logger.debug(
@@ -234,6 +221,7 @@ final class ProcessUsageMonitor {
                 CPU sample baseline bundle=\(runningApp.bundleIdentifier, privacy: .public) \
                 pid=\(runningApp.processIdentifier) \
                 processes=\(currentSample.processCount) \
+                sources=\(currentSample.sampleSourceDescription, privacy: .public) \
                 cumulative=\(currentSample.cumulativeCPUTime, format: .fixed(precision: 6))s \
                 memory=\(memoryMegabytes)MB
                 """
@@ -246,6 +234,7 @@ final class ProcessUsageMonitor {
             CPU sample bundle=\(runningApp.bundleIdentifier, privacy: .public) \
             pid=\(runningApp.processIdentifier) \
             processes=\(currentSample.processCount) \
+            sources=\(currentSample.sampleSourceDescription, privacy: .public) \
             previous=\(previousSample.cumulativeCPUTime, format: .fixed(precision: 6))s \
             current=\(currentSample.cumulativeCPUTime, format: .fixed(precision: 6))s \
             delta=\(cpuCalculation.cpuTime, format: .fixed(precision: 6))s \
@@ -257,121 +246,67 @@ final class ProcessUsageMonitor {
     }
     #endif
 
-    private static func readProcessSample(processIdentifier: pid_t) -> RawProcessSample? {
+    private func readProcessSample(processIdentifier: pid_t) -> RawProcessSample? {
         readProcessSample(processIdentifiers: [processIdentifier])
     }
 
-    private static func readProcessSample(processIdentifiers: [pid_t]) -> RawProcessSample? {
+    private func readProcessSample(processIdentifiers: [pid_t]) -> RawProcessSample? {
         let sampledAt = Date()
-        var cumulativeCPUTime: TimeInterval = 0
-        var residentMemoryBytes: UInt64 = 0
+        var cumulativeCPUTimeByProcess: [ProcessIdentity: TimeInterval] = [:]
+        var memoryFootprintBytes: UInt64 = 0
         var processCount = 0
+        var sampleSources: Set<ProcessUsageSampleSource> = []
 
         for processIdentifier in processIdentifiers {
-            guard let processSample = readSingleProcessSample(processIdentifier: processIdentifier) else {
+            guard let processSample = sampler.sample(processIdentifier: processIdentifier) else {
                 continue
             }
 
-            cumulativeCPUTime += processSample.cumulativeCPUTime
-            residentMemoryBytes += processSample.residentMemoryBytes
+            cumulativeCPUTimeByProcess[processSample.identity] = processSample.cumulativeCPUTime
+            memoryFootprintBytes += processSample.memoryFootprintBytes
             processCount += 1
+            sampleSources.insert(processSample.source)
         }
 
         guard processCount > 0 else { return nil }
 
         return RawProcessSample(
-            cumulativeCPUTime: cumulativeCPUTime,
-            residentMemoryBytes: residentMemoryBytes,
+            cumulativeCPUTimeByProcess: cumulativeCPUTimeByProcess,
+            memoryFootprintBytes: memoryFootprintBytes,
             sampledAt: sampledAt,
-            processCount: processCount
+            processCount: processCount,
+            sampleSources: sampleSources
         )
-    }
-
-    private static func readSingleProcessSample(processIdentifier: pid_t) -> RawProcessSample? {
-        var taskInfo = proc_taskinfo()
-        let size = Int32(MemoryLayout<proc_taskinfo>.stride)
-        let result = withUnsafeMutablePointer(to: &taskInfo) { pointer in
-            proc_pidinfo(processIdentifier, PROC_PIDTASKINFO, 0, pointer, size)
-        }
-
-        guard result == size else { return nil }
-
-        let cumulativeCPUTime = taskInfo.pti_total_user
-            + taskInfo.pti_total_system
-            + taskInfo.pti_threads_user
-            + taskInfo.pti_threads_system
-
-        return RawProcessSample(
-            cumulativeCPUTime: TimeInterval(cumulativeCPUTime) / TimeInterval(NSEC_PER_SEC),
-            residentMemoryBytes: UInt64(taskInfo.pti_resident_size),
-            sampledAt: Date(),
-            processCount: 1
-        )
-    }
-
-    private static func descendantProcessIdentifiers(rootProcessIdentifier: pid_t) -> [pid_t] {
-        let processIdentifiers = allProcessIdentifiers()
-        guard !processIdentifiers.isEmpty else { return [rootProcessIdentifier] }
-
-        var childrenByParent: [pid_t: [pid_t]] = [:]
-
-        for processIdentifier in processIdentifiers where processIdentifier > 0 && processIdentifier != rootProcessIdentifier {
-            guard let parentIdentifier = parentProcessIdentifier(for: processIdentifier) else {
-                continue
-            }
-
-            childrenByParent[parentIdentifier, default: []].append(processIdentifier)
-        }
-
-        var processGroup = [rootProcessIdentifier]
-        var pending = childrenByParent[rootProcessIdentifier] ?? []
-
-        while let processIdentifier = pending.popLast() {
-            processGroup.append(processIdentifier)
-            pending.append(contentsOf: childrenByParent[processIdentifier] ?? [])
-        }
-
-        return processGroup
-    }
-
-    private static func allProcessIdentifiers() -> [pid_t] {
-        let processIdentifierBytes = proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0)
-        guard processIdentifierBytes > 0 else { return [] }
-
-        let processIdentifierCount = Int(processIdentifierBytes) / MemoryLayout<pid_t>.stride
-        var processIdentifiers = [pid_t](repeating: 0, count: processIdentifierCount)
-
-        let resultBytes = processIdentifiers.withUnsafeMutableBufferPointer { buffer in
-            proc_listpids(UInt32(PROC_ALL_PIDS), 0, buffer.baseAddress, processIdentifierBytes)
-        }
-
-        guard resultBytes > 0 else { return [] }
-
-        let resultCount = min(Int(resultBytes) / MemoryLayout<pid_t>.stride, processIdentifiers.count)
-        return Array(processIdentifiers.prefix(resultCount)).filter { $0 > 0 }
-    }
-
-    private static func parentProcessIdentifier(for processIdentifier: pid_t) -> pid_t? {
-        var bsdInfo = proc_bsdinfo()
-        let size = Int32(MemoryLayout<proc_bsdinfo>.stride)
-        let result = withUnsafeMutablePointer(to: &bsdInfo) { pointer in
-            proc_pidinfo(processIdentifier, PROC_PIDTBSDINFO, 0, pointer, size)
-        }
-
-        guard result == size else { return nil }
-        return pid_t(bsdInfo.pbi_ppid)
     }
 
     private static func cpuCalculation(from previousSample: RawProcessSample?, to currentSample: RawProcessSample) -> CPUCalculation? {
         guard let previousSample else { return nil }
 
         let elapsedTime = currentSample.sampledAt.timeIntervalSince(previousSample.sampledAt)
-        let cpuTime = currentSample.cumulativeCPUTime - previousSample.cumulativeCPUTime
+        var cpuTime: TimeInterval = 0
+        var comparableProcessCount = 0
 
-        guard elapsedTime > 0, cpuTime >= 0 else { return nil }
+        guard elapsedTime >= minimumCPUCalculationInterval else { return nil }
+
+        for (processIdentity, currentCPUTime) in currentSample.cumulativeCPUTimeByProcess {
+            guard let previousCPUTime = previousSample.cumulativeCPUTimeByProcess[processIdentity] else {
+                continue
+            }
+
+            let processCPUTime = currentCPUTime - previousCPUTime
+            guard processCPUTime >= 0 else { continue }
+
+            cpuTime += processCPUTime
+            comparableProcessCount += 1
+        }
+
+        guard elapsedTime > 0, comparableProcessCount > 0 else { return nil }
+
+        let percent = (cpuTime / elapsedTime) * 100
+        guard percent.isFinite else { return nil }
 
         return CPUCalculation(
-            percent: min((cpuTime / elapsedTime) * 100, 999),
+            percent: percent,
             elapsedTime: elapsedTime,
             cpuTime: cpuTime
         )
