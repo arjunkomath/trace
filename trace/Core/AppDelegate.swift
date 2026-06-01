@@ -33,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = AppLogger.appDelegate
     private let settingsManager = SettingsManager.shared
     private let caffeinateManager = ServiceContainer.shared.caffeinateManager
+    @MainActor private var mirrorManager: MirrorManager {
+        ServiceContainer.shared.mirrorManager
+    }
     
     private var launcherWindow: LauncherWindow?
     private var settingsWindow: SettingsWindow?
@@ -138,6 +141,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         caffeinateItem.state = caffeinateManager.isActive ? .on : .off
         caffeinateItem.image = NSImage(systemSymbolName: caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: caffeinateTitle)
         menu.addItem(caffeinateItem)
+
+        let mirrorItem = NSMenuItem(title: "Show Mirror", action: #selector(showMirror), keyEquivalent: "")
+        mirrorItem.target = self
+        mirrorItem.image = NSImage(systemSymbolName: "video", accessibilityDescription: "Show Mirror")
+        menu.addItem(mirrorItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -206,6 +214,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if caffeinateManager.start() {
             ToastManager.shared.showSuccess("Caffeinate started")
         }
+    }
+
+    @MainActor
+    @objc private func showMirror() {
+        mirrorManager.show()
     }
 
     @objc private func caffeinateStatusChanged() {
@@ -337,8 +350,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    @MainActor
     func applicationWillTerminate(_ notification: Notification) {
         caffeinateManager.stop()
+        mirrorManager.hide()
         hotkeyManager?.unregisterHotkey()
         stopGlobalEventMonitoring()
     }

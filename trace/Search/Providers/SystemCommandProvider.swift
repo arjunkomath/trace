@@ -35,6 +35,11 @@ class SystemCommandProvider: ResultProvider {
             results.append(caffeinateResult)
         }
 
+        // Mirror command
+        if let mirrorResult = createMirrorCommand(query: query, context: context) {
+            results.append(mirrorResult)
+        }
+
         // Quit command
         if let quitResult = createQuitCommand(query: query, context: context) {
             results.append(quitResult)
@@ -145,6 +150,35 @@ class SystemCommandProvider: ResultProvider {
         )
 
         return (caffeinateResult, caffeinateScore)
+    }
+
+    private func createMirrorCommand(query: String, context: SearchContext) -> (SearchResult, Double)? {
+        let mirrorMatchScore = matchesSearchTerms(query: query, terms: [
+            "mirror", "show mirror", "camera", "webcam", "webcam preview",
+            "camera preview", "video preview", "video check", "appearance check",
+            "check camera", "check myself"
+        ])
+
+        let mirrorId = "com.trace.command.mirror"
+        let mirrorUsageScore = context.usageScores[mirrorId] ?? 0.0
+
+        guard let mirrorScore = calculateUnifiedScore(matchScore: mirrorMatchScore, usageScore: mirrorUsageScore) else {
+            return nil
+        }
+
+        let mirrorResult = createSystemCommand(
+            commandId: mirrorId,
+            title: "Show Mirror",
+            subtitle: "Open a temporary local webcam preview",
+            icon: "video",
+            operation: createStandardAction(commandId: mirrorId, context: context) {
+                Task { @MainActor in
+                    context.services.mirrorManager.show()
+                }
+            }
+        )
+
+        return (mirrorResult, mirrorScore)
     }
 
     private func createQuitCommand(query: String, context: SearchContext) -> (SearchResult, Double)? {

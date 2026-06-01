@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 import Carbon
 import UniformTypeIdentifiers
 import os.log
@@ -35,7 +36,10 @@ struct GeneralSettingsView: View {
     @ObservedObject private var permissionManager = PermissionManager.shared
     @State private var accessibilityEnabled = false
     @State private var calendarEnabled = false
+    @State private var cameraAuthorizationStatus: AVAuthorizationStatus = .notDetermined
     @State private var checkingPermissions = false
+    @State private var requestingCalendarPermission = false
+    @State private var requestingCameraPermission = false
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
@@ -105,7 +109,7 @@ struct GeneralSettingsView: View {
             NativeSettingsSection("Permissions") {
                 PermissionRow(
                     title: "Accessibility Access",
-                    subtitle: "Required for window management and global hotkeys",
+                    subtitle: "Enables window management and global hotkeys",
                     icon: "accessibility",
                     status: accessibilityEnabled ? .granted : .denied,
                     action: {
@@ -115,9 +119,9 @@ struct GeneralSettingsView: View {
                 
                 PermissionRow(
                     title: "Calendar Access",
-                    subtitle: "Required to search calendar events",
+                    subtitle: "Enables calendar event search",
                     icon: "calendar",
-                    status: checkingPermissions ? .checking : (calendarEnabled ? .granted : .denied),
+                    status: requestingCalendarPermission || checkingPermissions ? .checking : (calendarEnabled ? .granted : .denied),
                     action: {
                         if calendarEnabled {
                             openCalendarPrivacySettings()
@@ -126,6 +130,23 @@ struct GeneralSettingsView: View {
                         }
                     },
                     buttonTitle: calendarEnabled ? "Open Settings" : "Request Permission"
+                )
+
+                NativeSettingsDivider()
+
+                PermissionRow(
+                    title: "Camera Access",
+                    subtitle: "Enables the local Mirror preview",
+                    icon: "video",
+                    status: requestingCameraPermission || checkingPermissions ? .checking : cameraPermissionStatus,
+                    action: {
+                        if cameraAuthorizationStatus == .notDetermined {
+                            requestCameraPermission()
+                        } else {
+                            openCameraPrivacySettings()
+                        }
+                    },
+                    buttonTitle: cameraPermissionButtonTitle
                 )
                 
                 NativeSettingsDivider()
@@ -152,7 +173,7 @@ struct GeneralSettingsView: View {
                 .padding(.vertical, 7)
                 .frame(minHeight: 44)
             } footer: {
-                Text("These permissions help Trace work seamlessly with macOS. Click 'Open Settings' to grant missing permissions.")
+                Text("All permissions are optional. Features that need a permission may be unavailable until you grant it, and you can change access any time in System Settings.")
             }
 
             NativeSettingsSection("Interface") {
@@ -499,6 +520,9 @@ struct GeneralSettingsView: View {
         
         // Check calendar permissions
         checkCalendarPermissions()
+
+        // Check camera permissions
+        checkCameraPermissions()
     }
     
     private func checkAccessibilityPermissions() {
@@ -534,16 +558,52 @@ struct GeneralSettingsView: View {
             }
         }
     }
+
+    private var cameraPermissionStatus: PermissionStatus {
+        switch cameraAuthorizationStatus {
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .denied, .restricted:
+            return .denied
+        @unknown default:
+            return .denied
+        }
+    }
+
+    private var cameraPermissionButtonTitle: String {
+        cameraAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
+    }
+
+    private func checkCameraPermissions() {
+        cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    }
+
+    private func requestCameraPermission() {
+        guard !requestingCameraPermission else { return }
+
+        Task {
+            requestingCameraPermission = true
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            await MainActor.run {
+                cameraAuthorizationStatus = granted ? .authorized : AVCaptureDevice.authorizationStatus(for: .video)
+                requestingCameraPermission = false
+            }
+        }
+    }
     
     /// Requests calendar permissions from the user and enables calendar search if granted
     private func requestCalendarPermission() {
+        guard !requestingCalendarPermission else { return }
+
         Task {
-            checkingPermissions = true
+            requestingCalendarPermission = true
             let granted = await permissionManager.requestCalendarPermissions()
             await MainActor.run {
                 self.calendarEnabled = granted
-                self.checkingPermissions = false
-                
+                self.requestingCalendarPermission = false
+
                 if granted {
                     // Automatically enable calendar search when permission is granted
                     settingsManager.updateCalendarSearchEnabled(true)
@@ -565,6 +625,12 @@ struct GeneralSettingsView: View {
             NSWorkspace.shared.open(url)
         }
     }
+
+    private func openCameraPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+            NSWorkspace.shared.open(url)
+        }
+    }
 }
 
 // MARK: - Permission Types
@@ -572,12 +638,14 @@ struct GeneralSettingsView: View {
 enum PermissionStatus {
     case granted
     case denied
+    case notDetermined
     case checking
     
     var color: Color {
         switch self {
         case .granted: return .green
         case .denied: return .orange
+        case .notDetermined: return .secondary
         case .checking: return .secondary
         }
     }
@@ -586,6 +654,7 @@ enum PermissionStatus {
         switch self {
         case .granted: return "checkmark.circle.fill"
         case .denied: return "exclamationmark.triangle.fill"
+        case .notDetermined: return "questionmark.circle.fill"
         case .checking: return "clock"
         }
     }
@@ -594,6 +663,7 @@ enum PermissionStatus {
         switch self {
         case .granted: return "Granted"
         case .denied: return "Not Granted"
+        case .notDetermined: return "Not Requested"
         case .checking: return "Checking..."
         }
     }

@@ -24,6 +24,7 @@ class ServiceContainer: ObservableObject {
     private var _emojiManager: EmojiManager?
     private var _processUsageMonitor: ProcessUsageMonitor?
     private var _caffeinateManager: CaffeinateManager?
+    private var _mirrorManager: MirrorManager?
     
     // MARK: - Service Accessors
     
@@ -153,6 +154,16 @@ class ServiceContainer: ObservableObject {
         _caffeinateManager = manager
         return manager
     }
+
+    @MainActor
+    var mirrorManager: MirrorManager {
+        if let manager = _mirrorManager {
+            return manager
+        }
+        let manager = MirrorManager()
+        _mirrorManager = manager
+        return manager
+    }
     
     // MARK: - Lifecycle
     
@@ -172,6 +183,10 @@ class ServiceContainer: ObservableObject {
         _processUsageMonitor = nil
         _caffeinateManager?.stop()
         _caffeinateManager = nil
+        Task { @MainActor in
+            _mirrorManager?.hide()
+            _mirrorManager = nil
+        }
     }
 }
 

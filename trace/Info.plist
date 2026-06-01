@@ -44,6 +44,16 @@
     <string>Trace needs permission to control system settings like appearance mode.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>Trace needs access to your calendar to help you search for and quickly access your events.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Trace uses the camera only to show a temporary local mirror preview. Trace does not record, save, or send camera video.</string>
+    <key>NSCameraPortraitEffectEnabled</key>
+    <true/>
+    <key>NSCameraReactionEffectsEnabled</key>
+    <true/>
+    <key>NSCameraReactionEffectGesturesEnabledDefault</key>
+    <true/>
+    <key>NSCameraStudioLightEnabled</key>
+    <true/>
     <key>SUPublicEDKey</key>
     <string>oB7gQCpdfoZD4FGg8kFZlVUmLK+4tUh9lapdUmT4vpU=</string>
     <key>SUFeedURL</key>
