@@ -20,8 +20,9 @@ class CalendarResultProvider: ResultProvider {
             return []
         }
         
-        // Ensure events are loaded
-        await calendarManager.loadEvents()
+        // Keep search responsive: use the current cache and refresh EventKit in
+        // the background when stale. EventKit can occasionally block.
+        calendarManager.refreshEventsIfStale()
         
         let matchingEvents = calendarManager.searchEvents(query: query)
         

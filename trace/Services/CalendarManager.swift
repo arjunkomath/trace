@@ -193,6 +193,19 @@ class CalendarManager: ObservableObject {
         
         logger.info("Loaded \(calendarEvents.count) calendar events")
     }
+
+    func refreshEventsIfStale() {
+        guard hasPermission else { return }
+
+        if let lastFetch = lastFetchDate,
+           Date().timeIntervalSince(lastFetch) < cacheExpiryInterval {
+            return
+        }
+
+        Task {
+            await loadEvents()
+        }
+    }
     
     // MARK: - Search
     

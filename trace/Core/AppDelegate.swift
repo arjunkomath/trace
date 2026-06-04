@@ -9,6 +9,7 @@ import Cocoa
 import SwiftUI
 import Carbon
 import Sparkle
+import Combine
 
 extension NSEvent.ModifierFlags {
     init(carbonModifiers: UInt32) {
@@ -44,6 +45,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var skipQuitConfirmation = false
     private var statusItem: NSStatusItem?
     private var onboardingWindow: OnboardingWindow?
+    private var settingsCancellable: AnyCancellable?
     private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -59,6 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupLauncherWindow()
         setupHotkey()
         setupMenuBar()
+        setupSettingsObservation()
         setupCaffeinateObservation()
         
         // Initialize window hotkey manager to register saved hotkeys
@@ -97,6 +100,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.hide()
         settingsWindow = nil
         NotificationCenter.default.removeObserver(self)
+        settingsCancellable?.cancel()
         logger.debug("AppDelegate deinitialized")
     }
     
@@ -104,6 +108,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupMenuBar() {
         guard settingsManager.settings.showMenuBarIcon else { return }
+
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
         
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
@@ -115,6 +124,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         updateStatusItemAppearance()
         setupMenuBarMenu()
+        logger.debug("Menu bar status item setup completed")
+    }
+
+    private func ensureMenuBarStatusItem() {
+        guard settingsManager.settings.showMenuBarIcon else {
+            if let statusItem {
+                NSStatusBar.system.removeStatusItem(statusItem)
+                self.statusItem = nil
+                logger.debug("Menu bar status item removed because setting is disabled")
+            }
+            return
+        }
+
+        guard statusItem != nil, statusItem?.button != nil else {
+            logger.warning("Menu bar status item missing while setting is enabled; recreating")
+            setupMenuBar()
+            return
+        }
+
+        updateStatusItemAppearance()
     }
     
     private func setupMenuBarMenu() {
@@ -202,6 +231,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+
+    private func setupSettingsObservation() {
+        settingsCancellable = settingsManager.$settings
+            .map { $0.showMenuBarIcon }
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.settingsChanged()
+            }
+    }
     
     @objc private func quitFromMenu() {
         NSApp.terminate(nil)
@@ -222,6 +261,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func caffeinateStatusChanged() {
+        ensureMenuBarStatusItem()
         guard statusItem != nil else { return }
 
         updateStatusItemAppearance()
@@ -286,6 +326,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func showLauncher() {
+        ensureMenuBarStatusItem()
+
         // Capture the current frontmost app before showing the launcher
         PermissionManager.shared.updateLastActiveApplication()
         
@@ -307,6 +349,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func toggleLauncher() {
+        ensureMenuBarStatusItem()
+
         guard let launcherWindow = launcherWindow else { 
             logger.error("⚠️ LauncherWindow is nil in toggleLauncher - recreating window")
             setupLauncherWindow() // Recreate the window if it's nil

@@ -32,6 +32,21 @@ protocol ProcessUsageSampling {
 struct DarwinProcessUsageSampler: ProcessUsageSampling {
     private let logger = AppLogger.processUsageMonitor
 
+    /// CPU times from `proc_pid_rusage` and `PROC_PIDTASKINFO` are reported in mach
+    /// absolute-time units, not nanoseconds. On Intel the timebase is 1:1 so dividing by
+    /// `NSEC_PER_SEC` worked, but on Apple Silicon a tick is ~41.67 ns, which made CPU
+    /// usage read ~40x too low. Convert with the mach timebase before scaling to seconds.
+    private static let timebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
+
+    private static func cpuSeconds(fromMachTicks ticks: UInt64) -> TimeInterval {
+        let nanoseconds = Double(ticks) * Double(timebase.numer) / Double(timebase.denom)
+        return nanoseconds / Double(NSEC_PER_SEC)
+    }
+
     func sample(processIdentifier: pid_t) -> ProcessUsageProcessSample? {
         let bsdInfo = readBSDInfo(processIdentifier: processIdentifier)
 
@@ -65,7 +80,7 @@ struct DarwinProcessUsageSampler: ProcessUsageSampling {
                 bsdInfo: bsdInfo,
                 fallbackStartIdentifier: resourceUsage.ri_proc_start_abstime
             ),
-            cumulativeCPUTime: TimeInterval(cumulativeCPUTime) / TimeInterval(NSEC_PER_SEC),
+            cumulativeCPUTime: Self.cpuSeconds(fromMachTicks: cumulativeCPUTime),
             memoryFootprintBytes: memoryFootprintBytes,
             source: .resourceUsage
         )
@@ -94,7 +109,7 @@ struct DarwinProcessUsageSampler: ProcessUsageSampling {
                 bsdInfo: bsdInfo,
                 fallbackStartIdentifier: nil
             ),
-            cumulativeCPUTime: TimeInterval(cumulativeCPUTime) / TimeInterval(NSEC_PER_SEC),
+            cumulativeCPUTime: Self.cpuSeconds(fromMachTicks: cumulativeCPUTime),
             memoryFootprintBytes: UInt64(taskInfo.pti_resident_size),
             source: .taskInfo
         )

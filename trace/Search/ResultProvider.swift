@@ -6,8 +6,10 @@
 //
 
 import Foundation
+import os.log
 
 protocol ResultProvider {
+    var providerName: String { get }
     func getResults(for query: String, context: SearchContext) async -> [(SearchResult, Double)]
 }
 
@@ -36,6 +38,7 @@ struct SearchContext {
 
 class SearchCoordinator {
     private let providers: [ResultProvider]
+    private let logger = AppLogger.launcherView
     
     init(providers: [ResultProvider]) {
         self.providers = providers
@@ -54,13 +57,22 @@ class SearchCoordinator {
             eventPublisher: eventPublisher
         )
         
+        let startTime = CFAbsoluteTimeGetCurrent()
         var allResults: [(SearchResult, Double)] = []
+
+        logger.debug("Search started query='\(query, privacy: .private)' providers=\(self.providers.count)")
         
         // Collect results from all providers concurrently
         await withTaskGroup(of: [(SearchResult, Double)].self) { group in
             for provider in providers {
-                group.addTask {
-                    await provider.getResults(for: context.queryLower, context: context)
+                group.addTask { [logger] in
+                    let providerStartTime = CFAbsoluteTimeGetCurrent()
+                    let results = await provider.getResults(for: context.queryLower, context: context)
+                    let elapsedMilliseconds = (CFAbsoluteTimeGetCurrent() - providerStartTime) * 1000
+                    logger.debug(
+                        "Search provider \(provider.providerName, privacy: .public) returned \(results.count) results in \(elapsedMilliseconds, format: .fixed(precision: 1))ms"
+                    )
+                    return results
                 }
             }
             
@@ -75,13 +87,21 @@ class SearchCoordinator {
             .prefix(10)
             .map { $0.0 }
         
-        return Array(sortedResults)
+        let finalResults = Array(sortedResults)
+        let elapsedMilliseconds = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        logger.debug("Search completed query='\(query, privacy: .private)' results=\(finalResults.count) elapsed=\(elapsedMilliseconds, format: .fixed(precision: 1))ms")
+
+        return finalResults
     }
 }
 
 // MARK: - Helper Functions
 
 extension ResultProvider {
+    var providerName: String {
+        String(describing: Self.self)
+    }
+
     func calculateUnifiedScore(matchScore: Double, usageScore: Double, threshold: Double = 0.3) -> Double? {
         guard matchScore > threshold else { return nil }
         let normalizedUsage = normalizeUsageScore(usageScore)

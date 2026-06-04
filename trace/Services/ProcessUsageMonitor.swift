@@ -67,6 +67,7 @@ struct ProcessUsageSnapshot: Equatable {
 
 final class ProcessUsageMonitor {
     private static let minimumCPUCalculationInterval: TimeInterval = 0.5
+    private static let processTreeSnapshotStaleness: TimeInterval = 1.0
 
     private struct RawProcessSample {
         let cumulativeCPUTimeByProcess: [ProcessIdentity: TimeInterval]
@@ -90,11 +91,38 @@ final class ProcessUsageMonitor {
         let cpuTime: TimeInterval
     }
 
+    private struct ProcessTreeSnapshot {
+        let childProcessIdentifiersByParentProcessIdentifier: [pid_t: [pid_t]]
+
+        func descendants(of rootProcessIdentifier: pid_t) -> [pid_t] {
+            var descendants: [pid_t] = []
+            var queue: [pid_t] = [rootProcessIdentifier]
+            var visited: Set<pid_t> = [rootProcessIdentifier]
+
+            while !queue.isEmpty {
+                let parentProcessIdentifier = queue.removeFirst()
+
+                let childProcessIdentifiers =
+                    childProcessIdentifiersByParentProcessIdentifier[parentProcessIdentifier, default: []]
+
+                for processIdentifier in childProcessIdentifiers
+                    where !visited.contains(processIdentifier) {
+                    visited.insert(processIdentifier)
+                    descendants.append(processIdentifier)
+                    queue.append(processIdentifier)
+                }
+            }
+
+            return descendants
+        }
+    }
+
     private let logger = AppLogger.processUsageMonitor
     private let sampler: ProcessUsageSampling
     private let queue = DispatchQueue(label: "com.trace.process-usage-monitor", qos: .utility)
     private var lastSamples: [pid_t: RawProcessSample] = [:]
     private var cachedSnapshots: [pid_t: ProcessUsageSnapshot] = [:]
+    private var cachedProcessTreeSnapshot: (snapshot: ProcessTreeSnapshot, sampledAt: Date)?
 
     init(sampler: ProcessUsageSampling = DarwinProcessUsageSampler()) {
         self.sampler = sampler
@@ -247,7 +275,8 @@ final class ProcessUsageMonitor {
     #endif
 
     private func readProcessSample(processIdentifier: pid_t) -> RawProcessSample? {
-        readProcessSample(processIdentifiers: [processIdentifier])
+        let relatedProcessIdentifiers = relatedProcessIdentifiers(for: processIdentifier)
+        return readProcessSample(processIdentifiers: relatedProcessIdentifiers)
     }
 
     private func readProcessSample(processIdentifiers: [pid_t]) -> RawProcessSample? {
@@ -309,6 +338,71 @@ final class ProcessUsageMonitor {
             percent: percent,
             elapsedTime: elapsedTime,
             cpuTime: cpuTime
+        )
+    }
+
+    private func relatedProcessIdentifiers(for processIdentifier: pid_t) -> [pid_t] {
+        let processTreeSnapshot: ProcessTreeSnapshot
+        let now = Date()
+
+        if let cachedProcessTreeSnapshot,
+           now.timeIntervalSince(cachedProcessTreeSnapshot.sampledAt) <= Self.processTreeSnapshotStaleness {
+            processTreeSnapshot = cachedProcessTreeSnapshot.snapshot
+        } else if let freshProcessTreeSnapshot = Self.processTreeSnapshot() {
+            processTreeSnapshot = freshProcessTreeSnapshot
+            cachedProcessTreeSnapshot = (freshProcessTreeSnapshot, now)
+        } else {
+            return [processIdentifier]
+        }
+
+        return [processIdentifier] + processTreeSnapshot.descendants(of: processIdentifier)
+    }
+
+    private static func processTreeSnapshot() -> ProcessTreeSnapshot? {
+        let processIdentifierCount = proc_listpids(
+            UInt32(PROC_ALL_PIDS),
+            0,
+            nil,
+            0
+        ) / Int32(MemoryLayout<pid_t>.stride)
+        guard processIdentifierCount > 0 else { return nil }
+
+        var processIdentifiers = Array(repeating: pid_t(0), count: Int(processIdentifierCount))
+        let bytesWritten = processIdentifiers.withUnsafeMutableBufferPointer { bufferPointer in
+            proc_listpids(
+                UInt32(PROC_ALL_PIDS),
+                0,
+                bufferPointer.baseAddress,
+                Int32(bufferPointer.count * MemoryLayout<pid_t>.stride)
+            )
+        }
+
+        guard bytesWritten > 0 else { return nil }
+
+        let returnedProcessIdentifierCount = Int(bytesWritten) / MemoryLayout<pid_t>.stride
+        var childProcessIdentifiersByParentProcessIdentifier: [pid_t: [pid_t]] = [:]
+
+        for processIdentifier in processIdentifiers.prefix(returnedProcessIdentifierCount) where processIdentifier > 0 {
+            var bsdInfo = proc_bsdinfo()
+            let size = Int32(MemoryLayout<proc_bsdinfo>.stride)
+            let result = withUnsafeMutablePointer(to: &bsdInfo) { pointer in
+                proc_pidinfo(processIdentifier, PROC_PIDTBSDINFO, 0, pointer, size)
+            }
+
+            guard result == size, bsdInfo.pbi_ppid > 0 else {
+                continue
+            }
+
+            childProcessIdentifiersByParentProcessIdentifier[
+                pid_t(bsdInfo.pbi_ppid),
+                default: []
+            ].append(processIdentifier)
+        }
+
+        guard !childProcessIdentifiersByParentProcessIdentifier.isEmpty else { return nil }
+
+        return ProcessTreeSnapshot(
+            childProcessIdentifiersByParentProcessIdentifier: childProcessIdentifiersByParentProcessIdentifier
         )
     }
 }
