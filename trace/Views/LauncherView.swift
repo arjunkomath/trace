@@ -189,6 +189,10 @@ struct LauncherView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .launcherWindowWillHide)) { _ in
             cancelUsageSampling()
+            clearSearch()
+        }
+        .onChange(of: results.count) { _, _ in
+            notifyContentSizeDidChange()
         }
         .onDisappear {
             currentSearchTask?.cancel()
@@ -196,7 +200,6 @@ struct LauncherView: View {
             cancellables.removeAll()
         }
         .onKeyPress(.escape) {
-            clearSearch()
             onClose()
             return .handled
         }
@@ -224,6 +227,12 @@ struct LauncherView: View {
                 selectedActionIndex = (selectedActionIndex + 1) % actionCount
             }
             return .handled
+        }
+    }
+
+    private func notifyContentSizeDidChange() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .launcherContentSizeDidChange, object: nil)
         }
     }
 }

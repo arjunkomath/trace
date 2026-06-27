@@ -137,8 +137,8 @@ class LauncherWindow: NSPanel {
         logger.debug("🙈 LauncherWindow.hide() called with restoreFocus: \(restoreFocus)")
         
         preventAutoClose = false // Reset flag when hiding
-        NotificationCenter.default.post(name: .launcherWindowWillHide, object: self)
         orderOut(nil)
+        NotificationCenter.default.post(name: .launcherWindowWillHide, object: self)
         
         // Only restore focus to the previously active application if requested
         if restoreFocus, let lastApp = PermissionManager.shared.lastActiveApplication {
@@ -162,10 +162,17 @@ class LauncherWindow: NSPanel {
             name: NSWindow.didMoveNotification,
             object: self
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(launcherContentSizeDidChange),
+            name: .launcherContentSizeDidChange,
+            object: nil
+        )
     }
     
     private func positionOnScreen() {
         guard let screen = NSScreen.main else { return }
+        resizeToFitContent()
         
         let nextFrame = frame(
             on: screen,
@@ -193,6 +200,37 @@ class LauncherWindow: NSPanel {
         }
         
         schedulePositionSave(for: constrainedFrame, on: screen)
+    }
+
+    @objc private func launcherContentSizeDidChange() {
+        guard isVisible else { return }
+        guard let screen = screen ?? NSScreen.main else { return }
+
+        let previousMaxY = frame.maxY
+        savePositionWorkItem?.cancel()
+        isApplyingSavedPosition = true
+
+        resizeToFitContent()
+        var nextFrame = horizontallyCenteredFrame(frame, on: screen)
+        nextFrame.origin.y = clamp(
+            previousMaxY - nextFrame.height,
+            min: screen.visibleFrame.minY,
+            max: screen.visibleFrame.maxY - nextFrame.height
+        )
+
+        setFrame(nextFrame, display: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.isApplyingSavedPosition = false
+        }
+    }
+
+    private func resizeToFitContent() {
+        guard let hostingView else { return }
+
+        let fittingSize = hostingView.fittingSize
+        guard fittingSize.width > 0, fittingSize.height > 0 else { return }
+
+        setContentSize(fittingSize)
     }
     
     private func frame(on screen: NSScreen, verticalPositionRatio: Double) -> NSRect {
@@ -261,4 +299,5 @@ extension Notification.Name {
     static let launcherWindowDidBecomeKey = Notification.Name("launcherWindowDidBecomeKey")
     static let shouldFocusSearchField = Notification.Name("shouldFocusSearchField")
     static let launcherWindowWillHide = Notification.Name("launcherWindowWillHide")
+    static let launcherContentSizeDidChange = Notification.Name("launcherContentSizeDidChange")
 }

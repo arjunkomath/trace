@@ -123,7 +123,7 @@ final class MirrorManager {
         let session = AVCaptureSession()
         session.beginConfiguration()
 
-        guard let camera = AVCaptureDevice.default(for: .video) else {
+        guard let camera = preferredCamera() else {
             session.commitConfiguration()
             throw MirrorError.noCamera
         }
@@ -139,6 +139,20 @@ final class MirrorManager {
 
         session.commitConfiguration()
         return session
+    }
+
+    private func preferredCamera() -> AVCaptureDevice? {
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.external, .builtInWideAngleCamera],
+            mediaType: .video,
+            position: .unspecified
+        )
+
+        if let externalCamera = discoverySession.devices.first(where: { $0.deviceType == .external }) {
+            return externalCamera
+        }
+
+        return discoverySession.devices.first ?? AVCaptureDevice.default(for: .video)
     }
 
     private func configureUserSelectedVideoEffects(for camera: AVCaptureDevice) {
