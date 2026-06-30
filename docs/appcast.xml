@@ -3,6 +3,21 @@
     <channel>
         <title>trace</title>
         <item>
+            <title>1.12.0</title>
+            <pubDate>Tue, 30 Jun 2026 20:44:30 +1000</pubDate>
+            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>31</sparkle:version>
+            <sparkle:shortVersionString>1.12.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.12.0.dmg" length="3054661" type="application/octet-stream" sparkle:edSignature="KD211YMQ0/TlCtZFeRYCjpL3XfbdYwU6MCSHVo+O3t+sA+CBdHjCfHSG/F+nSqdlgLuJqyMEBZSKqaERCqFaDA=="/>
+            <sparkle:deltas>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace31-30.delta" sparkle:deltaFrom="30" length="225290" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="BBw0FxmtcOk1PoTgOk3YTvNehKf03LqedYda6hThrF8xom/KXr8UD27Scita74LSZz1R8lyJZyPQNU/74DpuAw=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace31-29.delta" sparkle:deltaFrom="29" length="278334" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="uP+0i1xYvjbHT8RjKtFK24OCZOr8/SCdwloLkx4C9osg2LGfK6W7JNA5O4f3h3uOGLWRO9N2NpdvMxBFLVmdCw=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace31-28.delta" sparkle:deltaFrom="28" length="352442" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="Vcb+1cbY14kqW8qcuW0LaQQKpCh6AKnTke+nlDlwPvOTEaIlHxR0r9fZbXNlUxXgxC3ZUzqM5eZVBLnGFHVqDg=="/>
+                <enclosure url="https://trace.techulus.xyz/downloads/trace31-24.delta" sparkle:deltaFrom="24" length="1005350" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="SzL+nDUb1E1c7LniFR4i6gggPX6uS1mTCnqGCjyygv3QEYNW+DCAwXa2L6bTgYWskejP+V0+l88xab6tBdzdCA=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.11.0</title>
             <pubDate>Thu, 04 Jun 2026 21:21:16 +1000</pubDate>
             <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
@@ -31,21 +46,6 @@
                 <enclosure url="https://trace.techulus.xyz/downloads/trace29-27.delta" sparkle:deltaFrom="27" length="320690" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="BS95j0SUBEiX/p2Gc+1PhtHKn/myNV0C+MOCo6MO2I7EE2gP4nJPjGgKB1UD6dGizqKdU+oJxEHEELQDNcZlCw=="/>
                 <enclosure url="https://trace.techulus.xyz/downloads/trace29-26.delta" sparkle:deltaFrom="26" length="516330" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="ToEiCoT7J03iBivZgn4Biez3v2s0gB1pUF+76fmEFaNeop29i9VIJD6z+Cse8hAkby6DkDek8HalBrH6BtZ4CQ=="/>
                 <enclosure url="https://trace.techulus.xyz/downloads/trace29-24.delta" sparkle:deltaFrom="24" length="985098" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="/FYyuQS7+YKacKYhj1dhUzWd1YdpAA9jrVaPdoJuP7YcpxJRehiR0e8wr0vUAOqqRnTqi2IShWpCmLlOBInFBg=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>1.9.0</title>
-            <pubDate>Thu, 28 May 2026 20:19:50 +1000</pubDate>
-            <sparkle:fullReleaseNotesLink>https://github.com/arjunkomath/trace/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>28</sparkle:version>
-            <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://trace.techulus.xyz/downloads/Trace-1.9.0.dmg" length="2996992" type="application/octet-stream" sparkle:edSignature="qA6kNEy6DD7aEk/bem1m+G/CPNxv35R4JzvGPfZ+HeEtTRJ0vFon5NgfjwuIF7kU4WZ23/LwxN+2heKR0JwABg=="/>
-            <sparkle:deltas>
-                <enclosure url="https://trace.techulus.xyz/downloads/trace28-27.delta" sparkle:deltaFrom="27" length="209422" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="HrfXfrVvn6vPz+7xAlbZxTHkrkUGJs3u0YQvWE0OJf2ubdbKqdkSYQs3RzX9LPJPUYoWYhczUhYzuPL2PpwRDQ=="/>
-                <enclosure url="https://trace.techulus.xyz/downloads/trace28-26.delta" sparkle:deltaFrom="26" length="466450" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="ngBkOxSzp1Voz+euxVH/4I1YsK9ZEF8oEp050dT42FKONqGfdVHhMCmPiXrQX4DaHHMGpT/7O5cZqda644Y2Aw=="/>
-                <enclosure url="https://trace.techulus.xyz/downloads/trace28-25.delta" sparkle:deltaFrom="25" length="527658" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="p1jRp53iZ1QF2mA/GKs3cuJELf4RGv6gBsILGzo+/Za7aHp8W+dkdSHlACH6fEuQtYfZVwKvzqsrABONz7d5Cg=="/>
-                <enclosure url="https://trace.techulus.xyz/downloads/trace28-24.delta" sparkle:deltaFrom="24" length="949394" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="+r2FEuICX703CCFjBXCxnqt3GdTcLlpv3euCu0jUJkh6ACE8RQ94r/UBCrzJi7xgnSLU7CjS7ZZmy8ifICUpAQ=="/>
             </sparkle:deltas>
         </item>
     </channel>
