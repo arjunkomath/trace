@@ -296,10 +296,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
 
         let isCaffeinateActive = caffeinateManager.isActive
-        let symbolName = isCaffeinateActive ? "cup.and.saucer.fill" : "filemenu.and.selection"
         let description = isCaffeinateActive ? "Trace Caffeinate On" : "Trace"
 
-        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description)
+        if isCaffeinateActive {
+            button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: description)
+        } else {
+            button.image = NSImage(named: "MenuBarIcon")
+                ?? NSImage(systemSymbolName: "filemenu.and.selection", accessibilityDescription: description)
+        }
         button.image?.size = NSSize(width: 18, height: 18)
         button.image?.isTemplate = true
         button.toolTip = isCaffeinateActive ? "Trace - Caffeinate is on" : "Trace - Click to open launcher"
