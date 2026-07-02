@@ -200,7 +200,7 @@ private final class DictationIndicatorView: NSView {
             height: bounds.height - Layout.islandInset.top - Layout.islandInset.bottom
         )
         islandBodyLayer.frame = islandFrame
-        let islandPath = makeTopAttachedIslandPath(
+        let islandPath = TopAttachedIslandPath.make(
             in: islandBodyLayer.bounds,
             topRadius: Layout.outerTopCornerRadius,
             bottomRadius: Layout.outerBottomCornerRadius
@@ -318,49 +318,5 @@ private final class DictationIndicatorView: NSView {
         group.repeatCount = .infinity
         group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         pulseLayer.add(group, forKey: "dictationPulse")
-    }
-
-    private func makeTopAttachedIslandPath(
-        in rect: CGRect,
-        topRadius: CGFloat,
-        bottomRadius: CGFloat
-    ) -> CGPath {
-        guard !rect.isEmpty else { return CGPath(rect: rect, transform: nil) }
-
-        var topRadius = min(topRadius, rect.width / 2, rect.height / 2)
-        var bottomRadius = min(bottomRadius, rect.width / 2, rect.height / 2)
-        let combinedRadius = topRadius + bottomRadius
-        if combinedRadius > rect.height, combinedRadius > 0 {
-            let scale = rect.height / combinedRadius
-            topRadius *= scale
-            bottomRadius *= scale
-        }
-
-        let path = CGMutablePath()
-
-        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - topRadius, y: rect.maxY - topRadius),
-            control: CGPoint(x: rect.maxX - topRadius, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY + bottomRadius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - topRadius - bottomRadius, y: rect.minY),
-            control: CGPoint(x: rect.maxX - topRadius, y: rect.minY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX + topRadius + bottomRadius, y: rect.minY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + topRadius, y: rect.minY + bottomRadius),
-            control: CGPoint(x: rect.minX + topRadius, y: rect.minY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX + topRadius, y: rect.maxY - topRadius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.maxY),
-            control: CGPoint(x: rect.minX + topRadius, y: rect.maxY)
-        )
-        path.closeSubpath()
-
-        return path
     }
 }

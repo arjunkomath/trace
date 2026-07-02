@@ -201,7 +201,7 @@ private final class MirrorPreviewView: NSView {
             height: bounds.height - Layout.islandInset.top - Layout.islandInset.bottom
         )
         islandBodyLayer.frame = islandFrame
-        let islandPath = makeTopAttachedIslandPath(
+        let islandPath = TopAttachedIslandPath.make(
             in: islandBodyLayer.bounds,
             topRadius: Layout.outerTopCornerRadius,
             bottomRadius: Layout.outerBottomCornerRadius
@@ -266,7 +266,34 @@ private final class MirrorPreviewView: NSView {
         layer?.addSublayer(previewBorderLayer)
     }
 
-    private func makeTopAttachedIslandPath(
+    private func configureMirroringIfNeeded() {
+        guard !didConfigureMirroring else { return }
+
+        guard let connection = previewLayer.connection, connection.isVideoMirroringSupported else {
+            previewLayer.transform = CATransform3DMakeScale(-1, 1, 1)
+            return
+        }
+
+        connection.automaticallyAdjustsVideoMirroring = false
+        connection.isVideoMirrored = true
+        previewLayer.transform = CATransform3DIdentity
+        didConfigureMirroring = true
+    }
+
+    private func setupCloseButton() {
+        closeButton.setAccessibilityLabel("Close Mirror")
+        closeButton.target = self
+        closeButton.action = #selector(closePressed)
+        addSubview(closeButton)
+    }
+
+    @objc private func closePressed() {
+        onClose()
+    }
+}
+
+enum TopAttachedIslandPath {
+    static func make(
         in rect: CGRect,
         topRadius: CGFloat,
         bottomRadius: CGFloat
@@ -308,31 +335,6 @@ private final class MirrorPreviewView: NSView {
         path.closeSubpath()
 
         return path
-    }
-
-    private func configureMirroringIfNeeded() {
-        guard !didConfigureMirroring else { return }
-
-        guard let connection = previewLayer.connection, connection.isVideoMirroringSupported else {
-            previewLayer.transform = CATransform3DMakeScale(-1, 1, 1)
-            return
-        }
-
-        connection.automaticallyAdjustsVideoMirroring = false
-        connection.isVideoMirrored = true
-        previewLayer.transform = CATransform3DIdentity
-        didConfigureMirroring = true
-    }
-
-    private func setupCloseButton() {
-        closeButton.setAccessibilityLabel("Close Mirror")
-        closeButton.target = self
-        closeButton.action = #selector(closePressed)
-        addSubview(closeButton)
-    }
-
-    @objc private func closePressed() {
-        onClose()
     }
 }
 

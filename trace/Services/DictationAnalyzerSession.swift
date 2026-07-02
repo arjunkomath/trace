@@ -32,7 +32,6 @@ final class DictationAnalyzerSession {
     private var analyzeTask: Task<CMTime?, Error>?
     private var resultTask: Task<String, Error>?
     private var converter: DictationBufferConverter?
-    private var latestText = ""
 
     init(locale: Locale) {
         self.locale = locale
@@ -102,6 +101,8 @@ final class DictationAnalyzerSession {
         inputContinuation = nil
 
         guard let analyzer else { throw SessionError.noAnalyzer }
+        defer { cleanup() }
+
         let lastSampleTime = try await analyzeTask?.value
 
         try await withTimeout(seconds: 8) {
@@ -112,8 +113,7 @@ final class DictationAnalyzerSession {
             }
         }
 
-        let transcript = (try await resultTask?.value ?? latestText).trimmingCharacters(in: .whitespacesAndNewlines)
-        cleanup()
+        let transcript = (try await resultTask?.value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return transcript
     }
 
