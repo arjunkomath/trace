@@ -32,7 +32,8 @@ final class DictationCoordinator: ObservableObject {
         settingsManager.settings.dictationEnabled &&
         settingsManager.settings.dictationHotkeyKeyCode > 0 &&
         assetManager.state.isReady &&
-        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized &&
+        AXIsProcessTrusted()
     }
 
     private init() {}
@@ -49,6 +50,10 @@ final class DictationCoordinator: ObservableObject {
                 return
             }
             guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+                openDictationSettings()
+                return
+            }
+            guard AXIsProcessTrusted() else {
                 openDictationSettings()
                 return
             }
@@ -108,8 +113,8 @@ final class DictationCoordinator: ObservableObject {
                     self.scheduleMaxDurationStop()
                 }
             } catch {
+                await session.cancel()
                 if error is CancellationError {
-                    await session.cancel()
                     return
                 }
                 await MainActor.run {
@@ -142,7 +147,7 @@ final class DictationCoordinator: ObservableObject {
                     try await self.insertionService.insert(transcript)
                 } catch TextInsertionService.InsertionError.accessibilityNotTrusted {
                     #if DEBUG
-                    self.logger.notice("Dictation transcript because Accessibility permission is disabled: \(transcript, privacy: .public)")
+                    self.logger.notice("Dictation insertion skipped because Accessibility permission is disabled")
                     #endif
                     throw TextInsertionService.InsertionError.accessibilityNotTrusted
                 }
