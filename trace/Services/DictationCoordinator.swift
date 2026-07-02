@@ -110,8 +110,7 @@ final class DictationCoordinator: ObservableObject {
     private func start(locale: Locale) {
         state = .starting
         indicator.showListening()
-        let session = DictationAnalyzerSession(locale: locale)
-        session.onAudioLevel = { [weak self] level in
+        let session = DictationAnalyzerSession(locale: locale) { [weak self] level in
             Task { @MainActor [weak self] in
                 self?.indicator.updateAudioLevel(level)
             }
@@ -165,11 +164,7 @@ final class DictationCoordinator: ObservableObject {
                 #if DEBUG
                 self.logger.notice("Dictation transcript: \(transcript, privacy: .public)")
                 #else
-                do {
-                    try await self.insertionService.insert(transcript)
-                } catch TextInsertionService.InsertionError.accessibilityNotTrusted {
-                    throw TextInsertionService.InsertionError.accessibilityNotTrusted
-                }
+                try await self.insertionService.insert(transcript)
                 #endif
                 await MainActor.run {
                     self.session = nil

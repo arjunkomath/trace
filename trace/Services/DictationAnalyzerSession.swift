@@ -1,14 +1,16 @@
 import AVFoundation
 import CoreMedia
 import Foundation
+import os.log
 import Speech
 
-final class DictationAnalyzerSession {
+actor DictationAnalyzerSession {
     enum SessionError: LocalizedError {
         case unsupportedAudioFormat
         case missingInputNodeFormat
         case conversionFailed
         case noAnalyzer
+        case finalizationTimedOut
 
         var errorDescription: String? {
             switch self {
@@ -20,24 +22,24 @@ final class DictationAnalyzerSession {
                 return "Trace could not convert microphone audio for dictation."
             case .noAnalyzer:
                 return "Dictation session was not started."
+            case .finalizationTimedOut:
+                return "Dictation took too long to finish transcribing. Please try again."
             }
         }
     }
 
     private let locale: Locale
+    private let onAudioLevel: @Sendable (Float) -> Void
     private let logger = AppLogger.dictation
     private let audioEngine = AVAudioEngine()
     private var analyzer: SpeechAnalyzer?
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     private var analyzeTask: Task<CMTime?, Error>?
     private var resultTask: Task<String, Error>?
-    private var converter: DictationBufferConverter?
-    private var lastAudioLevelEmitTime: TimeInterval = 0
 
-    var onAudioLevel: ((Float) -> Void)?
-
-    init(locale: Locale) {
+    init(locale: Locale, onAudioLevel: @escaping @Sendable (Float) -> Void = { _ in }) {
         self.locale = locale
+        self.onAudioLevel = onAudioLevel
     }
 
     func start() async throws {
@@ -62,8 +64,14 @@ final class DictationAnalyzerSession {
         try Task.checkCancellation()
 
         let streamPair = AsyncStream<AnalyzerInput>.makeStream(bufferingPolicy: .bufferingNewest(32))
-        inputContinuation = streamPair.continuation
-        converter = DictationBufferConverter(inputFormat: inputFormat, outputFormat: analyzerFormat)
+        let inputContinuation = streamPair.continuation
+        self.inputContinuation = inputContinuation
+        let tapHandler = DictationAudioTapHandler(
+            inputContinuation: inputContinuation,
+            converter: DictationBufferConverter(inputFormat: inputFormat, outputFormat: analyzerFormat),
+            onAudioLevel: onAudioLevel,
+            logger: logger
+        )
 
         resultTask = Task {
             var finalText = ""
@@ -89,8 +97,8 @@ final class DictationAnalyzerSession {
 
         try Task.checkCancellation()
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-            self?.handleAudioBuffer(buffer)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { buffer, _ in
+            tapHandler.handle(buffer)
         }
 
         audioEngine.prepare()
@@ -108,7 +116,7 @@ final class DictationAnalyzerSession {
 
         let lastSampleTime = try await analyzeTask?.value
 
-        try await withTimeout(seconds: 8) {
+        try await withFinalizationTimeout(seconds: 8) {
             if let lastSampleTime, lastSampleTime.isValid {
                 try await analyzer.finalizeAndFinish(through: lastSampleTime)
             } else {
@@ -128,15 +136,40 @@ final class DictationAnalyzerSession {
         cleanup()
     }
 
-    private func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
-        guard let inputContinuation else { return }
+    private func cleanup() {
+        analyzeTask?.cancel()
+        resultTask?.cancel()
+        analyzeTask = nil
+        resultTask = nil
+        analyzer = nil
+    }
+}
 
+private final class DictationAudioTapHandler {
+    private let inputContinuation: AsyncStream<AnalyzerInput>.Continuation
+    private let converter: DictationBufferConverter
+    private let onAudioLevel: @Sendable (Float) -> Void
+    private let logger: Logger
+    private var lastAudioLevelEmitTime: TimeInterval = 0
+
+    init(
+        inputContinuation: AsyncStream<AnalyzerInput>.Continuation,
+        converter: DictationBufferConverter,
+        onAudioLevel: @escaping @Sendable (Float) -> Void,
+        logger: Logger
+    ) {
+        self.inputContinuation = inputContinuation
+        self.converter = converter
+        self.onAudioLevel = onAudioLevel
+        self.logger = logger
+    }
+
+    func handle(_ buffer: AVAudioPCMBuffer) {
         emitAudioLevel(from: buffer)
 
         do {
-            if let converted = try converter?.convert(buffer) {
-                inputContinuation.yield(AnalyzerInput(buffer: converted))
-            }
+            let converted = try converter.convert(buffer)
+            inputContinuation.yield(AnalyzerInput(buffer: converted))
         } catch {
             logger.error("Dictation audio conversion failed: \(error.localizedDescription)")
         }
@@ -147,16 +180,7 @@ final class DictationAnalyzerSession {
         guard now - lastAudioLevelEmitTime >= 1.0 / 60.0 else { return }
 
         lastAudioLevelEmitTime = now
-        onAudioLevel?(DictationAudioLevelMeter.normalizedLevel(from: buffer))
-    }
-
-    private func cleanup() {
-        analyzeTask?.cancel()
-        resultTask?.cancel()
-        analyzeTask = nil
-        resultTask = nil
-        analyzer = nil
-        converter = nil
+        onAudioLevel(DictationAudioLevelMeter.normalizedLevel(from: buffer))
     }
 }
 
@@ -230,17 +254,19 @@ private final class DictationBufferConverter {
     }
 }
 
-private func withTimeout<T: Sendable>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
+private func withFinalizationTimeout<T: Sendable>(seconds: TimeInterval, operation: @escaping @Sendable () async throws -> T) async throws -> T {
     try await withThrowingTaskGroup(of: T.self) { group in
         group.addTask {
             try await operation()
         }
         group.addTask {
             try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            throw CancellationError()
+            throw DictationAnalyzerSession.SessionError.finalizationTimedOut
         }
 
-        guard let result = try await group.next() else { throw CancellationError() }
+        guard let result = try await group.next() else {
+            throw DictationAnalyzerSession.SessionError.finalizationTimedOut
+        }
         group.cancelAll()
         return result
     }

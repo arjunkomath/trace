@@ -233,7 +233,7 @@ class PermissionManager: ObservableObject {
         }
     }
     
-    // MARK: - System Events (AppleScript) Permissions
+    // MARK: - Microphone & Speech Recognition Permissions
 
     var microphoneAuthorizationStatus: AVAuthorizationStatus {
         AVCaptureDevice.authorizationStatus(for: .audio)
