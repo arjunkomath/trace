@@ -32,6 +32,9 @@ final class DictationAnalyzerSession {
     private var analyzeTask: Task<CMTime?, Error>?
     private var resultTask: Task<String, Error>?
     private var converter: DictationBufferConverter?
+    private var lastAudioLevelEmitTime: TimeInterval = 0
+
+    var onAudioLevel: ((Float) -> Void)?
 
     init(locale: Locale) {
         self.locale = locale
@@ -128,6 +131,8 @@ final class DictationAnalyzerSession {
     private func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
         guard let inputContinuation else { return }
 
+        emitAudioLevel(from: buffer)
+
         do {
             if let converted = try converter?.convert(buffer) {
                 inputContinuation.yield(AnalyzerInput(buffer: converted))
@@ -137,6 +142,14 @@ final class DictationAnalyzerSession {
         }
     }
 
+    private func emitAudioLevel(from buffer: AVAudioPCMBuffer) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastAudioLevelEmitTime >= 1.0 / 60.0 else { return }
+
+        lastAudioLevelEmitTime = now
+        onAudioLevel?(DictationAudioLevelMeter.normalizedLevel(from: buffer))
+    }
+
     private func cleanup() {
         analyzeTask?.cancel()
         resultTask?.cancel()
@@ -144,6 +157,33 @@ final class DictationAnalyzerSession {
         resultTask = nil
         analyzer = nil
         converter = nil
+    }
+}
+
+private enum DictationAudioLevelMeter {
+    static func normalizedLevel(from buffer: AVAudioPCMBuffer) -> Float {
+        guard let channelData = buffer.floatChannelData else { return 0 }
+
+        let channelCount = Int(buffer.format.channelCount)
+        let frameLength = Int(buffer.frameLength)
+        guard channelCount > 0, frameLength > 0 else { return 0 }
+
+        var squareSum: Double = 0
+        for channel in 0..<channelCount {
+            let samples = channelData[channel]
+            for frame in 0..<frameLength {
+                let sample = Double(samples[frame])
+                squareSum += sample * sample
+            }
+        }
+
+        let rms = sqrt(squareSum / Double(channelCount * frameLength))
+        guard rms.isFinite else { return 0 }
+
+        let decibels = 20 * log10(max(rms, 0.000_01))
+        let normalized = (decibels + 55) / 45
+        let clamped = max(0, min(1, normalized))
+        return Float(pow(clamped, 0.7))
     }
 }
 

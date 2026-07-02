@@ -179,7 +179,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let caffeinateItem = NSMenuItem(title: caffeinateTitle, action: #selector(toggleCaffeinate), keyEquivalent: "")
         caffeinateItem.target = self
         caffeinateItem.state = caffeinateManager.isActive ? .on : .off
-        caffeinateItem.image = NSImage(systemSymbolName: caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer", accessibilityDescription: caffeinateTitle)
+        caffeinateItem.image = makeMenuBarImage(
+            named: "MenuBarCaffeinate",
+            fallbackSymbolName: caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
+            accessibilityDescription: caffeinateTitle
+        )
         menu.addItem(caffeinateItem)
 
         let mirrorItem = NSMenuItem(title: "Show Mirror", action: #selector(showMirror), keyEquivalent: "")
@@ -310,14 +314,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let description = isCaffeinateActive ? "Trace Caffeinate On" : "Trace"
 
         if isCaffeinateActive {
-            button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: description)
+            button.image = makeMenuBarImage(
+                named: "MenuBarCaffeinate",
+                fallbackSymbolName: "cup.and.saucer.fill",
+                accessibilityDescription: description
+            )
         } else {
-            button.image = NSImage(named: "MenuBarIcon")
-                ?? NSImage(systemSymbolName: "filemenu.and.selection", accessibilityDescription: description)
+            button.image = makeMenuBarImage(
+                named: "MenuBarIcon",
+                fallbackSymbolName: "filemenu.and.selection",
+                accessibilityDescription: description
+            )
         }
         button.image?.size = NSSize(width: 18, height: 18)
         button.image?.isTemplate = true
         button.toolTip = isCaffeinateActive ? "Trace - Caffeinate is on" : "Trace - Click to open launcher"
+    }
+
+    private func makeMenuBarImage(
+        named imageName: String,
+        fallbackSymbolName: String,
+        accessibilityDescription: String
+    ) -> NSImage? {
+        let image = NSImage(named: imageName)?.copy() as? NSImage
+            ?? NSImage(systemSymbolName: fallbackSymbolName, accessibilityDescription: accessibilityDescription)
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        return image
     }
     
     private func setupHotkey() {

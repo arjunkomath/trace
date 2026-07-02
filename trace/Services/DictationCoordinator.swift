@@ -30,12 +30,18 @@ final class DictationCoordinator: ObservableObject {
     private let maximumDuration: TimeInterval = 90
 
     var isReady: Bool {
-        settingsManager.settings.dictationEnabled &&
-        settingsManager.settings.dictationHotkeyKeyCode > 0 &&
-        assetManager.state.isReady &&
-        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized &&
-        SFSpeechRecognizer.authorizationStatus() == .authorized &&
-        AXIsProcessTrusted()
+        let readyWithoutAccessibility =
+            settingsManager.settings.dictationEnabled &&
+            settingsManager.settings.dictationHotkeyKeyCode > 0 &&
+            assetManager.state.isReady &&
+            AVCaptureDevice.authorizationStatus(for: .audio) == .authorized &&
+            SFSpeechRecognizer.authorizationStatus() == .authorized
+
+        #if DEBUG
+        return readyWithoutAccessibility
+        #else
+        return readyWithoutAccessibility && AXIsProcessTrusted()
+        #endif
     }
 
     private init() {}
@@ -59,10 +65,12 @@ final class DictationCoordinator: ObservableObject {
                 openDictationSettings()
                 return
             }
+            #if !DEBUG
             guard AXIsProcessTrusted() else {
                 openDictationSettings()
                 return
             }
+            #endif
             guard let locale = assetManager.resolvedLocale, assetManager.state.isReady else {
                 openDictationSettings()
                 return
@@ -103,6 +111,11 @@ final class DictationCoordinator: ObservableObject {
         state = .starting
         indicator.showListening()
         let session = DictationAnalyzerSession(locale: locale)
+        session.onAudioLevel = { [weak self] level in
+            Task { @MainActor [weak self] in
+                self?.indicator.updateAudioLevel(level)
+            }
+        }
         self.session = session
 
         startTask = Task { [weak self] in
@@ -149,14 +162,15 @@ final class DictationCoordinator: ObservableObject {
             guard let self else { return }
             do {
                 let transcript = try await session.stop()
+                #if DEBUG
+                self.logger.notice("Dictation transcript: \(transcript, privacy: .public)")
+                #else
                 do {
                     try await self.insertionService.insert(transcript)
                 } catch TextInsertionService.InsertionError.accessibilityNotTrusted {
-                    #if DEBUG
-                    self.logger.notice("Dictation insertion skipped because Accessibility permission is disabled")
-                    #endif
                     throw TextInsertionService.InsertionError.accessibilityNotTrusted
                 }
+                #endif
                 await MainActor.run {
                     self.session = nil
                     self.state = .idle

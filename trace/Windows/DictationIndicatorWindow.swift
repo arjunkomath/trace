@@ -12,6 +12,10 @@ final class DictationIndicatorController {
         show(mode: .processing)
     }
 
+    func updateAudioLevel(_ level: Float) {
+        window?.updateAudioLevel(level)
+    }
+
     func hide() {
         window?.hide()
     }
@@ -65,6 +69,11 @@ final class DictationIndicatorWindow: NSPanel {
     func update(mode: DictationIndicatorMode) {
         self.mode = mode
         indicatorView?.update(mode: mode)
+    }
+
+    func updateAudioLevel(_ level: Float) {
+        guard mode == .listening else { return }
+        indicatorView?.updateAudioLevel(level)
     }
 
     func show() {
@@ -172,6 +181,7 @@ private final class DictationIndicatorView: NSView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let progressIndicator = NSProgressIndicator()
     private var mode: DictationIndicatorMode
+    private var displayedAudioLevel: Float = 0
 
     init(mode: DictationIndicatorMode) {
         self.mode = mode
@@ -259,12 +269,30 @@ private final class DictationIndicatorView: NSView {
         dotLayer.isHidden = mode == .processing
 
         if mode == .processing {
+            resetAudioLevel()
             progressIndicator.startAnimation(nil)
             pulseLayer.removeAnimation(forKey: "dictationPulse")
         } else {
+            resetAudioLevel()
             progressIndicator.stopAnimation(nil)
             startPulseAnimation()
         }
+    }
+
+    func updateAudioLevel(_ level: Float) {
+        guard mode == .listening else { return }
+
+        let gatedLevel = max(0, min(1, (level - 0.08) / 0.72))
+        let responsiveLevel = Float(pow(Double(gatedLevel), 0.85))
+        let smoothing: Float = responsiveLevel > displayedAudioLevel ? 0.82 : 0.58
+        displayedAudioLevel += (responsiveLevel - displayedAudioLevel) * smoothing
+
+        let scale = 0.24 + (CGFloat(displayedAudioLevel) * 1.72)
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.025)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        dotLayer.transform = CATransform3DMakeScale(scale, scale, 1)
+        CATransaction.commit()
     }
 
     private func setupLayers() {
@@ -298,6 +326,15 @@ private final class DictationIndicatorView: NSView {
         progressIndicator.isDisplayedWhenStopped = false
         progressIndicator.isHidden = true
         addSubview(progressIndicator)
+    }
+
+    private func resetAudioLevel() {
+        displayedAudioLevel = 0
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        dotLayer.transform = CATransform3DIdentity
+        CATransaction.commit()
     }
 
     private func startPulseAnimation() {
