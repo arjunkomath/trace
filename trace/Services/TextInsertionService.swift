@@ -43,10 +43,13 @@ final class TextInsertionService {
             Self.restorePasteboard(pasteboard, items: previousItems)
             throw InsertionError.pasteboardWriteFailed
         }
+        let tracePasteboardChangeCount = pasteboard.changeCount
 
         Self.sendPasteKeystroke()
         try? await Task.sleep(nanoseconds: 450_000_000)
-        Self.restorePasteboard(pasteboard, items: previousItems)
+        if pasteboard.changeCount == tracePasteboardChangeCount {
+            Self.restorePasteboard(pasteboard, items: previousItems)
+        }
     }
 
     private static func snapshotPasteboard(_ pasteboard: NSPasteboard) -> [NSPasteboardItem] {

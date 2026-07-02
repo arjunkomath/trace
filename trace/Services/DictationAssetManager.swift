@@ -7,6 +7,7 @@ final class DictationAssetManager: ObservableObject {
 
     enum AssetState: Equatable {
         case checking
+        case speechPermissionRequired
         case unsupported
         case supportedNeedsDownload(Locale)
         case downloading(Locale, Double)
@@ -28,7 +29,7 @@ final class DictationAssetManager: ObservableObject {
         switch state {
         case .supportedNeedsDownload(let locale), .downloading(let locale, _), .installed(let locale):
             return locale
-        case .checking, .unsupported, .failed:
+        case .checking, .speechPermissionRequired, .unsupported, .failed:
             return nil
         }
     }
@@ -37,6 +38,11 @@ final class DictationAssetManager: ObservableObject {
 
     func refresh() async {
         state = .checking
+
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
+            state = .speechPermissionRequired
+            return
+        }
 
         guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: Locale.current) else {
             state = .unsupported
@@ -59,6 +65,11 @@ final class DictationAssetManager: ObservableObject {
     }
 
     func download() async {
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
+            state = .speechPermissionRequired
+            return
+        }
+
         let locale: Locale?
         if let resolvedLocale {
             locale = resolvedLocale

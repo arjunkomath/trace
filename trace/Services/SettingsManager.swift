@@ -402,6 +402,16 @@ class SettingsManager: ObservableObject {
                 settings.mainHotkeyKeyCode = importedSettings.mainHotkeyKeyCode
                 settings.mainHotkeyModifiers = importedSettings.mainHotkeyModifiers
             }
+
+            if !settings.dictationEnabled {
+                settings.dictationEnabled = importedSettings.dictationEnabled
+            }
+
+            if settings.dictationHotkey.isEmpty && !importedSettings.dictationHotkey.isEmpty {
+                settings.dictationHotkey = importedSettings.dictationHotkey
+                settings.dictationHotkeyKeyCode = importedSettings.dictationHotkeyKeyCode
+                settings.dictationHotkeyModifiers = importedSettings.dictationHotkeyModifiers
+            }
             
             // Window hotkeys - add new ones, keep existing
             for (position, hotkeyData) in importedSettings.windowHotkeys {

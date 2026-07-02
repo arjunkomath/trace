@@ -424,6 +424,8 @@ struct GeneralSettingsView: View {
             let serviceContainer = ServiceContainer.shared
             serviceContainer.quickLinksManager.loadQuickLinks()
         }
+
+        DictationHotkeyManager.shared.reload()
     }
     
     private func showAlert(title: String, message: String) {

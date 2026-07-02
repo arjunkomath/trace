@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Foundation
+import Speech
 
 @MainActor
 final class DictationCoordinator: ObservableObject {
@@ -33,6 +34,7 @@ final class DictationCoordinator: ObservableObject {
         settingsManager.settings.dictationHotkeyKeyCode > 0 &&
         assetManager.state.isReady &&
         AVCaptureDevice.authorizationStatus(for: .audio) == .authorized &&
+        SFSpeechRecognizer.authorizationStatus() == .authorized &&
         AXIsProcessTrusted()
     }
 
@@ -50,6 +52,10 @@ final class DictationCoordinator: ObservableObject {
                 return
             }
             guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+                openDictationSettings()
+                return
+            }
+            guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
                 openDictationSettings()
                 return
             }

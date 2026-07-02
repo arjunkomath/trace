@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Carbon
+import Speech
 import SwiftUI
 
 struct DictationSettingsView: View {
@@ -12,7 +13,9 @@ struct DictationSettingsView: View {
     @State private var isRecordingHotkey = false
     @State private var eventMonitor: Any?
     @State private var requestingMicrophone = false
+    @State private var requestingSpeechRecognition = false
     @State private var microphoneAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+    @State private var speechRecognitionAuthorizationStatus = SFSpeechRecognizer.authorizationStatus()
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
     var body: some View {
@@ -25,8 +28,12 @@ struct DictationSettingsView: View {
                     Toggle("", isOn: Binding(
                         get: { settingsManager.settings.dictationEnabled },
                         set: { enabled in
+                            let previousValue = settingsManager.settings.dictationEnabled
                             settingsManager.updateDictationEnabled(enabled)
-                            DictationHotkeyManager.shared.reload()
+                            if !DictationHotkeyManager.shared.reload() {
+                                settingsManager.updateDictationEnabled(previousValue)
+                                DictationHotkeyManager.shared.reload()
+                            }
                         }
                     ))
                     .toggleStyle(.switch)
@@ -114,6 +121,17 @@ struct DictationSettingsView: View {
                 NativeSettingsDivider()
 
                 PermissionRow(
+                    title: "Speech Recognition",
+                    subtitle: "Required to transcribe audio on this Mac",
+                    icon: "waveform",
+                    status: speechRecognitionPermissionStatus,
+                    action: handleSpeechRecognitionPermission,
+                    buttonTitle: speechRecognitionButtonTitle
+                )
+
+                NativeSettingsDivider()
+
+                PermissionRow(
                     title: "Accessibility Access",
                     subtitle: "Required to paste dictated text into the active app",
                     icon: "accessibility",
@@ -146,6 +164,8 @@ struct DictationSettingsView: View {
         switch assetManager.state {
         case .checking:
             ProgressView().controlSize(.small)
+        case .speechPermissionRequired:
+            StatusPill(text: "Permission Needed", color: .orange)
         case .unsupported:
             StatusPill(text: "Unsupported", color: .orange)
         case .supportedNeedsDownload:
@@ -169,6 +189,8 @@ struct DictationSettingsView: View {
         switch assetManager.state {
         case .checking:
             return "Checking dictation support for your system language…"
+        case .speechPermissionRequired:
+            return "Grant Speech Recognition access before checking dictation assets."
         case .unsupported:
             return "Dictation is not available for your current system language."
         case .supportedNeedsDownload:
@@ -184,7 +206,7 @@ struct DictationSettingsView: View {
 
     private var shouldShowAssetAction: Bool {
         switch assetManager.state {
-        case .checking, .supportedNeedsDownload, .downloading, .failed:
+        case .checking, .speechPermissionRequired, .supportedNeedsDownload, .downloading, .failed:
             return true
         case .installed, .unsupported:
             return false
@@ -212,8 +234,22 @@ struct DictationSettingsView: View {
         }
     }
 
+    private var speechRecognitionPermissionStatus: PermissionStatus {
+        if requestingSpeechRecognition { return .checking }
+        switch speechRecognitionAuthorizationStatus {
+        case .authorized: return .granted
+        case .notDetermined: return .notDetermined
+        case .denied, .restricted: return .denied
+        @unknown default: return .denied
+        }
+    }
+
     private var microphoneButtonTitle: String {
         microphoneAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
+    }
+
+    private var speechRecognitionButtonTitle: String {
+        speechRecognitionAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
     }
 
     private func handleMicrophonePermission() {
@@ -231,6 +267,24 @@ struct DictationSettingsView: View {
         }
     }
 
+    private func handleSpeechRecognitionPermission() {
+        refreshPermissions()
+
+        if speechRecognitionAuthorizationStatus == .notDetermined {
+            Task {
+                requestingSpeechRecognition = true
+                let granted = await permissionManager.requestSpeechRecognitionPermission()
+                refreshPermissions()
+                if granted {
+                    await assetManager.refresh()
+                }
+                requestingSpeechRecognition = false
+            }
+        } else {
+            permissionManager.openSpeechRecognitionPrivacySettings()
+        }
+    }
+
     private func openAccessibilitySettings() {
         refreshPermissions()
 
@@ -241,7 +295,9 @@ struct DictationSettingsView: View {
 
     private func refreshPermissions() {
         permissionManager.refreshMicrophoneCapability()
+        permissionManager.refreshSpeechRecognitionCapability()
         microphoneAuthorizationStatus = permissionManager.microphoneAuthorizationStatus
+        speechRecognitionAuthorizationStatus = permissionManager.speechRecognitionAuthorizationStatus
         accessibilityTrusted = AXIsProcessTrusted()
     }
 
@@ -267,10 +323,26 @@ struct DictationSettingsView: View {
 
             guard modifierValue != 0 else { return event }
 
-            let keyBinding = KeyBindingView(keyCode: UInt32(event.keyCode), modifiers: modifierValue)
+            let keyCode = UInt32(event.keyCode)
+            guard DictationHotkeyManager.shared.canRegister(keyCode: keyCode, modifiers: modifierValue) else {
+                ToastManager.shared.showError("Dictation hotkey conflicts with another Trace shortcut.")
+                isRecordingHotkey = false
+                stopRecordingHotkey()
+                return nil
+            }
+
+            let previousSettings = settingsManager.settings
+            let keyBinding = KeyBindingView(keyCode: keyCode, modifiers: modifierValue)
             let hotkey = keyBinding.keys.joined(separator: "")
-            settingsManager.updateDictationHotkey(hotkey: hotkey, keyCode: Int(event.keyCode), modifiers: Int(modifierValue))
-            DictationHotkeyManager.shared.reload()
+            settingsManager.updateDictationHotkey(hotkey: hotkey, keyCode: Int(keyCode), modifiers: Int(modifierValue))
+            if !DictationHotkeyManager.shared.reload() {
+                settingsManager.updateDictationHotkey(
+                    hotkey: previousSettings.dictationHotkey,
+                    keyCode: previousSettings.dictationHotkeyKeyCode,
+                    modifiers: previousSettings.dictationHotkeyModifiers
+                )
+                DictationHotkeyManager.shared.reload()
+            }
             isRecordingHotkey = false
             stopRecordingHotkey()
             return nil
