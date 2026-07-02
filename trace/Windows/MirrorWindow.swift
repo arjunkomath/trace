@@ -245,10 +245,7 @@ private final class MirrorPreviewView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
 
         islandBodyLayer.fillColor = NSColor.black.cgColor
-        islandBodyLayer.shadowColor = NSColor.black.cgColor
-        islandBodyLayer.shadowOpacity = 0.6
-        islandBodyLayer.shadowRadius = 10
-        islandBodyLayer.shadowOffset = .zero
+        islandBodyLayer.shadowOpacity = 0
 
         previewContainerLayer.masksToBounds = true
         previewContainerLayer.backgroundColor = NSColor.black.cgColor
