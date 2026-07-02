@@ -72,6 +72,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Initialize QuickLink hotkey manager to register saved QuickLink hotkeys
         _ = QuickLinkHotkeyManager.shared
+
+        // Initialize dictation asset state and register saved opt-in hotkey if configured
+        _ = DictationCoordinator.shared
+        DictationHotkeyManager.shared.reload()
+        Task { @MainActor in
+            await DictationAssetManager.shared.refresh()
+        }
         
         // Initialize emoji manager and load emoji database
         _ = EmojiManager.shared
@@ -94,6 +101,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     deinit {
         hotkeyManager?.unregisterHotkey()
+        DictationHotkeyManager.shared.unregister()
+        Task { @MainActor in
+            DictationCoordinator.shared.cancel()
+        }
         stopGlobalEventMonitoring()
         onboardingWindow?.hide()
         onboardingWindow = nil
@@ -461,6 +472,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindow?.show()
         logger.notice("✅ Settings window shown")
+    }
+
+    @objc func showDictationSettings() {
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindow(initialSection: .dictation)
+        }
+        settingsWindow?.show(section: .dictation)
+        logger.notice("✅ Dictation settings shown")
     }
     
     

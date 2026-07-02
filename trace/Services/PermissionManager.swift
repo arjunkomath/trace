@@ -7,6 +7,7 @@
 
 import AppKit
 import ApplicationServices
+import AVFoundation
 import EventKit
 import os.log
 
@@ -20,6 +21,7 @@ class PermissionManager: ObservableObject {
     @Published var windowManagementAvailable = false
     @Published private(set) var systemEventsAvailable = false
     @Published private(set) var calendarAvailable = false
+    @Published private(set) var microphoneAvailable = false
     
     /// Track the last active application before Trace became frontmost
     internal var lastActiveApplication: NSRunningApplication?
@@ -229,6 +231,30 @@ class PermissionManager: ObservableObject {
         }
     }
     
+    // MARK: - System Events (AppleScript) Permissions
+
+    var microphoneAuthorizationStatus: AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
+    func refreshMicrophoneCapability() {
+        microphoneAvailable = microphoneAuthorizationStatus == .authorized
+    }
+
+    func requestMicrophonePermission() async -> Bool {
+        let granted = await AVCaptureDevice.requestAccess(for: .audio)
+        await MainActor.run {
+            self.microphoneAvailable = granted
+        }
+        return granted
+    }
+
+    func openMicrophonePrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     // MARK: - System Events (AppleScript) Permissions
     
     /// Tests if we can execute AppleScript commands for system control

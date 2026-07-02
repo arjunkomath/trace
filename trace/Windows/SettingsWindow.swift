@@ -10,8 +10,10 @@ import SwiftUI
 
 class SettingsWindow: NSWindow {
     private var hostingView: NSHostingView<SettingsView>?
+    private var initialSection: TraceSettingsSection
     
-    init() {
+    init(initialSection: TraceSettingsSection = .general) {
+        self.initialSection = initialSection
         super.init(
             contentRect: NSRect(
                 x: 0,
@@ -25,7 +27,7 @@ class SettingsWindow: NSWindow {
         )
         
         setupWindow()
-        setupContent()
+        setupContent(initialSection: initialSection)
     }
     
     private func setupWindow() {
@@ -55,8 +57,8 @@ class SettingsWindow: NSWindow {
         titlebarAppearsTransparent = true
     }
     
-    private func setupContent() {
-        let settingsView = SettingsView()
+    private func setupContent(initialSection: TraceSettingsSection) {
+        let settingsView = SettingsView(initialSection: initialSection)
         
         let hostingView = NSHostingView(rootView: settingsView)
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
@@ -71,6 +73,11 @@ class SettingsWindow: NSWindow {
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
         setIsVisible(true)
+    }
+
+    func show(section: TraceSettingsSection) {
+        setupContent(initialSection: section)
+        show()
     }
     
     func hide() {

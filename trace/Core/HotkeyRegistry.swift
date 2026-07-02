@@ -7,6 +7,7 @@ import os.log
 
 enum HotkeyType: Hashable {
     case appLauncher
+    case dictation
     case windowManagement(WindowPosition)
     case applicationLauncher(String) // for future use
     case quickLink(String) // QuickLink ID
@@ -15,6 +16,8 @@ enum HotkeyType: Hashable {
         switch self {
         case .appLauncher:
             return "App Launcher"
+        case .dictation:
+            return "Dictation"
         case .windowManagement(let position):
             return "Window: \(position.rawValue)"
         case .applicationLauncher(let bundleId):
@@ -33,6 +36,7 @@ struct HotkeyRegistration {
     let modifiers: UInt32
     let type: HotkeyType
     let action: () -> Void
+    let releaseAction: (() -> Void)?
     let eventHotkey: EventHotKeyRef
     
     var signature: String {
@@ -70,7 +74,8 @@ class HotkeyRegistry {
         keyCode: UInt32,
         modifiers: UInt32,
         type: HotkeyType,
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        releaseAction: (() -> Void)? = nil
     ) -> UInt32? {
         let signature = "\(keyCode):\(modifiers)"
         
@@ -108,6 +113,7 @@ class HotkeyRegistry {
             modifiers: modifiers,
             type: type,
             action: action,
+            releaseAction: releaseAction,
             eventHotkey: hotkey
         )
         
@@ -148,7 +154,8 @@ class HotkeyRegistry {
             keyCode: keyCode,
             modifiers: modifiers,
             type: oldRegistration.type,
-            action: oldRegistration.action
+            action: oldRegistration.action,
+            releaseAction: oldRegistration.releaseAction
         )
         
         return newId != nil
@@ -171,7 +178,10 @@ class HotkeyRegistry {
     private func installGlobalEventHandler() {
         logger.notice("🔧 Installing global event handler...")
         
-        var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        var eventSpecs = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
+        ]
         
         eventHandler = { (nextHandler, event, userData) -> OSStatus in
             let registry = HotkeyRegistry.shared
@@ -194,8 +204,13 @@ class HotkeyRegistry {
             
             // Find and execute the action
             if let registration = registry.registrations[hotkeyID.id] {
+                let eventKind = GetEventKind(event)
                 DispatchQueue.main.async {
-                    registration.action()
+                    if eventKind == UInt32(kEventHotKeyReleased) {
+                        registration.releaseAction?()
+                    } else {
+                        registration.action()
+                    }
                 }
             }
             
@@ -205,8 +220,8 @@ class HotkeyRegistry {
         let installStatus = InstallEventHandler(
             GetApplicationEventTarget(),
             eventHandler,
-            1,
-            &eventSpec,
+            eventSpecs.count,
+            &eventSpecs,
             nil,
             &eventHandlerRef
         )
@@ -235,4 +250,3 @@ class HotkeyRegistry {
         logger.notice("✅ HotkeyRegistry cleanup completed")
     }
 }
-
