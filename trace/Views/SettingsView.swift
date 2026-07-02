@@ -9,8 +9,9 @@ import SwiftUI
 import ServiceManagement
 import Carbon
 
-private enum TraceSettingsSection: String, CaseIterable, Identifiable {
+enum TraceSettingsSection: String, CaseIterable, Identifiable {
     case general
+    case dictation
     case caffeinate
     case windowHotkeys
     case appHotkeys
@@ -23,6 +24,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .dictation:
+            return "Dictation"
         case .caffeinate:
             return "Caffeinate"
         case .windowHotkeys:
@@ -40,6 +43,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .dictation:
+            return "Dictation"
         case .caffeinate:
             return "Caffeinate"
         case .windowHotkeys:
@@ -57,6 +62,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "Permissions, startup, appearance, and backups"
+        case .dictation:
+            return "Push-to-talk offline dictation"
         case .caffeinate:
             return "Keep your Mac awake"
         case .windowHotkeys:
@@ -74,6 +81,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "gearshape"
+        case .dictation:
+            return "waveform.and.mic"
         case .caffeinate:
             return "cup.and.saucer"
         case .windowHotkeys:
@@ -91,6 +100,8 @@ private enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return Color(nsColor: .systemGray)
+        case .dictation:
+            return Color(nsColor: .systemRed)
         case .caffeinate:
             return Color(nsColor: .systemBrown)
         case .windowHotkeys:
@@ -115,13 +126,17 @@ struct SettingsView: View {
     @State private var launchAtLogin: Bool = false
     @State private var currentKeyCombo: String = "⌥Space"
     @State private var isRecording: Bool = false
-    @State private var selectedSection: TraceSettingsSection = .general
+    @State private var selectedSection: TraceSettingsSection
     @ObservedObject private var settingsManager = SettingsManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     private let logger = AppLogger.settingsView
     private var effectiveColorScheme: ColorScheme {
         appearanceManager.colorScheme
+    }
+
+    init(initialSection: TraceSettingsSection = .general) {
+        _selectedSection = State(initialValue: initialSection)
     }
 
     var body: some View {
@@ -156,6 +171,8 @@ struct SettingsView: View {
                 onHotkeyRecord: handleHotkeyRecord,
                 onHotkeyReset: handleHotkeyReset
             )
+        case .dictation:
+            DictationSettingsView()
         case .caffeinate:
             CaffeinateSettingsView()
         case .windowHotkeys:

@@ -46,6 +46,10 @@
     <string>Trace needs access to your calendar to help you search for and quickly access your events.</string>
     <key>NSCameraUsageDescription</key>
     <string>Trace uses the camera only to show a temporary local mirror preview. Trace does not record, save, or send camera video.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Trace needs microphone access to transcribe your speech locally for dictation.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Trace uses on-device speech recognition to turn your dictation into text.</string>
     <key>NSCameraPortraitEffectEnabled</key>
     <true/>
     <key>NSCameraReactionEffectsEnabled</key>

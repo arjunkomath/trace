@@ -25,6 +25,7 @@ class ServiceContainer: ObservableObject {
     private var _processUsageMonitor: ProcessUsageMonitor?
     private var _caffeinateManager: CaffeinateManager?
     private var _mirrorManager: MirrorManager?
+    private var _dictationCoordinator: DictationCoordinator?
     
     // MARK: - Service Accessors
     
@@ -146,6 +147,16 @@ class ServiceContainer: ObservableObject {
         return monitor
     }
 
+    @MainActor
+    var dictationCoordinator: DictationCoordinator {
+        if let coordinator = _dictationCoordinator {
+            return coordinator
+        }
+        let coordinator = DictationCoordinator.shared
+        _dictationCoordinator = coordinator
+        return coordinator
+    }
+
     var caffeinateManager: CaffeinateManager {
         if let manager = _caffeinateManager {
             return manager
@@ -183,6 +194,10 @@ class ServiceContainer: ObservableObject {
         _processUsageMonitor = nil
         _caffeinateManager?.stop()
         _caffeinateManager = nil
+        Task { @MainActor in
+            _dictationCoordinator?.cancel()
+            _dictationCoordinator = nil
+        }
         Task { @MainActor in
             _mirrorManager?.hide()
             _mirrorManager = nil

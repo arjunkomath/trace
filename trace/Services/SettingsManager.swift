@@ -22,6 +22,10 @@ struct TraceSettings: Codable {
     var accentColor: String = TraceAccent.system.rawValue
     var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
     var caffeinateFlags: String = CaffeinateManager.defaultFlags
+    var dictationEnabled: Bool = false
+    var dictationHotkey: String = ""
+    var dictationHotkeyKeyCode: Int = 0
+    var dictationHotkeyModifiers: Int = 0
     
     // Main Hotkey
     var mainHotkeyKeyCode: Int = 49 // Default: Space
@@ -56,6 +60,10 @@ struct TraceSettings: Codable {
             try container.decodeIfPresent(Double.self, forKey: .launcherVerticalPositionRatio) ?? Self.defaultLauncherVerticalPositionRatio
         )
         caffeinateFlags = try container.decodeIfPresent(String.self, forKey: .caffeinateFlags) ?? CaffeinateManager.defaultFlags
+        dictationEnabled = try container.decodeIfPresent(Bool.self, forKey: .dictationEnabled) ?? false
+        dictationHotkey = try container.decodeIfPresent(String.self, forKey: .dictationHotkey) ?? ""
+        dictationHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .dictationHotkeyKeyCode) ?? 0
+        dictationHotkeyModifiers = try container.decodeIfPresent(Int.self, forKey: .dictationHotkeyModifiers) ?? 0
         
         // hotkey
         mainHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .mainHotkeyKeyCode) ?? 49
@@ -222,6 +230,29 @@ class SettingsManager: ObservableObject {
         settings.caffeinateFlags = flags
         saveSettings()
     }
+
+    // MARK: - Dictation
+
+    func updateDictationEnabled(_ enabled: Bool) {
+        guard settings.dictationEnabled != enabled else { return }
+
+        settings.dictationEnabled = enabled
+        saveSettings()
+    }
+
+    func updateDictationHotkey(hotkey: String, keyCode: Int, modifiers: Int) {
+        settings.dictationHotkey = hotkey
+        settings.dictationHotkeyKeyCode = keyCode
+        settings.dictationHotkeyModifiers = modifiers
+        saveSettings()
+    }
+
+    func clearDictationHotkey() {
+        settings.dictationHotkey = ""
+        settings.dictationHotkeyKeyCode = 0
+        settings.dictationHotkeyModifiers = 0
+        saveSettings()
+    }
     
     // MARK: - Main Hotkey
     
@@ -370,6 +401,16 @@ class SettingsManager: ObservableObject {
             if settings.mainHotkeyKeyCode == 49 && settings.mainHotkeyModifiers == 2048 {
                 settings.mainHotkeyKeyCode = importedSettings.mainHotkeyKeyCode
                 settings.mainHotkeyModifiers = importedSettings.mainHotkeyModifiers
+            }
+
+            if !settings.dictationEnabled {
+                settings.dictationEnabled = importedSettings.dictationEnabled
+            }
+
+            if settings.dictationHotkey.isEmpty && !importedSettings.dictationHotkey.isEmpty {
+                settings.dictationHotkey = importedSettings.dictationHotkey
+                settings.dictationHotkeyKeyCode = importedSettings.dictationHotkeyKeyCode
+                settings.dictationHotkeyModifiers = importedSettings.dictationHotkeyModifiers
             }
             
             // Window hotkeys - add new ones, keep existing
