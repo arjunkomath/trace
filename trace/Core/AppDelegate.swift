@@ -179,8 +179,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let caffeinateItem = NSMenuItem(title: caffeinateTitle, action: #selector(toggleCaffeinate), keyEquivalent: "")
         caffeinateItem.target = self
         caffeinateItem.state = caffeinateManager.isActive ? .on : .off
-        caffeinateItem.image = makeMenuBarImage(
-            named: "MenuBarCaffeinate",
+        caffeinateItem.image = makeMenuBarSymbolImage(
+            named: caffeinateManager.isActive ? "mug.fill" : "mug",
             fallbackSymbolName: caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
             accessibilityDescription: caffeinateTitle
         )
@@ -314,8 +314,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let description = isCaffeinateActive ? "Trace Caffeinate On" : "Trace"
 
         if isCaffeinateActive {
-            button.image = makeMenuBarImage(
-                named: "MenuBarCaffeinate",
+            button.image = makeMenuBarSymbolImage(
+                named: "mug.fill",
                 fallbackSymbolName: "cup.and.saucer.fill",
                 accessibilityDescription: description
             )
@@ -337,6 +337,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityDescription: String
     ) -> NSImage? {
         let image = NSImage(named: imageName)?.copy() as? NSImage
+            ?? NSImage(systemSymbolName: fallbackSymbolName, accessibilityDescription: accessibilityDescription)
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        return image
+    }
+
+    private func makeMenuBarSymbolImage(
+        named symbolName: String,
+        fallbackSymbolName: String,
+        accessibilityDescription: String
+    ) -> NSImage? {
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityDescription)
             ?? NSImage(systemSymbolName: fallbackSymbolName, accessibilityDescription: accessibilityDescription)
         image?.size = NSSize(width: 18, height: 18)
         image?.isTemplate = true

@@ -4,7 +4,7 @@
 
 <img width="1774" height="1075" alt="CleanShot 2026-05-19 at 22 50 42@2x" src="https://github.com/user-attachments/assets/5249826e-206b-423b-beb0-afa034599c44" />
 
-A SwiftUI-based application launcher that runs as a background service (LSUIElement) with global hotkey access. Features fuzzy search, window management, quick links, and system integration.
+A SwiftUI-based application launcher that runs as a background service (LSUIElement) with global hotkey access. Features fuzzy search, window management, quick links, push-to-talk dictation, and system integration.
 
 ## Features
 
@@ -12,6 +12,7 @@ A SwiftUI-based application launcher that runs as a background service (LSUIElem
 - **Window Management**: Snap windows to halves, thirds, or custom positions instantly
 - **Quick Links**: One-key access to your most-used files, folders, and websites
 - **Global Hotkeys**: Customizable shortcuts for launching apps and managing windows
+- **Push-to-Talk Dictation**: Hold a custom hotkey, speak, and release to paste on-device transcription into the active app
 - **Built-in Calculator**: Perform calculations directly without opening a separate app
 - **Calendar Integration**: Quick access to your calendar events without leaving the launcher
 - **Emoji Picker**: Search and copy from 1550+ emojis with fuzzy search
@@ -44,12 +45,20 @@ xcodebuild -project trace.xcodeproj -scheme trace -configuration Release build
 Grant when prompted:
 - **Accessibility**: For window management and app control
 - **Apple Events**: For system command execution
+- **Microphone**: For optional push-to-talk dictation
+- **Speech Recognition**: For optional on-device transcription
+
+## Dictation
+
+Trace includes opt-in push-to-talk dictation. Enable it from Settings → Dictation, set a hotkey, download the on-device speech asset for your system language if prompted, then hold the shortcut to speak and release to paste the transcription into the active app.
+
+Dictation is processed on your Mac using Apple's Speech framework. Trace does not save audio or transcripts.
 
 ## Architecture
 
 - **Language**: Swift 5.9+
 - **Framework**: SwiftUI with AppKit integration
-- **APIs**: Accessibility (AXUIElement), Carbon (EventHotKey), Core Graphics, EventKit (Calendar)
+- **APIs**: Accessibility (AXUIElement), Carbon (EventHotKey), Core Graphics, EventKit (Calendar), AVFoundation and Speech (Dictation)
 - **Dependencies**: Sparkle (auto-updates), SymbolPicker (UI icons)
 
 ### Key Components
@@ -61,6 +70,7 @@ Grant when prompted:
 - `ToastManager`: Non-intrusive notification system
 - `CalendarManager`: EventKit integration for calendar access
 - `EmojiManager`: Comprehensive emoji database with search functionality
+- `DictationCoordinator`: Push-to-talk dictation lifecycle, speech analysis, and text insertion
 
 ## Development
 
@@ -92,6 +102,7 @@ trace/
 Settings stored in `UserDefaults` and `~/Library/Application Support/Trace/`:
 - Hotkey combinations (keyCode + modifiers)
 - Quick links with custom hotkeys
+- Dictation opt-in state and push-to-talk hotkey
 - Launch at login preference
 - Application cache and icons
 
