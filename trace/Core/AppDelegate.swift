@@ -206,7 +206,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         // Version and Build (disabled)
+        #if DEBUG
+        let versionText = "Version \(AppConstants.version) (\(AppConstants.build)) Debug"
+        #else
         let versionText = "Version \(AppConstants.version) (\(AppConstants.build))"
+        #endif
         let versionItem = NSMenuItem(title: versionText, action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         menu.addItem(versionItem)
@@ -506,19 +510,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings
     
     @objc func showSettings() {
-        if settingsWindow == nil {
-            settingsWindow = SettingsWindow()
+        launcherWindow?.hide(restoreFocus: false)
+        stopGlobalEventMonitoring()
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            if self.settingsWindow == nil {
+                self.settingsWindow = SettingsWindow()
+            }
+            self.settingsWindow?.show()
+            self.logger.notice("✅ Settings window shown")
         }
-        settingsWindow?.show()
-        logger.notice("✅ Settings window shown")
     }
 
     @objc func showDictationSettings() {
-        if settingsWindow == nil {
-            settingsWindow = SettingsWindow(initialSection: .dictation)
+        launcherWindow?.hide(restoreFocus: false)
+        stopGlobalEventMonitoring()
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            if self.settingsWindow == nil {
+                self.settingsWindow = SettingsWindow(initialSection: .dictation)
+            }
+            self.settingsWindow?.show(section: .dictation)
+            self.logger.notice("✅ Dictation settings shown")
         }
-        settingsWindow?.show(section: .dictation)
-        logger.notice("✅ Dictation settings shown")
     }
     
     
