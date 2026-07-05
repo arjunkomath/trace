@@ -219,6 +219,7 @@ class SettingsManager: ObservableObject {
         set { userDefaults.set(newValue, forKey: syncLastVersionKey) }
     }
 
+    @MainActor
     func testSyncServerConnection() async throws -> SyncSettingsState? {
         let request = try makeSyncRequest(path: "/v1/settings", method: "GET")
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -236,6 +237,7 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @MainActor
     func uploadSettingsToSyncServer() async throws -> SyncSettingsState {
         let requestBody = SyncSettingsUploadRequest(
             baseVersion: syncLastVersion,
@@ -265,6 +267,7 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @MainActor
     func downloadSettingsFromSyncServer(overwriteExisting: Bool = true) async throws -> SyncSettingsState {
         let state = try await fetchSyncSettings()
         guard state.settings.version == "1.0" else {
@@ -287,6 +290,7 @@ class SettingsManager: ObservableObject {
         case 401:
             throw SyncServerError.unauthorized
         case 404:
+            syncLastVersion = 0
             throw SyncServerError.notFound
         default:
             throw SyncServerError.unexpectedStatus(statusCode)
