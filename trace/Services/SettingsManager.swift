@@ -113,12 +113,34 @@ struct TraceSettings: Codable {
     }
 }
 
+struct SyncSettingsState: Codable {
+    let version: Int
+    let updatedAt: String
+    let updatedBy: String?
+    let sha256: String
+    let settings: TraceSettings
+}
+
+struct SyncSettingsUploadRequest: Codable {
+    let baseVersion: Int
+    let updatedBy: String
+    let settings: TraceSettings
+}
+
+private struct SyncConflictResponse: Codable {
+    let currentVersion: Int
+}
+
 // MARK: - Settings Manager
 
 class SettingsManager: ObservableObject {
     static let shared = SettingsManager()
     private let logger = AppLogger.settingsManager
     private let fileManager = FileManager.default
+    private let userDefaults = UserDefaults.standard
+    private let syncServerURLKey = "sync_server_url"
+    private let syncServerTokenKey = "sync_server_token"
+    private let syncLastVersionKey = "sync_last_version"
     
     @Published var settings: TraceSettings
     
@@ -178,6 +200,150 @@ class SettingsManager: ObservableObject {
         } catch {
             logger.error("Failed to save settings: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Sync Server Settings
+
+    var syncServerURL: String {
+        get { userDefaults.string(forKey: syncServerURLKey) ?? "" }
+        set { userDefaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: syncServerURLKey) }
+    }
+
+    var syncServerToken: String {
+        get { userDefaults.string(forKey: syncServerTokenKey) ?? "" }
+        set { userDefaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: syncServerTokenKey) }
+    }
+
+    var syncLastVersion: Int {
+        get { userDefaults.integer(forKey: syncLastVersionKey) }
+        set { userDefaults.set(newValue, forKey: syncLastVersionKey) }
+    }
+
+    @MainActor
+    func testSyncServerConnection() async throws -> SyncSettingsState? {
+        let request = try makeSyncRequest(path: "/v1/settings", method: "GET")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let statusCode = try httpStatusCode(from: response)
+
+        switch statusCode {
+        case 200:
+            return try decodeSyncState(from: data)
+        case 404:
+            return nil
+        case 401:
+            throw SyncServerError.unauthorized
+        default:
+            throw SyncServerError.unexpectedStatus(statusCode)
+        }
+    }
+
+    @MainActor
+    func uploadSettingsToSyncServer() async throws -> SyncSettingsState {
+        let requestBody = SyncSettingsUploadRequest(
+            baseVersion: syncLastVersion,
+            updatedBy: Host.current().localizedName ?? "Trace Mac",
+            settings: exportSettings()
+        )
+
+        var request = try makeSyncRequest(path: "/v1/settings", method: "PUT")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try syncJSONEncoder().encode(requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let statusCode = try httpStatusCode(from: response)
+
+        switch statusCode {
+        case 200:
+            let state = try decodeSyncState(from: data)
+            syncLastVersion = state.version
+            return state
+        case 401:
+            throw SyncServerError.unauthorized
+        case 409:
+            let conflict = try? JSONDecoder().decode(SyncConflictResponse.self, from: data)
+            throw SyncServerError.conflict(currentVersion: conflict?.currentVersion ?? 0)
+        default:
+            throw SyncServerError.unexpectedStatus(statusCode)
+        }
+    }
+
+    @MainActor
+    func downloadSettingsFromSyncServer(overwriteExisting: Bool = true) async throws -> SyncSettingsState {
+        let state = try await fetchSyncSettings()
+        guard state.settings.version == "1.0" else {
+            throw SettingsError.incompatibleVersion(state.settings.version)
+        }
+
+        try importSettings(state.settings, overwriteExisting: overwriteExisting)
+        syncLastVersion = state.version
+        return state
+    }
+
+    private func fetchSyncSettings() async throws -> SyncSettingsState {
+        let request = try makeSyncRequest(path: "/v1/settings", method: "GET")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let statusCode = try httpStatusCode(from: response)
+
+        switch statusCode {
+        case 200:
+            return try decodeSyncState(from: data)
+        case 401:
+            throw SyncServerError.unauthorized
+        case 404:
+            syncLastVersion = 0
+            throw SyncServerError.notFound
+        default:
+            throw SyncServerError.unexpectedStatus(statusCode)
+        }
+    }
+
+    private func makeSyncRequest(path: String, method: String) throws -> URLRequest {
+        let urlString = syncServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = syncServerToken.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !urlString.isEmpty, var components = URLComponents(string: urlString) else {
+            throw SyncServerError.missingServerURL
+        }
+        guard !token.isEmpty else {
+            throw SyncServerError.missingToken
+        }
+
+        components.path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let basePath = components.path.isEmpty ? "" : "/\(components.path)"
+        components.path = basePath + path
+
+        guard let url = components.url, let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else {
+            throw SyncServerError.invalidServerURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return request
+    }
+
+    private func httpStatusCode(from response: URLResponse) throws -> Int {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SyncServerError.invalidResponse
+        }
+        return httpResponse.statusCode
+    }
+
+    private func decodeSyncState(from data: Data) throws -> SyncSettingsState {
+        try syncJSONDecoder().decode(SyncSettingsState.self, from: data)
+    }
+
+    private func syncJSONEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private func syncJSONDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
     
     // MARK: - General Settings
@@ -507,6 +673,38 @@ enum SettingsError: LocalizedError {
             return "Invalid settings file format"
         case .importFailed(let reason):
             return "Failed to import settings: \(reason)"
+        }
+    }
+}
+
+enum SyncServerError: LocalizedError {
+    case missingServerURL
+    case invalidServerURL
+    case missingToken
+    case unauthorized
+    case notFound
+    case conflict(currentVersion: Int)
+    case invalidResponse
+    case unexpectedStatus(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingServerURL:
+            return "Enter a sync server URL."
+        case .invalidServerURL:
+            return "Enter a valid http or https sync server URL."
+        case .missingToken:
+            return "Enter the sync server token."
+        case .unauthorized:
+            return "The sync server rejected the token."
+        case .notFound:
+            return "No settings have been uploaded to this sync server yet."
+        case .conflict(let currentVersion):
+            return "Remote settings changed first. Download the remote settings before uploading. Current remote version: \(currentVersion)."
+        case .invalidResponse:
+            return "The sync server returned an invalid response."
+        case .unexpectedStatus(let status):
+            return "The sync server returned HTTP \(status)."
         }
     }
 }
