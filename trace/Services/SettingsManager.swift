@@ -239,8 +239,13 @@ class SettingsManager: ObservableObject {
 
     @MainActor
     func uploadSettingsToSyncServer() async throws -> SyncSettingsState {
+        try await uploadSettingsToSyncServer(baseVersion: syncLastVersion, retryEmptyRemoteConflict: true)
+    }
+
+    @MainActor
+    private func uploadSettingsToSyncServer(baseVersion: Int, retryEmptyRemoteConflict: Bool) async throws -> SyncSettingsState {
         let requestBody = SyncSettingsUploadRequest(
-            baseVersion: syncLastVersion,
+            baseVersion: baseVersion,
             updatedBy: Host.current().localizedName ?? "Trace Mac",
             settings: exportSettings()
         )
@@ -261,7 +266,12 @@ class SettingsManager: ObservableObject {
             throw SyncServerError.unauthorized
         case 409:
             let conflict = try? JSONDecoder().decode(SyncConflictResponse.self, from: data)
-            throw SyncServerError.conflict(currentVersion: conflict?.currentVersion ?? 0)
+            let currentVersion = conflict?.currentVersion ?? 0
+            if retryEmptyRemoteConflict && currentVersion == 0 {
+                syncLastVersion = 0
+                return try await uploadSettingsToSyncServer(baseVersion: 0, retryEmptyRemoteConflict: false)
+            }
+            throw SyncServerError.conflict(currentVersion: currentVersion)
         default:
             throw SyncServerError.unexpectedStatus(statusCode)
         }
