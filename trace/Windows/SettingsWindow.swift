@@ -71,13 +71,35 @@ class SettingsWindow: NSWindow {
     
     func show() {
         NSApp.activate(ignoringOtherApps: true)
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
+
+        orderFrontRegardless()
         makeKeyAndOrderFront(nil)
+        makeMain()
         setIsVisible(true)
+
+        ensureFocus()
     }
 
     func show(section: TraceSettingsSection) {
         setupContent(initialSection: section)
         show()
+    }
+
+    private func ensureFocus() {
+        let delays: [TimeInterval] = [0.05, 0.15, 0.3]
+
+        for delay in delays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.isVisible else { return }
+
+                NSApp.activate(ignoringOtherApps: true)
+                NSRunningApplication.current.activate(options: [.activateAllWindows])
+                self.orderFrontRegardless()
+                self.makeKeyAndOrderFront(nil)
+                self.makeMain()
+            }
+        }
     }
     
     func hide() {
