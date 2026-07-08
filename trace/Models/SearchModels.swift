@@ -79,6 +79,7 @@ enum ResultCategory {
     case customFolder
     case appearance
     case systemSettings
+    case menuItems
     
     var displayName: String {
         switch self {
@@ -96,6 +97,8 @@ enum ResultCategory {
             return "Appearance"
         case .systemSettings:
             return "System Settings"
+        case .menuItems:
+            return "Menu Items"
         }
     }
 }

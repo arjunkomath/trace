@@ -23,6 +23,7 @@ class ServiceContainer: ObservableObject {
     private var _settingsManager: SettingsManager?
     private var _emojiManager: EmojiManager?
     private var _processUsageMonitor: ProcessUsageMonitor?
+    private var _menuBarService: MenuBarService?
     private var _caffeinateManager: CaffeinateManager?
     private var _mirrorManager: MirrorManager?
     private var _dictationCoordinator: DictationCoordinator?
@@ -147,6 +148,15 @@ class ServiceContainer: ObservableObject {
         return monitor
     }
 
+    var menuBarService: MenuBarService {
+        if let service = _menuBarService {
+            return service
+        }
+        let service = MenuBarService()
+        _menuBarService = service
+        return service
+    }
+
     @MainActor
     var dictationCoordinator: DictationCoordinator {
         if let coordinator = _dictationCoordinator {
@@ -192,6 +202,8 @@ class ServiceContainer: ObservableObject {
         _settingsManager = nil
         _emojiManager = nil
         _processUsageMonitor = nil
+        _menuBarService?.invalidateCache()
+        _menuBarService = nil
         _caffeinateManager?.stop()
         _caffeinateManager = nil
         Task { @MainActor in
