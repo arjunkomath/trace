@@ -107,6 +107,20 @@ extension LauncherView {
     /// Calculate search results using provider system
     func calculateSearchResults(query: String) async -> [SearchResult] {
         let runningApps = services.appSearchManager.getRunningAppBundleIds()
+
+        if MenuItemProvider.isScoped(query) {
+            let context = SearchContext(
+                query: query,
+                services: services,
+                runningApps: runningApps,
+                eventPublisher: eventPublisher
+            )
+            return await createMenuItemProvider().scopedResults(
+                filter: MenuItemProvider.scopedFilter(from: query),
+                context: context
+            )
+        }
+
         let searchCoordinator = createSearchCoordinator()
         
         return await searchCoordinator.search(
@@ -121,6 +135,7 @@ extension LauncherView {
     private func createSearchCoordinator() -> SearchCoordinator {
         let providers: [ResultProvider] = [
             AppResultProvider(),
+            createMenuItemProvider(),
             SystemCommandProvider(
                 clearSearch: clearSearch,
                 onClose: onClose
@@ -136,6 +151,12 @@ extension LauncherView {
         ]
         
         return SearchCoordinator(providers: providers)
+    }
+
+    private func createMenuItemProvider() -> MenuItemProvider {
+        MenuItemProvider(setSearchText: { newValue in
+            searchText = newValue
+        })
     }
     
     
@@ -264,7 +285,9 @@ extension LauncherView {
         case .command:
             // Use the command's semantic identifier for tracking
             let commandId = result.commandId ?? getCommandIdentifier(for: result.title)
-            services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
+            if !MenuItemProvider.shouldSkipUsageTracking(commandId: commandId) {
+                services.usageTracker.recordUsage(for: commandId, type: UsageType.command)
+            }
         case .suggestion:
             let commandId = result.commandId ?? "com.trace.search.unknown"
             services.usageTracker.recordUsage(for: commandId, type: UsageType.webSearch)
@@ -318,6 +341,20 @@ extension LauncherView {
                 } else if result.commandId == "com.trace.command.settings" {
                     // Don't close launcher
                     clearSearch()
+                } else if result.commandId == MenuItemProvider.commandId {
+                    selectedIndex = 0
+                    selectedActionIndex = 0
+                } else if MenuItemProvider.isStateCommand(commandId: result.commandId) {
+                    selectedIndex = 0
+                    selectedActionIndex = 0
+                } else if MenuItemProvider.isMenuItemCommand(commandId: result.commandId) {
+                    if success {
+                        clearSearch()
+                        onClose()
+                    } else {
+                        selectedIndex = 0
+                        selectedActionIndex = 0
+                    }
                 } else {
                     // For other commands, close launcher
                     clearSearch()

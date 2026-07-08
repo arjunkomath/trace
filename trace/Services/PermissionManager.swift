@@ -171,6 +171,10 @@ class PermissionManager: ObservableObject {
         logger.debug("No suitable application with windows found")
         return nil
     }
+
+    var currentTargetApplication: NSRunningApplication? {
+        findTargetApplication()
+    }
     
     /// Attempts to request accessibility permissions with proper user guidance
     func requestWindowManagementPermissions() {
