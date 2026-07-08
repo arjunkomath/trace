@@ -54,6 +54,12 @@ Trace includes opt-in push-to-talk dictation. Enable it from Settings → Dictat
 
 Dictation is processed on your Mac using Apple's Speech framework. Trace does not save audio or transcripts.
 
+## Settings Sync
+
+Trace can back up and restore settings through a self-hosted sync server. Open Settings → General → Remote Settings Sync, enter your sync server URL and bearer token, then use Test, Download, or Upload.
+
+For server setup, Docker, Docker Compose, API, and security details, see the [Trace Sync Server README](https://github.com/arjunkomath/trace-sync-server#readme).
+
 ## Architecture
 
 - **Language**: Swift 5.9+

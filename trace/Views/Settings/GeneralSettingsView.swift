@@ -28,10 +28,6 @@ struct GeneralSettingsView: View {
     @State private var exportedFileURL: URL?
     @State private var importOverwriteExisting = false
     @State private var importError: String?
-    @State private var syncServerURL = ""
-    @State private var syncServerToken = ""
-    @State private var syncStatus = "Not configured"
-    @State private var isSyncingSettings = false
     @ObservedObject private var settingsManager = SettingsManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.traceTheme) private var traceTheme
@@ -312,73 +308,17 @@ struct GeneralSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-
-                NativeSettingsDivider()
-
-                VStack(spacing: 0) {
-                    NativeSettingsRow(
-                        title: "Sync Server URL",
-                        subtitle: "Self-hosted Trace sync server"
-                    ) {
-                        TextField("http://localhost:8787", text: $syncServerURL)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 220)
-                            .onChange(of: syncServerURL) { _, newValue in
-                                settingsManager.syncServerURL = newValue
-                            }
-                    }
-
-                    NativeSettingsDivider()
-
-                    NativeSettingsRow(
-                        title: "Sync Server Token",
-                        subtitle: "Shared bearer token from your server"
-                    ) {
-                        SecureField("Token", text: $syncServerToken)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 220)
-                            .onChange(of: syncServerToken) { _, newValue in
-                                settingsManager.syncServerToken = newValue
-                            }
-                    }
-
-                    NativeSettingsDivider()
-
-                    NativeSettingsRow(
-                        title: "Sync Now",
-                        subtitle: syncStatus
-                    ) {
-                        HStack(spacing: 8) {
-                            Button("Test") {
-                                testSyncServer()
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button("Download") {
-                                downloadSettingsFromSyncServer()
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button("Upload") {
-                                uploadSettingsToSyncServer()
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                        .disabled(isSyncingSettings)
-                    }
-                }
             } footer: {
-                Text("Export includes hotkeys, custom folders, app preferences, and usage statistics. Sync uses a self-hosted server and stores settings as plaintext JSON on that server.")
+                Text("Export includes hotkeys, custom folders, app preferences, and usage statistics.")
             }
+
+            RemoteSettingsSyncView()
         }
         .onAppear {
             // Load settings from SettingsManager
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
             accentColor = settingsManager.selectedAccent
-            syncServerURL = settingsManager.syncServerURL
-            syncServerToken = settingsManager.syncServerToken
-            syncStatus = settingsManager.syncLastVersion > 0 ? "Last synced remote version: \(settingsManager.syncLastVersion)" : "Not synced yet"
             
             // Check permissions
             checkPermissions()
@@ -462,72 +402,6 @@ struct GeneralSettingsView: View {
         } catch {
             showAlert(title: "Import Failed", message: error.localizedDescription)
         }
-    }
-
-    private func testSyncServer() {
-        guard !isSyncingSettings else { return }
-        isSyncingSettings = true
-        syncStatus = "Testing..."
-
-        Task {
-            do {
-                if let state = try await settingsManager.testSyncServerConnection() {
-                    updateSyncStatus("Connected. Remote version: \(state.version)")
-                } else {
-                    updateSyncStatus("Connected. No remote settings yet.")
-                }
-            } catch {
-                finishSyncWithError(prefix: "Test failed", error: error)
-            }
-        }
-    }
-
-    private func uploadSettingsToSyncServer() {
-        guard !isSyncingSettings else { return }
-        isSyncingSettings = true
-        syncStatus = "Uploading..."
-
-        Task {
-            do {
-                let state = try await settingsManager.uploadSettingsToSyncServer()
-                updateSyncStatus("Uploaded remote version \(state.version)")
-            } catch {
-                finishSyncWithError(prefix: "Upload failed", error: error)
-            }
-        }
-    }
-
-    private func downloadSettingsFromSyncServer() {
-        guard !isSyncingSettings else { return }
-        isSyncingSettings = true
-        syncStatus = "Downloading..."
-
-        Task {
-            do {
-                let state = try await settingsManager.downloadSettingsFromSyncServer(overwriteExisting: true)
-                await MainActor.run {
-                    reloadManagersAfterImport()
-                    syncStatus = "Downloaded remote version \(state.version)"
-                    isSyncingSettings = false
-                }
-            } catch {
-                finishSyncWithError(prefix: "Download failed", error: error)
-            }
-        }
-    }
-
-    @MainActor
-    private func updateSyncStatus(_ status: String) {
-        syncStatus = status
-        isSyncingSettings = false
-    }
-
-    @MainActor
-    private func finishSyncWithError(prefix: String, error: Error) {
-        let message = error.localizedDescription
-        syncStatus = "\(prefix): \(message)"
-        isSyncingSettings = false
-        showAlert(title: prefix, message: message)
     }
     
     private func reloadManagersAfterImport() {

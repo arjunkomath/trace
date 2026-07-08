@@ -296,7 +296,7 @@ private struct SettingsTopTabBar: View {
         VStack(spacing: 0) {
             GeometryReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         ForEach(TraceSettingsSection.allCases) { section in
                             SettingsTopTabButton(
                                 section: section,
@@ -306,13 +306,13 @@ private struct SettingsTopTabBar: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
                     .frame(minWidth: proxy.size.width, alignment: .center)
                 }
             }
-            .frame(height: 80)
+            .frame(height: 68)
 
             Rectangle()
                 .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.10))
@@ -349,7 +349,7 @@ private struct SettingsTopTabButton: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
             }
-            .frame(width: 86, height: 58)
+            .frame(width: 78, height: 52)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(backgroundFill)
