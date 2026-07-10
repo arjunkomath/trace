@@ -136,8 +136,8 @@ final class MirrorWindow: NSPanel {
     }
 
     private func windowFrame(for size: NSSize) -> NSRect {
-        let screen = NSScreen.main ?? NSScreen.screens.first
-        guard let screen else {
+        // Place Mirror on the screen with the active window, not always the main display.
+        guard let screen = NSScreen.active else {
             return NSRect(origin: .zero, size: size)
         }
 

@@ -90,7 +90,7 @@ class LauncherWindow: NSPanel {
     }
     
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
-        guard let screen = screen ?? self.screen ?? NSScreen.main else {
+        guard let screen = screen ?? self.screen ?? NSScreen.active else {
             return super.constrainFrameRect(frameRect, to: screen)
         }
         
@@ -171,7 +171,8 @@ class LauncherWindow: NSPanel {
     }
     
     private func positionOnScreen() {
-        guard let screen = NSScreen.main else { return }
+        // Place the launcher on the screen with the active window, not always the main display.
+        guard let screen = NSScreen.active else { return }
         resizeToFitContent()
         
         let nextFrame = frame(
@@ -188,7 +189,7 @@ class LauncherWindow: NSPanel {
     
     @objc private func windowDidMove() {
         guard isVisible, !isApplyingSavedPosition else { return }
-        guard let screen = screen ?? NSScreen.main else { return }
+        guard let screen = screen ?? NSScreen.active else { return }
         
         let constrainedFrame = horizontallyCenteredFrame(frame, on: screen)
         if frame.origin != constrainedFrame.origin {
@@ -204,7 +205,7 @@ class LauncherWindow: NSPanel {
 
     @objc private func launcherContentSizeDidChange() {
         guard isVisible else { return }
-        guard let screen = screen ?? NSScreen.main else { return }
+        guard let screen = screen ?? NSScreen.active else { return }
 
         let previousMaxY = frame.maxY
         savePositionWorkItem?.cancel()
