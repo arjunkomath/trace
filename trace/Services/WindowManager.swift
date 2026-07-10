@@ -35,6 +35,8 @@ enum WindowPosition: String, CaseIterable {
     case larger = "larger"
     case center = "center"
     case centerProminently = "center-prominently"
+    case moveToLeftDisplay = "move-to-left-display"
+    case moveToRightDisplay = "move-to-right-display"
     
     var displayName: String {
         switch self {
@@ -61,6 +63,8 @@ enum WindowPosition: String, CaseIterable {
         case .larger: return "Larger"
         case .center: return "Center"
         case .centerProminently: return "Center Prominently"
+        case .moveToLeftDisplay: return "Move to Left Display"
+        case .moveToRightDisplay: return "Move to Right Display"
         }
     }
     
@@ -89,6 +93,8 @@ enum WindowPosition: String, CaseIterable {
         case .larger: return "Make window larger"
         case .center: return "Center window on screen"
         case .centerProminently: return "Center and resize prominently"
+        case .moveToLeftDisplay: return "Move window to the display on the left, scaling size and position"
+        case .moveToRightDisplay: return "Move window to the display on the right, scaling size and position"
         }
     }
 }
@@ -130,19 +136,276 @@ class WindowManager: ObservableObject {
     }
     
     private func repositionWindow(_ window: AXUIElement, to position: WindowPosition) -> Bool {
-        guard let screen = NSScreen.main else {
-            logger.error("Could not get main screen")
+        let axWindowFrame = getCurrentWindowFrame(window)
+        let appKitWindowFrame = axWindowFrame.map(convertAXFrameToAppKit)
+        
+        // Left/right half cycle across adjacent monitors (Rectangle-style).
+        if position == .leftHalf || position == .rightHalf {
+            let windowFrame = appKitWindowFrame
+                ?? screenContainingWindow(nil)?.visibleFrame
+                ?? NSScreen.main?.visibleFrame
+                ?? .zero
+            
+            guard windowFrame != .zero else {
+                logger.error("Could not determine window frame for horizontal half positioning")
+                return false
+            }
+            
+            let targetAppKitFrame = calculateHorizontalHalfFrame(
+                direction: position == .leftHalf ? .left : .right,
+                windowFrame: windowFrame
+            )
+            logger.debug(
+                "Horizontal half \(position.rawValue): appKit \(NSStringFromRect(targetAppKitFrame))"
+            )
+            return setWindowFrame(window, frame: convertAppKitFrameToAX(targetAppKitFrame))
+        }
+        
+        // Move to adjacent display, preserving size and relative position.
+        if position == .moveToLeftDisplay || position == .moveToRightDisplay {
+            let windowFrame = appKitWindowFrame
+                ?? screenContainingWindow(nil)?.visibleFrame
+                ?? NSScreen.main?.visibleFrame
+                ?? .zero
+            
+            guard windowFrame != .zero else {
+                logger.error("Could not determine window frame for display move")
+                return false
+            }
+            
+            let targetAppKitFrame = moveWindowFrameToAdjacentDisplay(
+                windowFrame: windowFrame,
+                direction: position == .moveToLeftDisplay ? .left : .right
+            )
+            
+            // No adjacent display — leave window where it is.
+            if framesApproximatelyEqual(targetAppKitFrame, windowFrame) {
+                logger.info("No display to the \(position == .moveToLeftDisplay ? "left" : "right"); keeping window on current display")
+                return true
+            }
+            
+            logger.debug(
+                "Move to \(position.rawValue): appKit \(NSStringFromRect(targetAppKitFrame))"
+            )
+            return setWindowFrame(window, frame: convertAppKitFrameToAX(targetAppKitFrame))
+        }
+        
+        guard let screen = screenContainingWindow(appKitWindowFrame) ?? NSScreen.main else {
+            logger.error("Could not determine screen for window")
             return false
         }
         
         let screenFrame = screen.visibleFrame
-        let newFrame = calculateFrame(for: position, screenFrame: screenFrame, window: window)
+        let currentFrame = appKitWindowFrame
+            ?? CGRect(x: screenFrame.midX - 300, y: screenFrame.midY - 200, width: 600, height: 400)
+        let newAppKitFrame = calculateFrame(
+            for: position,
+            screenFrame: screenFrame,
+            currentFrame: currentFrame
+        )
         
-        return setWindowFrame(window, frame: newFrame)
+        logger.debug(
+            "Reposition \(position.rawValue) on screen \(screen.localizedName): appKit \(NSStringFromRect(newAppKitFrame))"
+        )
+        return setWindowFrame(window, frame: convertAppKitFrameToAX(newAppKitFrame))
     }
     
-    private func calculateFrame(for position: WindowPosition, screenFrame: CGRect, window: AXUIElement) -> CGRect {
-        let _: CGFloat = 20 // For almost-maximize
+    // MARK: - Multi-monitor helpers
+    
+    private enum HorizontalDirection {
+        case left
+        case right
+    }
+    
+    /// Ordered left→right half slots across all displays:
+    /// left mon1, right mon1, left mon2, right mon2, ...
+    private struct HorizontalHalfSlot {
+        let screen: NSScreen
+        let isLeftHalf: Bool
+        
+        var frame: CGRect {
+            let visible = screen.visibleFrame
+            let width = visible.width / 2
+            return CGRect(
+                x: isLeftHalf ? visible.minX : visible.minX + width,
+                y: visible.minY,
+                width: width,
+                height: visible.height
+            )
+        }
+    }
+    
+    private func screensLeftToRight() -> [NSScreen] {
+        NSScreen.screens.sorted { $0.frame.minX < $1.frame.minX }
+    }
+    
+    private func horizontalHalfSlots() -> [HorizontalHalfSlot] {
+        screensLeftToRight().flatMap { screen in
+            [
+                HorizontalHalfSlot(screen: screen, isLeftHalf: true),
+                HorizontalHalfSlot(screen: screen, isLeftHalf: false)
+            ]
+        }
+    }
+    
+    /// Move the window to the neighboring display on the left or right.
+    /// Remaps both origin and size proportionally to the destination visible frame,
+    /// so e.g. right-half on a 2560×1440 display becomes right-half on a 1512×982 display.
+    /// If no display exists in that direction, returns the original frame.
+    private func moveWindowFrameToAdjacentDisplay(
+        windowFrame: CGRect,
+        direction: HorizontalDirection
+    ) -> CGRect {
+        let screens = screensLeftToRight()
+        guard !screens.isEmpty else { return windowFrame }
+        
+        guard let currentScreen = screenContainingWindow(windowFrame),
+              let currentIndex = screens.firstIndex(where: {
+                  $0.frame.equalTo(currentScreen.frame)
+              }) else {
+            return windowFrame
+        }
+        
+        let targetIndex: Int
+        switch direction {
+        case .left:
+            targetIndex = currentIndex - 1
+        case .right:
+            targetIndex = currentIndex + 1
+        }
+        
+        guard screens.indices.contains(targetIndex) else {
+            return windowFrame
+        }
+        
+        let source = currentScreen.visibleFrame
+        let destination = screens[targetIndex].visibleFrame
+        
+        guard source.width > 0, source.height > 0 else {
+            return windowFrame
+        }
+        
+        // Normalize the window rect against the source display (0…1 in each axis),
+        // then scale onto the destination display's visible area.
+        let relativeX = (windowFrame.minX - source.minX) / source.width
+        let relativeY = (windowFrame.minY - source.minY) / source.height
+        let relativeWidth = windowFrame.width / source.width
+        let relativeHeight = windowFrame.height / source.height
+        
+        var width = relativeWidth * destination.width
+        var height = relativeHeight * destination.height
+        var x = destination.minX + relativeX * destination.width
+        var y = destination.minY + relativeY * destination.height
+        
+        // Keep fully on destination (handles floating-point edge cases / slightly oversize windows).
+        width = min(max(width, 1), destination.width)
+        height = min(max(height, 1), destination.height)
+        x = min(max(x, destination.minX), destination.maxX - width)
+        y = min(max(y, destination.minY), destination.maxY - height)
+        
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+    
+    /// Cycle half positions across monitors.
+    /// Left:  right mon2 → left mon2 → right mon1 → left mon1
+    /// Right: left mon1 → right mon1 → left mon2 → right mon2
+    private func calculateHorizontalHalfFrame(
+        direction: HorizontalDirection,
+        windowFrame: CGRect
+    ) -> CGRect {
+        let slots = horizontalHalfSlots()
+        guard !slots.isEmpty else {
+            return windowFrame
+        }
+        
+        if let currentIndex = slots.firstIndex(where: { framesApproximatelyEqual($0.frame, windowFrame) }) {
+            switch direction {
+            case .left:
+                let nextIndex = max(0, currentIndex - 1)
+                return slots[nextIndex].frame
+            case .right:
+                let nextIndex = min(slots.count - 1, currentIndex + 1)
+                return slots[nextIndex].frame
+            }
+        }
+        
+        // Not currently snapped to a half: snap on the window's current screen.
+        let screen = screenContainingWindow(windowFrame) ?? NSScreen.main ?? slots[0].screen
+        let isLeft = direction == .left
+        return HorizontalHalfSlot(screen: screen, isLeftHalf: isLeft).frame
+    }
+    
+    private func framesApproximatelyEqual(_ lhs: CGRect, _ rhs: CGRect, tolerance: CGFloat = 12) -> Bool {
+        abs(lhs.minX - rhs.minX) <= tolerance
+            && abs(lhs.minY - rhs.minY) <= tolerance
+            && abs(lhs.width - rhs.width) <= tolerance
+            && abs(lhs.height - rhs.height) <= tolerance
+    }
+    
+    /// Screen with the largest intersection area with the window (by center fallback).
+    private func screenContainingWindow(_ windowFrame: CGRect?) -> NSScreen? {
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return nil }
+        
+        guard let windowFrame else {
+            return NSScreen.main ?? screens.first
+        }
+        
+        var bestScreen: NSScreen?
+        var bestArea: CGFloat = 0
+        
+        for screen in screens {
+            let intersection = screen.frame.intersection(windowFrame)
+            let area = intersection.isNull ? 0 : intersection.width * intersection.height
+            if area > bestArea {
+                bestArea = area
+                bestScreen = screen
+            }
+        }
+        
+        if let bestScreen, bestArea > 0 {
+            return bestScreen
+        }
+        
+        // Fallback: screen whose frame contains the window center.
+        let center = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
+        return screens.first { $0.frame.contains(center) } ?? NSScreen.main ?? screens.first
+    }
+    
+    /// Primary display used as the origin for global coordinate conversion.
+    private func primaryScreen() -> NSScreen? {
+        NSScreen.screens.first { $0.frame.origin == .zero } ?? NSScreen.screens.first
+    }
+    
+    /// Accessibility / CoreGraphics use top-left origin; AppKit uses bottom-left.
+    private func convertAXFrameToAppKit(_ axFrame: CGRect) -> CGRect {
+        guard let primary = primaryScreen() else { return axFrame }
+        let appKitY = primary.frame.maxY - axFrame.origin.y - axFrame.height
+        return CGRect(
+            x: axFrame.origin.x,
+            y: appKitY,
+            width: axFrame.width,
+            height: axFrame.height
+        )
+    }
+    
+    private func convertAppKitFrameToAX(_ appKitFrame: CGRect) -> CGRect {
+        guard let primary = primaryScreen() else { return appKitFrame }
+        let axY = primary.frame.maxY - appKitFrame.origin.y - appKitFrame.height
+        return CGRect(
+            x: appKitFrame.origin.x,
+            y: axY,
+            width: appKitFrame.width,
+            height: appKitFrame.height
+        )
+    }
+    
+    /// All frames here are in AppKit coordinates (bottom-left origin).
+    private func calculateFrame(
+        for position: WindowPosition,
+        screenFrame: CGRect,
+        currentFrame: CGRect
+    ) -> CGRect {
         let resizeStep: CGFloat = 50 // For smaller/larger
         
         switch position {
@@ -174,7 +437,7 @@ class WindowManager: ObservableObject {
         case .topHalf:
             return CGRect(
                 x: screenFrame.origin.x,
-                y: screenFrame.origin.y,
+                y: screenFrame.origin.y + screenFrame.height / 2,
                 width: screenFrame.width,
                 height: screenFrame.height / 2
             )
@@ -182,7 +445,7 @@ class WindowManager: ObservableObject {
         case .bottomHalf:
             return CGRect(
                 x: screenFrame.origin.x,
-                y: screenFrame.origin.y + screenFrame.height / 2,
+                y: screenFrame.origin.y,
                 width: screenFrame.width,
                 height: screenFrame.height / 2
             )
@@ -190,7 +453,7 @@ class WindowManager: ObservableObject {
         case .topLeft:
             return CGRect(
                 x: screenFrame.origin.x,
-                y: screenFrame.origin.y,
+                y: screenFrame.origin.y + screenFrame.height / 2,
                 width: screenFrame.width / 2,
                 height: screenFrame.height / 2
             )
@@ -198,7 +461,7 @@ class WindowManager: ObservableObject {
         case .topRight:
             return CGRect(
                 x: screenFrame.origin.x + screenFrame.width / 2,
-                y: screenFrame.origin.y,
+                y: screenFrame.origin.y + screenFrame.height / 2,
                 width: screenFrame.width / 2,
                 height: screenFrame.height / 2
             )
@@ -206,7 +469,7 @@ class WindowManager: ObservableObject {
         case .bottomLeft:
             return CGRect(
                 x: screenFrame.origin.x,
-                y: screenFrame.origin.y + screenFrame.height / 2,
+                y: screenFrame.origin.y,
                 width: screenFrame.width / 2,
                 height: screenFrame.height / 2
             )
@@ -214,7 +477,7 @@ class WindowManager: ObservableObject {
         case .bottomRight:
             return CGRect(
                 x: screenFrame.origin.x + screenFrame.width / 2,
-                y: screenFrame.origin.y + screenFrame.height / 2,
+                y: screenFrame.origin.y,
                 width: screenFrame.width / 2,
                 height: screenFrame.height / 2
             )
@@ -286,7 +549,6 @@ class WindowManager: ObservableObject {
             )
             
         case .maximizeHeight:
-            let currentFrame = getCurrentWindowFrame(window) ?? CGRect(x: screenFrame.midX - 300, y: screenFrame.origin.y, width: 600, height: screenFrame.height)
             return CGRect(
                 x: currentFrame.origin.x,
                 y: screenFrame.origin.y,
@@ -295,7 +557,6 @@ class WindowManager: ObservableObject {
             )
             
         case .smaller:
-            let currentFrame = getCurrentWindowFrame(window) ?? CGRect(x: screenFrame.midX - 300, y: screenFrame.midY - 200, width: 600, height: 400)
             let newWidth = max(300, currentFrame.width - resizeStep)
             let newHeight = max(200, currentFrame.height - resizeStep)
             return CGRect(
@@ -306,7 +567,6 @@ class WindowManager: ObservableObject {
             )
             
         case .larger:
-            let currentFrame = getCurrentWindowFrame(window) ?? CGRect(x: screenFrame.midX - 300, y: screenFrame.midY - 200, width: 600, height: 400)
             let newWidth = min(screenFrame.width, currentFrame.width + resizeStep)
             let newHeight = min(screenFrame.height, currentFrame.height + resizeStep)
             return CGRect(
@@ -317,7 +577,6 @@ class WindowManager: ObservableObject {
             )
             
         case .center:
-            let currentFrame = getCurrentWindowFrame(window) ?? CGRect(x: 0, y: 0, width: 600, height: 400)
             return CGRect(
                 x: screenFrame.origin.x + (screenFrame.width - currentFrame.width) / 2,
                 y: screenFrame.origin.y + (screenFrame.height - currentFrame.height) / 2,
@@ -334,9 +593,14 @@ class WindowManager: ObservableObject {
                 width: width,
                 height: height
             )
+            
+        case .moveToLeftDisplay, .moveToRightDisplay:
+            // Handled separately in repositionWindow.
+            return currentFrame
         }
     }
     
+    /// Returns the window frame in Accessibility (top-left origin) coordinates.
     private func getCurrentWindowFrame(_ window: AXUIElement) -> CGRect? {
         var position: CFTypeRef?
         var size: CFTypeRef?
@@ -361,7 +625,10 @@ class WindowManager: ObservableObject {
         return CGRect(origin: point, size: cgSize)
     }
     
+    /// `frame` must be in Accessibility (top-left origin) coordinates.
     private func setWindowFrame(_ window: AXUIElement, frame: CGRect) -> Bool {
+        // Set size first, then position — some apps clamp position based on current size.
+        // Then set size again so apps that clamp size after a move still end up correct.
         var origin = frame.origin
         var size = frame.size
         
@@ -371,8 +638,11 @@ class WindowManager: ObservableObject {
             return false
         }
         
+        let sizeResult1 = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
         let positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, positionValue)
-        let sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        let sizeResult2 = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        
+        let sizeResult = (sizeResult1 == .success || sizeResult2 == .success) ? AXError.success : sizeResult1
         
         // Log individual operation results for debugging
         if positionResult != .success {

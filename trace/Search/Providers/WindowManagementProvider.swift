@@ -40,7 +40,8 @@ class WindowManagementProvider: ResultProvider {
         // Only show window commands if user is searching for window-related terms
         let windowTerms = [
             "window", "win", "resize", "move", "position", "left", "right", "center", "top", "bottom",
-            "half", "third", "quarter", "maximize", "max", "larger", "smaller", "split"
+            "half", "third", "quarter", "maximize", "max", "larger", "smaller", "split",
+            "display", "monitor", "screen"
         ]
         
         let hasWindowMatch = windowTerms.contains { term in
@@ -128,6 +129,8 @@ class WindowManagementProvider: ResultProvider {
         case .larger: return "plus.rectangle"
         case .center: return "target"
         case .centerProminently: return "viewfinder"
+        case .moveToLeftDisplay: return "arrow.left.to.line"
+        case .moveToRightDisplay: return "arrow.right.to.line"
         }
     }
     

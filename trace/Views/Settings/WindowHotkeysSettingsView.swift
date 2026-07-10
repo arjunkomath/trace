@@ -170,6 +170,8 @@ struct WindowCommandRow: View {
         case .larger: return "plus.rectangle"
         case .center: return "target"
         case .centerProminently: return "viewfinder"
+        case .moveToLeftDisplay: return "arrow.left.to.line"
+        case .moveToRightDisplay: return "arrow.right.to.line"
         }
     }
 }
