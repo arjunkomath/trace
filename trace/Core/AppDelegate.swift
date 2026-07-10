@@ -63,6 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         setupSettingsObservation()
         setupCaffeinateObservation()
+        startCaffeinateIfNeededOnLaunch()
         
         // Initialize window hotkey manager to register saved hotkeys
         _ = WindowHotkeyManager.shared
@@ -309,6 +310,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: CaffeinateManager.statusDidChangeNotification,
             object: nil
         )
+    }
+
+    private func startCaffeinateIfNeededOnLaunch() {
+        guard settingsManager.settings.startCaffeinateOnLaunch else { return }
+
+        if caffeinateManager.start() {
+            logger.notice("Started caffeinate automatically on launch")
+        } else {
+            logger.error("Failed to start caffeinate on launch")
+        }
     }
 
     private func updateStatusItemAppearance() {

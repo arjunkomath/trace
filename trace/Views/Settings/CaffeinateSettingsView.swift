@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CaffeinateSettingsView: View {
     @State private var caffeinateActive = false
+    @State private var startCaffeinateOnLaunch = false
     @State private var keepDisplayAwake = true
     @State private var preventIdleSleep = true
     @State private var preventDiskSleep = true
@@ -48,6 +49,20 @@ struct CaffeinateSettingsView: View {
                         .help("Reset Caffeinate options")
                         .disabled(caffeinateFlagsPreview == CaffeinateManager.defaultFlags)
                     }
+                }
+
+                NativeSettingsDivider()
+
+                NativeSettingsRow(
+                    title: "Start on Launch",
+                    subtitle: "Automatically start Caffeinate when Trace opens"
+                ) {
+                    Toggle("", isOn: $startCaffeinateOnLaunch)
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                        .onChange(of: startCaffeinateOnLaunch) { _, enabled in
+                            settingsManager.updateStartCaffeinateOnLaunch(enabled)
+                        }
                 }
 
                 NativeSettingsDivider()
@@ -177,6 +192,7 @@ struct CaffeinateSettingsView: View {
         }
         .onAppear {
             caffeinateActive = ServiceContainer.shared.caffeinateManager.isActive
+            startCaffeinateOnLaunch = settingsManager.settings.startCaffeinateOnLaunch
             loadCaffeinateOptions()
         }
         .onReceive(NotificationCenter.default.publisher(for: CaffeinateManager.statusDidChangeNotification)) { _ in

@@ -26,6 +26,7 @@ struct TraceSettings: Codable {
     var caffeinateFlags: String = CaffeinateManager.defaultFlags
     /// Empty string means camera selection follows the macOS system preference.
     var mirrorCameraDeviceID: String = ""
+    var startCaffeinateOnLaunch: Bool = false
     var dictationEnabled: Bool = false
     var dictationHotkey: String = ""
     var dictationHotkeyKeyCode: Int = 0
@@ -72,6 +73,7 @@ struct TraceSettings: Codable {
         )
         caffeinateFlags = try container.decodeIfPresent(String.self, forKey: .caffeinateFlags) ?? CaffeinateManager.defaultFlags
         mirrorCameraDeviceID = try container.decodeIfPresent(String.self, forKey: .mirrorCameraDeviceID) ?? ""
+        startCaffeinateOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .startCaffeinateOnLaunch) ?? false
         dictationEnabled = try container.decodeIfPresent(Bool.self, forKey: .dictationEnabled) ?? false
         dictationHotkey = try container.decodeIfPresent(String.self, forKey: .dictationHotkey) ?? ""
         dictationHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .dictationHotkeyKeyCode) ?? 0
@@ -444,6 +446,13 @@ class SettingsManager: ObservableObject {
         guard settings.mirrorCameraDeviceID != deviceID else { return }
 
         settings.mirrorCameraDeviceID = deviceID
+        saveSettings()
+    }
+
+    func updateStartCaffeinateOnLaunch(_ enabled: Bool) {
+        guard settings.startCaffeinateOnLaunch != enabled else { return }
+
+        settings.startCaffeinateOnLaunch = enabled
         saveSettings()
     }
 
