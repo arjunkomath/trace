@@ -91,6 +91,7 @@ final class MirrorManager {
 
     private func showAuthorizedMirror() {
         if let mirrorWindow, mirrorWindow.isVisible {
+            mirrorWindow.repositionOnActiveScreen()
             mirrorWindow.orderFrontRegardless()
             scheduleAutoHide()
             return
