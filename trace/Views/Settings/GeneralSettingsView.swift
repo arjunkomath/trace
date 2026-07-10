@@ -40,6 +40,8 @@ struct GeneralSettingsView: View {
     @State private var checkingPermissions = false
     @State private var requestingCalendarPermission = false
     @State private var requestingCameraPermission = false
+    @State private var availableMirrorCameras: [AVCaptureDevice] = []
+    @State private var selectedMirrorCameraID: String = ""
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
@@ -174,6 +176,38 @@ struct GeneralSettingsView: View {
                 .frame(minHeight: 44)
             } footer: {
                 Text("All permissions are optional. Features that need a permission may be unavailable until you grant it, and you can change access any time in System Settings.")
+            }
+
+            NativeSettingsSection("Mirror") {
+                NativeSettingsRow(
+                    title: "Camera",
+                    subtitle: mirrorCameraSubtitle
+                ) {
+                    Picker("", selection: $selectedMirrorCameraID) {
+                        Text("Automatic (Built-in)").tag("")
+
+                        ForEach(availableMirrorCameras, id: \.uniqueID) { device in
+                            Text(MirrorManager.displayName(for: device)).tag(device.uniqueID)
+                        }
+
+                        // Keep a previously saved camera visible if it is currently disconnected.
+                        if !selectedMirrorCameraID.isEmpty,
+                           !availableMirrorCameras.contains(where: { $0.uniqueID == selectedMirrorCameraID }) {
+                            Text("Unavailable camera").tag(selectedMirrorCameraID)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(minWidth: 200, maxWidth: 260)
+                    .disabled(cameraAuthorizationStatus != .authorized && availableMirrorCameras.isEmpty)
+                    .onChange(of: selectedMirrorCameraID) { _, newValue in
+                        settingsManager.updateMirrorCameraDeviceID(newValue)
+                        Task { @MainActor in
+                            ServiceContainer.shared.mirrorManager.applyCameraSelectionChange()
+                        }
+                    }
+                }
+            } footer: {
+                Text("Choose which camera Mirror uses. Automatic prefers the built-in FaceTime camera. Continuity Camera (iPhone/iPad) appears when the device is nearby, unlocked, and camera access is granted.")
             }
 
             NativeSettingsSection("Interface") {
@@ -319,9 +353,17 @@ struct GeneralSettingsView: View {
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
             accentColor = settingsManager.selectedAccent
+            selectedMirrorCameraID = settingsManager.settings.mirrorCameraDeviceID
+            refreshAvailableMirrorCameras()
             
             // Check permissions
             checkPermissions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasConnectedNotification)) { _ in
+            refreshAvailableMirrorCameras()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { _ in
+            refreshAvailableMirrorCameras()
         }
         .onDisappear {
             stopRecording()
@@ -580,8 +622,32 @@ struct GeneralSettingsView: View {
         cameraAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
     }
 
+    private var mirrorCameraSubtitle: String {
+        if cameraAuthorizationStatus != .authorized {
+            return "Grant camera access to choose a Mirror camera"
+        }
+        if availableMirrorCameras.isEmpty {
+            return "No cameras detected"
+        }
+        let continuityCount = availableMirrorCameras.filter {
+            if #available(macOS 14.0, *) {
+                return $0.isContinuityCamera || $0.deviceType == .continuityCamera
+            }
+            return false
+        }.count
+        if continuityCount > 0 {
+            return "\(availableMirrorCameras.count) cameras · includes Continuity Camera"
+        }
+        return "\(availableMirrorCameras.count) cameras available for Mirror"
+    }
+
     private func checkCameraPermissions() {
         cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        refreshAvailableMirrorCameras()
+    }
+
+    private func refreshAvailableMirrorCameras() {
+        availableMirrorCameras = MirrorManager.availableCameras()
     }
 
     private func requestCameraPermission() {
@@ -593,6 +659,7 @@ struct GeneralSettingsView: View {
             await MainActor.run {
                 cameraAuthorizationStatus = granted ? .authorized : AVCaptureDevice.authorizationStatus(for: .video)
                 requestingCameraPermission = false
+                refreshAvailableMirrorCameras()
             }
         }
     }

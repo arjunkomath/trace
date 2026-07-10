@@ -141,18 +141,194 @@ final class MirrorManager {
         return session
     }
 
-    private func preferredCamera() -> AVCaptureDevice? {
-        let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.external, .builtInWideAngleCamera],
+    /// Retained discovery session so Continuity Camera / external devices stay observable.
+    /// Creating a throwaway session each call can miss Continuity devices that appear later.
+    private static let videoDiscoverySession: AVCaptureDevice.DiscoverySession = {
+        makeVideoDiscoverySession()
+    }()
+
+    private static func makeVideoDiscoverySession() -> AVCaptureDevice.DiscoverySession {
+        // Include every macOS video device type that can surface a camera.
+        // Continuity Camera requires NSCameraUseContinuityCameraDeviceType in Info.plist
+        // and the .continuityCamera type (macOS 14+).
+        var deviceTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInWideAngleCamera,
+            .external
+        ]
+
+        if #available(macOS 13.0, *) {
+            deviceTypes.append(.deskViewCamera)
+        }
+        if #available(macOS 14.0, *) {
+            deviceTypes.append(.continuityCamera)
+        }
+
+        return AVCaptureDevice.DiscoverySession(
+            deviceTypes: deviceTypes,
             mediaType: .video,
             position: .unspecified
         )
+    }
 
-        if let externalCamera = discoverySession.devices.first(where: { $0.deviceType == .external }) {
-            return externalCamera
+    /// Cameras available for Mirror, sorted with built-in devices first.
+    /// Includes Continuity Camera (iPhone/iPad), Desk View, USB webcams, and built-in FaceTime.
+    static func availableCameras() -> [AVCaptureDevice] {
+        // Touch the retained session so it stays warm for connect/disconnect updates.
+        _ = videoDiscoverySession
+
+        var devicesByID: [String: AVCaptureDevice] = [:]
+
+        for device in videoDiscoverySession.devices {
+            devicesByID[device.uniqueID] = device
         }
 
-        return discoverySession.devices.first ?? AVCaptureDevice.default(for: .video)
+        // Also merge a fresh session in case the retained one lags after permission grant.
+        for device in makeVideoDiscoverySession().devices {
+            devicesByID[device.uniqueID] = device
+        }
+
+        // Prefer/system cameras can surface Continuity Camera even when discovery is incomplete.
+        if #available(macOS 14.0, *) {
+            if let systemPreferred = AVCaptureDevice.systemPreferredCamera {
+                devicesByID[systemPreferred.uniqueID] = systemPreferred
+            }
+            if let userPreferred = AVCaptureDevice.userPreferredCamera {
+                devicesByID[userPreferred.uniqueID] = userPreferred
+            }
+            if let continuity = AVCaptureDevice.default(
+                .continuityCamera,
+                for: .video,
+                position: .unspecified
+            ) {
+                devicesByID[continuity.uniqueID] = continuity
+            }
+        }
+
+        if #available(macOS 13.0, *) {
+            if let deskView = AVCaptureDevice.default(
+                .deskViewCamera,
+                for: .video,
+                position: .unspecified
+            ) {
+                devicesByID[deskView.uniqueID] = deskView
+            }
+        }
+
+        if let builtIn = AVCaptureDevice.default(
+            .builtInWideAngleCamera,
+            for: .video,
+            position: .unspecified
+        ) {
+            devicesByID[builtIn.uniqueID] = builtIn
+        }
+
+        if let external = AVCaptureDevice.default(
+            .external,
+            for: .video,
+            position: .unspecified
+        ) {
+            devicesByID[external.uniqueID] = external
+        }
+
+        if let defaultVideo = AVCaptureDevice.default(for: .video) {
+            devicesByID[defaultVideo.uniqueID] = defaultVideo
+        }
+
+        return devicesByID.values.sorted { lhs, rhs in
+            let lhsRank = cameraSortRank(for: lhs)
+            let rhsRank = cameraSortRank(for: rhs)
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+            return lhs.localizedName.localizedCaseInsensitiveCompare(rhs.localizedName) == .orderedAscending
+        }
+    }
+
+    /// Human-readable label for settings pickers.
+    static func displayName(for device: AVCaptureDevice) -> String {
+        let name = device.localizedName
+
+        if #available(macOS 14.0, *), device.isContinuityCamera || device.deviceType == .continuityCamera {
+            if name.localizedCaseInsensitiveContains("iphone")
+                || name.localizedCaseInsensitiveContains("ipad")
+                || name.localizedCaseInsensitiveContains("continuity") {
+                return name
+            }
+            return "\(name) (Continuity Camera)"
+        }
+
+        if #available(macOS 13.0, *), device.deviceType == .deskViewCamera {
+            if name.localizedCaseInsensitiveContains("desk") {
+                return name
+            }
+            return "\(name) (Desk View)"
+        }
+
+        if device.deviceType == .external {
+            return "\(name) (External)"
+        }
+
+        return name
+    }
+
+    private static func cameraSortRank(for device: AVCaptureDevice) -> Int {
+        if device.deviceType == .builtInWideAngleCamera {
+            return 0
+        }
+        if #available(macOS 13.0, *), device.deviceType == .deskViewCamera {
+            return 3
+        }
+        if #available(macOS 14.0, *) {
+            if device.isContinuityCamera || device.deviceType == .continuityCamera {
+                return 2
+            }
+        }
+        if device.deviceType == .external {
+            return 2
+        }
+        return 1
+    }
+
+    private static func isContinuityOrExternal(_ device: AVCaptureDevice) -> Bool {
+        if #available(macOS 14.0, *), device.isContinuityCamera || device.deviceType == .continuityCamera {
+            return true
+        }
+        if #available(macOS 13.0, *), device.deviceType == .deskViewCamera {
+            return true
+        }
+        return device.deviceType == .external
+    }
+
+    /// Restart Mirror if it's open so a newly chosen camera takes effect.
+    func applyCameraSelectionChange() {
+        guard isVisible else { return }
+
+        hide()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            self?.show()
+        }
+    }
+
+    private func preferredCamera() -> AVCaptureDevice? {
+        let devices = Self.availableCameras()
+        let preferredID = SettingsManager.shared.settings.mirrorCameraDeviceID
+
+        // Explicit user selection takes priority when the device is still available.
+        if !preferredID.isEmpty,
+           let selected = devices.first(where: { $0.uniqueID == preferredID }) {
+            return selected
+        }
+
+        // Automatic: prefer built-in FaceTime camera over Continuity Camera / external.
+        if let builtIn = devices.first(where: { $0.deviceType == .builtInWideAngleCamera }) {
+            return builtIn
+        }
+
+        if let nonExternal = devices.first(where: { !Self.isContinuityOrExternal($0) }) {
+            return nonExternal
+        }
+
+        return devices.first ?? AVCaptureDevice.default(for: .video)
     }
 
     private func configureUserSelectedVideoEffects(for camera: AVCaptureDevice) {

@@ -22,6 +22,8 @@ struct TraceSettings: Codable {
     var accentColor: String = TraceAccent.system.rawValue
     var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
     var caffeinateFlags: String = CaffeinateManager.defaultFlags
+    /// Empty string means automatic camera selection (prefer built-in FaceTime camera).
+    var mirrorCameraDeviceID: String = ""
     var dictationEnabled: Bool = false
     var dictationHotkey: String = ""
     var dictationHotkeyKeyCode: Int = 0
@@ -60,6 +62,7 @@ struct TraceSettings: Codable {
             try container.decodeIfPresent(Double.self, forKey: .launcherVerticalPositionRatio) ?? Self.defaultLauncherVerticalPositionRatio
         )
         caffeinateFlags = try container.decodeIfPresent(String.self, forKey: .caffeinateFlags) ?? CaffeinateManager.defaultFlags
+        mirrorCameraDeviceID = try container.decodeIfPresent(String.self, forKey: .mirrorCameraDeviceID) ?? ""
         dictationEnabled = try container.decodeIfPresent(Bool.self, forKey: .dictationEnabled) ?? false
         dictationHotkey = try container.decodeIfPresent(String.self, forKey: .dictationHotkey) ?? ""
         dictationHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .dictationHotkeyKeyCode) ?? 0
@@ -404,6 +407,13 @@ class SettingsManager: ObservableObject {
         guard settings.caffeinateFlags != flags else { return }
 
         settings.caffeinateFlags = flags
+        saveSettings()
+    }
+
+    func updateMirrorCameraDeviceID(_ deviceID: String) {
+        guard settings.mirrorCameraDeviceID != deviceID else { return }
+
+        settings.mirrorCameraDeviceID = deviceID
         saveSettings()
     }
 
