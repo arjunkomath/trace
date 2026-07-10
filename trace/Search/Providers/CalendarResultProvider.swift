@@ -12,7 +12,7 @@ class CalendarResultProvider: ResultProvider {
     
     func getResults(for query: String, context: SearchContext) async -> [(SearchResult, Double)] {
         // Only return results if calendar search is enabled
-        guard context.services.settingsManager.settings.calendarSearchEnabled else {
+        guard context.services.settingsManager.isSearchResultSourceEnabled(.calendar) else {
             return []
         }
         

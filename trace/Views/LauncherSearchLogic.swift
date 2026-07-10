@@ -109,6 +109,9 @@ extension LauncherView {
         let runningApps = services.appSearchManager.getRunningAppBundleIds()
 
         if MenuItemProvider.isScoped(query) {
+            guard services.settingsManager.isSearchResultSourceEnabled(.menuItems) else {
+                return []
+            }
             let context = SearchContext(
                 query: query,
                 services: services,
@@ -131,24 +134,49 @@ extension LauncherView {
         )
     }
     
-    /// Create search coordinator with all providers
+    /// Create search coordinator with only enabled result sources
     private func createSearchCoordinator() -> SearchCoordinator {
-        let providers: [ResultProvider] = [
-            AppResultProvider(),
-            createMenuItemProvider(),
-            SystemCommandProvider(
-                clearSearch: clearSearch,
-                onClose: onClose
-            ),
-            NetworkCommandProvider(),
-            ControlCenterProvider(),
-            WindowManagementProvider(),
-            QuickLinksProvider(),
-            CalendarResultProvider(),
-            EmojiResultProvider(),
-            MathResultProvider(),
-            SearchEngineProvider()
-        ]
+        let settings = services.settingsManager
+        var providers: [ResultProvider] = []
+
+        if settings.isSearchResultSourceEnabled(.applications) {
+            providers.append(AppResultProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.menuItems) {
+            providers.append(createMenuItemProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.commands) {
+            providers.append(
+                SystemCommandProvider(
+                    clearSearch: clearSearch,
+                    onClose: onClose
+                )
+            )
+        }
+        if settings.isSearchResultSourceEnabled(.network) {
+            providers.append(NetworkCommandProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.systemSettings) {
+            providers.append(ControlCenterProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.windowManagement) {
+            providers.append(WindowManagementProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.quickLinks) {
+            providers.append(QuickLinksProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.calendar) {
+            providers.append(CalendarResultProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.emoji) {
+            providers.append(EmojiResultProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.math) {
+            providers.append(MathResultProvider())
+        }
+        if settings.isSearchResultSourceEnabled(.webSearch) {
+            providers.append(SearchEngineProvider())
+        }
         
         return SearchCoordinator(providers: providers)
     }

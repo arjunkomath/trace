@@ -33,6 +33,92 @@ enum ResultsLayout: String, CaseIterable {
     }
 }
 
+/// Toggleable search result sources shown in Settings → Interface.
+/// Each case maps to a result provider in the launcher search pipeline.
+enum SearchResultSource: String, CaseIterable, Codable, Identifiable {
+    case applications
+    case commands
+    case network
+    case systemSettings
+    case windowManagement
+    case quickLinks
+    case calendar
+    case emoji
+    case math
+    case webSearch
+    case menuItems
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .applications:
+            return "Applications"
+        case .commands:
+            return "Commands"
+        case .network:
+            return "Network"
+        case .systemSettings:
+            return "System Settings"
+        case .windowManagement:
+            return "Window Management"
+        case .quickLinks:
+            return "Quick Links"
+        case .calendar:
+            return "Calendar"
+        case .emoji:
+            return "Emoji"
+        case .math:
+            return "Math"
+        case .webSearch:
+            return "Web Search"
+        case .menuItems:
+            return "Menu Items"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .applications:
+            return "Installed apps and launch results"
+        case .commands:
+            return "Trace commands like Settings, Quit, Caffeinate, and Mirror"
+        case .network:
+            return "Public and private IP lookup commands"
+        case .systemSettings:
+            return "Control Center and system preference shortcuts"
+        case .windowManagement:
+            return "Window snap, resize, and position commands"
+        case .quickLinks:
+            return "Custom folders, files, and link shortcuts"
+        case .calendar:
+            return "Calendar events from EventKit"
+        case .emoji:
+            return "Emoji search and copy results"
+        case .math:
+            return "Inline math expression results"
+        case .webSearch:
+            return "Google, DuckDuckGo, and Perplexity suggestions"
+        case .menuItems:
+            return "Menu bar items from the frontmost app"
+        }
+    }
+
+    /// Defaults: every source enabled.
+    static var defaultEnabledMap: [String: Bool] {
+        Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, true) })
+    }
+
+    /// Merge saved values with defaults so new sources stay on when added later.
+    static func mergedWithDefaults(_ saved: [String: Bool]) -> [String: Bool] {
+        var merged = defaultEnabledMap
+        for (key, value) in saved {
+            merged[key] = value
+        }
+        return merged
+    }
+}
+
 enum SearchResultType {
     case application
     case command

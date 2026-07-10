@@ -19,6 +19,8 @@ struct TraceSettings: Codable {
     var launchAtLogin: Bool = false
     var hasCompletedOnboarding: Bool = false
     var calendarSearchEnabled: Bool = false
+    /// Per-source visibility in launcher search. Missing keys default to enabled.
+    var enabledSearchResultSources: [String: Bool] = SearchResultSource.defaultEnabledMap
     var accentColor: String = TraceAccent.system.rawValue
     var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
     var caffeinateFlags: String = CaffeinateManager.defaultFlags
@@ -55,6 +57,13 @@ struct TraceSettings: Codable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
         calendarSearchEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarSearchEnabled) ?? false
+        if let savedSources = try container.decodeIfPresent([String: Bool].self, forKey: .enabledSearchResultSources) {
+            enabledSearchResultSources = SearchResultSource.mergedWithDefaults(savedSources)
+        } else {
+            // Existing installs: keep previous calendar preference, enable everything else.
+            enabledSearchResultSources = SearchResultSource.defaultEnabledMap
+            enabledSearchResultSources[SearchResultSource.calendar.rawValue] = calendarSearchEnabled
+        }
         accentColor = try container.decodeIfPresent(String.self, forKey: .accentColor) ?? TraceAccent.system.rawValue
         launcherVerticalPositionRatio = Self.clampLauncherVerticalPositionRatio(
             try container.decodeIfPresent(Double.self, forKey: .launcherVerticalPositionRatio) ?? Self.defaultLauncherVerticalPositionRatio
@@ -380,6 +389,27 @@ class SettingsManager: ObservableObject {
     
     func updateCalendarSearchEnabled(_ enabled: Bool) {
         settings.calendarSearchEnabled = enabled
+        settings.enabledSearchResultSources[SearchResultSource.calendar.rawValue] = enabled
+        saveSettings()
+    }
+
+    func isSearchResultSourceEnabled(_ source: SearchResultSource) -> Bool {
+        if source == .calendar {
+            // Keep calendar in sync with the legacy flag used elsewhere.
+            return settings.enabledSearchResultSources[source.rawValue]
+                ?? settings.calendarSearchEnabled
+        }
+        return settings.enabledSearchResultSources[source.rawValue] ?? true
+    }
+
+    func updateSearchResultSource(_ source: SearchResultSource, enabled: Bool) {
+        let currentlyEnabled = isSearchResultSourceEnabled(source)
+        guard currentlyEnabled != enabled else { return }
+
+        settings.enabledSearchResultSources[source.rawValue] = enabled
+        if source == .calendar {
+            settings.calendarSearchEnabled = enabled
+        }
         saveSettings()
     }
     
