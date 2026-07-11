@@ -86,7 +86,7 @@ class WindowManagementProvider: ResultProvider {
                     let windowAction = InstantCommandAction(
                         id: "com.trace.window.\(position.rawValue)",
                         displayName: position.displayName,
-                        iconName: getWindowIcon(for: position),
+                        iconName: position.icon,
                         operation: {
                             context.services.windowManager.applyWindowPosition(position)
                         }
@@ -95,7 +95,7 @@ class WindowManagementProvider: ResultProvider {
                     commands.append(SearchResult(
                         title: position.displayName,
                         subtitle: position.subtitle,
-                        icon: .system(getWindowIcon(for: position)),
+                        icon: .system(position.icon),
                         type: .command,
                         category: .window,
                         shortcut: shortcut,
@@ -109,29 +109,6 @@ class WindowManagementProvider: ResultProvider {
         }
         
         return commands.sorted { $0.title < $1.title }
-    }
-    
-    private func getWindowIcon(for position: WindowPosition) -> String {
-        switch position {
-        case .leftHalf: return "rectangle.split.2x1"
-        case .rightHalf: return "rectangle.split.2x1"
-        case .centerHalf: return "rectangle.center.inset.filled"
-        case .topHalf: return "rectangle.split.1x2"
-        case .bottomHalf: return "rectangle.split.1x2"
-        case .topLeft, .topRight, .bottomLeft, .bottomRight: return "rectangle.split.2x2"
-        case .firstThird, .centerThird, .lastThird: return "rectangle.split.3x1"
-        case .firstTwoThirds, .lastTwoThirds, .centerThreeFourths: return "rectangle.split.3x1"
-        case .maximize: return "arrow.up.left.and.arrow.down.right"
-        case .fullScreen: return "rectangle.fill"
-        case .almostMaximize: return "macwindow"
-        case .maximizeHeight: return "arrow.up.and.down"
-        case .smaller: return "minus.rectangle"
-        case .larger: return "plus.rectangle"
-        case .center: return "target"
-        case .centerProminently: return "viewfinder"
-        case .moveToLeftDisplay: return "arrow.left.to.line"
-        case .moveToRightDisplay: return "arrow.right.to.line"
-        }
     }
     
     private func getCommandIdentifier(for title: String) -> String {
