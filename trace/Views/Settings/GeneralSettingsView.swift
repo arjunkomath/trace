@@ -91,7 +91,7 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            NativeSettingsSection("Interface") {
+            NativeSettingsSection("Appearance") {
                 NativeSettingsRow(
                     title: "Accent Color",
                     subtitle: "Tint Trace foregrounds and Liquid Glass surfaces",
@@ -161,9 +161,9 @@ struct GeneralSettingsView: View {
                             settingsManager.updateShowMenuBarIcon(newValue)
                         }
                 }
-            }
 
-            NativeSettingsSection("Search Results") {
+                NativeSettingsDivider()
+
                 NativeSettingsRow(
                     title: "Results Layout",
                     subtitle: "Choose how search results are displayed"
@@ -179,9 +179,13 @@ struct GeneralSettingsView: View {
                         settingsManager.updateResultsLayout(newValue.rawValue)
                     }
                 }
+            }
 
+            NativeSettingsSection("Search Results") {
                 ForEach(SearchResultSource.allCases) { source in
-                    NativeSettingsDivider()
+                    if source != .applications {
+                        NativeSettingsDivider()
+                    }
 
                     NativeSettingsRow(
                         title: source.displayName,
