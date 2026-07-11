@@ -17,6 +17,7 @@ final class MirrorWindow: NSPanel {
 
     private let onClose: () -> Void
     private var isAnimatingOut = false
+    private var targetScreen: NSScreen?
 
     init(session: AVCaptureSession, onClose: @escaping () -> Void) {
         self.onClose = onClose
@@ -58,8 +59,11 @@ final class MirrorWindow: NSPanel {
     }
 
     func show() {
-        let finalFrame = windowFrame(for: Layout.windowSize)
-        let initialFrame = windowFrame(for: Layout.collapsedSize)
+        let selectedScreen = NSScreen.active
+        targetScreen = selectedScreen
+
+        let finalFrame = windowFrame(for: Layout.windowSize, on: selectedScreen)
+        let initialFrame = windowFrame(for: Layout.collapsedSize, on: selectedScreen)
         setFrame(
             NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? finalFrame : initialFrame,
             display: true
@@ -80,6 +84,13 @@ final class MirrorWindow: NSPanel {
         }
     }
 
+    func repositionOnActiveScreen() {
+        guard let selectedScreen = NSScreen.active else { return }
+
+        targetScreen = selectedScreen
+        setFrame(windowFrame(for: Layout.windowSize, on: selectedScreen), display: true)
+    }
+
     func hide(notify: Bool = true, completion: (() -> Void)? = nil) {
         if notify {
             onClose()
@@ -92,6 +103,9 @@ final class MirrorWindow: NSPanel {
         }
         isAnimatingOut = true
 
+        let selectedScreen = screen ?? targetScreen ?? NSScreen.active
+        let collapsedFrame = windowFrame(for: Layout.collapsedSize, on: selectedScreen)
+
         let completionHandler = { [weak self] in
             self?.orderOut(nil)
             self?.setIsVisible(false)
@@ -101,7 +115,7 @@ final class MirrorWindow: NSPanel {
 
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             alphaValue = 0
-            setFrame(windowFrame(for: Layout.collapsedSize), display: true)
+            setFrame(collapsedFrame, display: true)
             completionHandler()
             return
         }
@@ -110,7 +124,7 @@ final class MirrorWindow: NSPanel {
             context.duration = 0.18
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             animator().alphaValue = 0
-            animator().setFrame(windowFrame(for: Layout.collapsedSize), display: true)
+            animator().setFrame(collapsedFrame, display: true)
         }, completionHandler: completionHandler)
     }
 
@@ -135,8 +149,7 @@ final class MirrorWindow: NSPanel {
         contentView = MirrorPreviewView(session: session, onClose: onClose)
     }
 
-    private func windowFrame(for size: NSSize) -> NSRect {
-        let screen = NSScreen.main ?? NSScreen.screens.first
+    private func windowFrame(for size: NSSize, on screen: NSScreen?) -> NSRect {
         guard let screen else {
             return NSRect(origin: .zero, size: size)
         }
