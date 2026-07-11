@@ -24,6 +24,8 @@ struct TraceSettings: Codable {
     var accentColor: String = TraceAccent.system.rawValue
     var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
     var caffeinateFlags: String = CaffeinateManager.defaultFlags
+    /// Empty string means camera selection follows the macOS system preference.
+    var mirrorCameraDeviceID: String = ""
     var dictationEnabled: Bool = false
     var dictationHotkey: String = ""
     var dictationHotkeyKeyCode: Int = 0
@@ -69,6 +71,7 @@ struct TraceSettings: Codable {
             try container.decodeIfPresent(Double.self, forKey: .launcherVerticalPositionRatio) ?? Self.defaultLauncherVerticalPositionRatio
         )
         caffeinateFlags = try container.decodeIfPresent(String.self, forKey: .caffeinateFlags) ?? CaffeinateManager.defaultFlags
+        mirrorCameraDeviceID = try container.decodeIfPresent(String.self, forKey: .mirrorCameraDeviceID) ?? ""
         dictationEnabled = try container.decodeIfPresent(Bool.self, forKey: .dictationEnabled) ?? false
         dictationHotkey = try container.decodeIfPresent(String.self, forKey: .dictationHotkey) ?? ""
         dictationHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .dictationHotkeyKeyCode) ?? 0
@@ -437,6 +440,13 @@ class SettingsManager: ObservableObject {
         saveSettings()
     }
 
+    func updateMirrorCameraDeviceID(_ deviceID: String) {
+        guard settings.mirrorCameraDeviceID != deviceID else { return }
+
+        settings.mirrorCameraDeviceID = deviceID
+        saveSettings()
+    }
+
     // MARK: - Dictation
 
     func updateDictationEnabled(_ enabled: Bool) {
@@ -601,6 +611,10 @@ class SettingsManager: ObservableObject {
             
             if settings.launcherVerticalPositionRatio == TraceSettings.defaultLauncherVerticalPositionRatio {
                 settings.launcherVerticalPositionRatio = importedSettings.launcherVerticalPositionRatio
+            }
+
+            if settings.mirrorCameraDeviceID.isEmpty {
+                settings.mirrorCameraDeviceID = importedSettings.mirrorCameraDeviceID
             }
 
             // Main hotkey - only update if current is default

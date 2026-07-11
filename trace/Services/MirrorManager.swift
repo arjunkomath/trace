@@ -20,6 +20,7 @@ final class MirrorManager {
     private var retiringMirrorWindow: MirrorWindow?
     private var autoHideWorkItem: DispatchWorkItem?
     private var runtimeErrorObserver: NSObjectProtocol?
+    private var systemPreferredCameraObserver: SystemPreferredCameraObserver?
 
     var isVisible: Bool {
         mirrorWindow?.isVisible == true
@@ -51,14 +52,16 @@ final class MirrorManager {
         }
     }
 
-    func hide() {
+    func hide(completion: (() -> Void)? = nil) {
         stopAutoHideTimer()
         stopRuntimeErrorObservation()
+        stopSystemPreferredCameraObservation()
 
         guard let mirrorWindow else {
             if retiringMirrorWindow == nil {
                 stopSession(session)
             }
+            completion?()
             return
         }
 
@@ -73,6 +76,7 @@ final class MirrorManager {
             }
 
             self.stopSession(outgoingSession)
+            completion?()
         }
     }
 
@@ -96,6 +100,8 @@ final class MirrorManager {
             scheduleAutoHide()
             return
         }
+
+        updateSystemPreferredCameraObservation()
 
         do {
             let session = try makePreviewSession()
@@ -142,18 +148,131 @@ final class MirrorManager {
         return session
     }
 
-    private func preferredCamera() -> AVCaptureDevice? {
-        let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.external, .builtInWideAngleCamera],
-            mediaType: .video,
-            position: .unspecified
-        )
+    /// Retained discovery session so Continuity Camera / external devices stay observable.
+    /// Creating a throwaway session each call can miss Continuity devices that appear later.
+    private static let videoDiscoverySession = AVCaptureDevice.DiscoverySession(
+        deviceTypes: [
+            .builtInWideAngleCamera,
+            .external,
+            .deskViewCamera,
+            .continuityCamera
+        ],
+        mediaType: .video,
+        position: .unspecified
+    )
 
-        if let externalCamera = discoverySession.devices.first(where: { $0.deviceType == .external }) {
-            return externalCamera
+    /// Cameras available for Mirror, sorted with built-in devices first.
+    /// Includes Continuity Camera (iPhone/iPad), Desk View, USB webcams, and built-in FaceTime.
+    static func availableCameras() -> [AVCaptureDevice] {
+        videoDiscoverySession.devices.sorted { lhs, rhs in
+            let lhsRank = cameraSortRank(for: lhs)
+            let rhsRank = cameraSortRank(for: rhs)
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+            return lhs.localizedName.localizedCaseInsensitiveCompare(rhs.localizedName) == .orderedAscending
+        }
+    }
+
+    /// Human-readable label for settings pickers.
+    static func displayName(for device: AVCaptureDevice) -> String {
+        let name = device.localizedName
+
+        if device.isContinuityCamera || device.deviceType == .continuityCamera {
+            if name.localizedCaseInsensitiveContains("iphone")
+                || name.localizedCaseInsensitiveContains("ipad")
+                || name.localizedCaseInsensitiveContains("continuity") {
+                return name
+            }
+            return "\(name) (Continuity Camera)"
         }
 
-        return discoverySession.devices.first ?? AVCaptureDevice.default(for: .video)
+        if device.deviceType == .deskViewCamera {
+            if name.localizedCaseInsensitiveContains("desk") {
+                return name
+            }
+            return "\(name) (Desk View)"
+        }
+
+        if device.deviceType == .external {
+            return "\(name) (External)"
+        }
+
+        return name
+    }
+
+    private static func cameraSortRank(for device: AVCaptureDevice) -> Int {
+        if device.deviceType == .builtInWideAngleCamera {
+            return 0
+        }
+        if device.deviceType == .deskViewCamera {
+            return 3
+        }
+        if device.isContinuityCamera || device.deviceType == .continuityCamera {
+            return 2
+        }
+        if device.deviceType == .external {
+            return 2
+        }
+        return 1
+    }
+
+    /// Restart Mirror if it's open so a newly chosen camera takes effect.
+    func applyCameraSelectionChange() {
+        guard isVisible else { return }
+
+        hide { [weak self] in
+            self?.show()
+        }
+    }
+
+    private func updateSystemPreferredCameraObservation() {
+        guard SettingsManager.shared.settings.mirrorCameraDeviceID.isEmpty else {
+            stopSystemPreferredCameraObservation()
+            return
+        }
+        guard systemPreferredCameraObserver == nil else { return }
+
+        systemPreferredCameraObserver = SystemPreferredCameraObserver { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.systemPreferredCameraDidChange()
+            }
+        }
+    }
+
+    private func stopSystemPreferredCameraObservation() {
+        systemPreferredCameraObserver = nil
+    }
+
+    private func systemPreferredCameraDidChange() {
+        guard SettingsManager.shared.settings.mirrorCameraDeviceID.isEmpty,
+              isVisible,
+              let preferredCamera = AVCaptureDevice.systemPreferredCamera else {
+            return
+        }
+
+        let activeCamera = session?.inputs
+            .compactMap { ($0 as? AVCaptureDeviceInput)?.device }
+            .first
+        guard activeCamera?.uniqueID != preferredCamera.uniqueID else { return }
+
+        applyCameraSelectionChange()
+    }
+
+    private func preferredCamera() -> AVCaptureDevice? {
+        let devices = Self.availableCameras()
+        let preferredID = SettingsManager.shared.settings.mirrorCameraDeviceID
+
+        // Explicit user selection takes priority when the device is still available.
+        if !preferredID.isEmpty,
+           let selected = devices.first(where: { $0.uniqueID == preferredID }) {
+            return selected
+        }
+
+        // System Default follows the camera recommended by macOS.
+        return AVCaptureDevice.systemPreferredCamera
+            ?? AVCaptureDevice.default(for: .video)
+            ?? devices.first
     }
 
     private func configureUserSelectedVideoEffects(for camera: AVCaptureDevice) {
@@ -294,6 +413,46 @@ final class MirrorManager {
             NotificationCenter.default.removeObserver(runtimeErrorObserver)
             self.runtimeErrorObserver = nil
         }
+    }
+}
+
+private final class SystemPreferredCameraObserver: NSObject {
+    private static let keyPath = "systemPreferredCamera"
+
+    private let onChange: () -> Void
+
+    init(onChange: @escaping () -> Void) {
+        self.onChange = onChange
+        super.init()
+        AVCaptureDevice.addObserver(
+            self,
+            forKeyPath: Self.keyPath,
+            options: [.new],
+            context: nil
+        )
+    }
+
+    deinit {
+        AVCaptureDevice.removeObserver(self, forKeyPath: Self.keyPath)
+    }
+
+    override func observeValue(
+        forKeyPath keyPath: String?,
+        of object: Any?,
+        change: [NSKeyValueChangeKey: Any]?,
+        context: UnsafeMutableRawPointer?
+    ) {
+        guard keyPath == Self.keyPath else {
+            super.observeValue(
+                forKeyPath: keyPath,
+                of: object,
+                change: change,
+                context: context
+            )
+            return
+        }
+
+        onChange()
     }
 }
 
