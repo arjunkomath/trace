@@ -20,6 +20,7 @@ final class MirrorManager {
     private var retiringMirrorWindow: MirrorWindow?
     private var autoHideWorkItem: DispatchWorkItem?
     private var runtimeErrorObserver: NSObjectProtocol?
+    private var systemPreferredCameraObserver: SystemPreferredCameraObserver?
 
     var isVisible: Bool {
         mirrorWindow?.isVisible == true
@@ -54,6 +55,7 @@ final class MirrorManager {
     func hide(completion: (() -> Void)? = nil) {
         stopAutoHideTimer()
         stopRuntimeErrorObservation()
+        stopSystemPreferredCameraObservation()
 
         guard let mirrorWindow else {
             if retiringMirrorWindow == nil {
@@ -97,6 +99,8 @@ final class MirrorManager {
             scheduleAutoHide()
             return
         }
+
+        updateSystemPreferredCameraObservation()
 
         do {
             let session = try makePreviewSession()
@@ -219,6 +223,39 @@ final class MirrorManager {
         hide { [weak self] in
             self?.show()
         }
+    }
+
+    private func updateSystemPreferredCameraObservation() {
+        guard SettingsManager.shared.settings.mirrorCameraDeviceID.isEmpty else {
+            stopSystemPreferredCameraObservation()
+            return
+        }
+        guard systemPreferredCameraObserver == nil else { return }
+
+        systemPreferredCameraObserver = SystemPreferredCameraObserver { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.systemPreferredCameraDidChange()
+            }
+        }
+    }
+
+    private func stopSystemPreferredCameraObservation() {
+        systemPreferredCameraObserver = nil
+    }
+
+    private func systemPreferredCameraDidChange() {
+        guard SettingsManager.shared.settings.mirrorCameraDeviceID.isEmpty,
+              isVisible,
+              let preferredCamera = AVCaptureDevice.systemPreferredCamera else {
+            return
+        }
+
+        let activeCamera = session?.inputs
+            .compactMap { ($0 as? AVCaptureDeviceInput)?.device }
+            .first
+        guard activeCamera?.uniqueID != preferredCamera.uniqueID else { return }
+
+        applyCameraSelectionChange()
     }
 
     private func preferredCamera() -> AVCaptureDevice? {
@@ -375,6 +412,46 @@ final class MirrorManager {
             NotificationCenter.default.removeObserver(runtimeErrorObserver)
             self.runtimeErrorObserver = nil
         }
+    }
+}
+
+private final class SystemPreferredCameraObserver: NSObject {
+    private static let keyPath = "systemPreferredCamera"
+
+    private let onChange: () -> Void
+
+    init(onChange: @escaping () -> Void) {
+        self.onChange = onChange
+        super.init()
+        AVCaptureDevice.addObserver(
+            self,
+            forKeyPath: Self.keyPath,
+            options: [.new],
+            context: nil
+        )
+    }
+
+    deinit {
+        AVCaptureDevice.removeObserver(self, forKeyPath: Self.keyPath)
+    }
+
+    override func observeValue(
+        forKeyPath keyPath: String?,
+        of object: Any?,
+        change: [NSKeyValueChangeKey: Any]?,
+        context: UnsafeMutableRawPointer?
+    ) {
+        guard keyPath == Self.keyPath else {
+            super.observeValue(
+                forKeyPath: keyPath,
+                of: object,
+                change: change,
+                context: context
+            )
+            return
+        }
+
+        onChange()
     }
 }
 

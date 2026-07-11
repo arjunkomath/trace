@@ -583,6 +583,10 @@ class SettingsManager: ObservableObject {
                 settings.launcherVerticalPositionRatio = importedSettings.launcherVerticalPositionRatio
             }
 
+            if settings.mirrorCameraDeviceID.isEmpty {
+                settings.mirrorCameraDeviceID = importedSettings.mirrorCameraDeviceID
+            }
+
             // Main hotkey - only update if current is default
             if settings.mainHotkeyKeyCode == 49 && settings.mainHotkeyModifiers == 2048 {
                 settings.mainHotkeyKeyCode = importedSettings.mainHotkeyKeyCode

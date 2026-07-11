@@ -41,7 +41,6 @@ struct GeneralSettingsView: View {
     @State private var requestingCalendarPermission = false
     @State private var requestingCameraPermission = false
     @State private var availableMirrorCameras: [AVCaptureDevice] = []
-    @State private var selectedMirrorCameraID: String = ""
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
@@ -183,7 +182,10 @@ struct GeneralSettingsView: View {
                     title: "Camera",
                     subtitle: mirrorCameraSubtitle
                 ) {
-                    Picker("", selection: $selectedMirrorCameraID) {
+                    Picker("", selection: Binding(
+                        get: { settingsManager.settings.mirrorCameraDeviceID },
+                        set: { settingsManager.updateMirrorCameraDeviceID($0) }
+                    )) {
                         Text("System Default").tag("")
 
                         ForEach(availableMirrorCameras, id: \.uniqueID) { device in
@@ -191,22 +193,16 @@ struct GeneralSettingsView: View {
                         }
 
                         // Keep a previously saved camera visible if it is currently disconnected.
-                        if !selectedMirrorCameraID.isEmpty,
-                           !availableMirrorCameras.contains(where: { $0.uniqueID == selectedMirrorCameraID }) {
-                            Text("Unavailable camera").tag(selectedMirrorCameraID)
+                        if !settingsManager.settings.mirrorCameraDeviceID.isEmpty,
+                           !availableMirrorCameras.contains(where: {
+                               $0.uniqueID == settingsManager.settings.mirrorCameraDeviceID
+                           }) {
+                            Text("Unavailable camera").tag(settingsManager.settings.mirrorCameraDeviceID)
                         }
                     }
                     .pickerStyle(.menu)
                     .frame(minWidth: 200, maxWidth: 260)
                     .disabled(cameraAuthorizationStatus != .authorized)
-                    .onChange(of: selectedMirrorCameraID) { _, newValue in
-                        guard newValue != settingsManager.settings.mirrorCameraDeviceID else { return }
-
-                        settingsManager.updateMirrorCameraDeviceID(newValue)
-                        Task { @MainActor in
-                            ServiceContainer.shared.mirrorManager.applyCameraSelectionChange()
-                        }
-                    }
                 }
             } footer: {
                 Text("Choose which camera Mirror uses. System Default follows the camera recommended by macOS. Continuity Camera (iPhone/iPad) appears when the device is nearby, unlocked, and camera access is granted.")
@@ -355,7 +351,6 @@ struct GeneralSettingsView: View {
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
             accentColor = settingsManager.selectedAccent
-            selectedMirrorCameraID = settingsManager.settings.mirrorCameraDeviceID
             refreshAvailableMirrorCameras()
             
             // Check permissions
@@ -366,6 +361,11 @@ struct GeneralSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { _ in
             refreshAvailableMirrorCameras()
+        }
+        .onChange(of: settingsManager.settings.mirrorCameraDeviceID) { _, _ in
+            Task { @MainActor in
+                ServiceContainer.shared.mirrorManager.applyCameraSelectionChange()
+            }
         }
         .onDisappear {
             stopRecording()
