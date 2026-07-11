@@ -39,25 +39,6 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var tabTitle: String {
-        switch self {
-        case .general:
-            return "General"
-        case .dictation:
-            return "Dictation"
-        case .caffeinate:
-            return "Keep Awake"
-        case .windowHotkeys:
-            return "Windows"
-        case .appHotkeys:
-            return "Apps"
-        case .quickLinks:
-            return "Links"
-        case .about:
-            return "About"
-        }
-    }
-
     var subtitle: String {
         switch self {
         case .general:
@@ -120,6 +101,7 @@ private enum SettingsLayout {
     static let contentMaxWidth: CGFloat = 620
     static let detailTopInset: CGFloat = 18
     static let detailHorizontalInset: CGFloat = 18
+    static let sidebarWidth: CGFloat = 215
 }
 
 struct SettingsView: View {
@@ -140,11 +122,15 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsTopTabBar(selection: $selectedSection)
+        HStack(spacing: 0) {
+            SettingsSidebar(selection: $selectedSection)
 
-            selectedSectionView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                SettingsDetailHeader(section: selectedSection)
+
+                selectedSectionView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(
@@ -288,44 +274,37 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsTopTabBar: View {
+private struct SettingsSidebar: View {
     @Binding var selection: TraceSettingsSection
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 0) {
-            GeometryReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(TraceSettingsSection.allCases) { section in
-                            SettingsTopTabButton(
-                                section: section,
-                                isSelected: selection == section
-                            ) {
-                                selection = section
-                            }
-                        }
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 2) {
+                ForEach(TraceSettingsSection.allCases) { section in
+                    SettingsSidebarRow(
+                        section: section,
+                        isSelected: selection == section
+                    ) {
+                        selection = section
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
-                    .frame(minWidth: proxy.size.width, alignment: .center)
                 }
             }
-            .frame(height: 68)
-
-            Rectangle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.10))
-                .frame(height: 1)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
         }
-        .background(
-            Rectangle()
-                .fill(Color(nsColor: .windowBackgroundColor))
-        )
+        .frame(width: SettingsLayout.sidebarWidth)
+        .frame(maxHeight: .infinity)
+        .background(sidebarBackground)
+    }
+
+    private var sidebarBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.035) : Color.black.opacity(0.03)
     }
 }
 
-private struct SettingsTopTabButton: View {
+private struct SettingsSidebarRow: View {
     let section: TraceSettingsSection
     let isSelected: Bool
     let action: () -> Void
@@ -336,29 +315,31 @@ private struct SettingsTopTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 24, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(isSelected ? traceTheme.accentForegroundSecondary : section.iconColor)
-                    .frame(width: 30, height: 28)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(section.iconColor)
+                    .frame(width: 22, height: 22)
+                    .overlay(
+                        Image(systemName: section.systemImage)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white)
+                    )
 
-                Text(section.tabTitle)
-                    .font(.system(size: 10.5, weight: isSelected ? .semibold : .medium))
+                Text(section.title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(textColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
+
+                Spacer(minLength: 0)
             }
-            .frame(width: 78, height: 52)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(backgroundFill)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isSelected ? traceTheme.accentBorder : Color.primary.opacity(0.08), lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(section.title))
@@ -368,9 +349,9 @@ private struct SettingsTopTabButton: View {
 
     private var textColor: Color {
         if isSelected {
-            return colorScheme == .dark ? Color.white.opacity(0.92) : Color.black.opacity(0.84)
+            return colorScheme == .dark ? Color.white.opacity(0.94) : Color.black.opacity(0.86)
         }
-        return colorScheme == .dark ? Color.white.opacity(0.76) : Color.black.opacity(0.66)
+        return colorScheme == .dark ? Color.white.opacity(0.78) : Color.black.opacity(0.7)
     }
 
     private var backgroundFill: Color {
@@ -385,6 +366,33 @@ private struct SettingsTopTabButton: View {
 
     private var hoverFill: Color {
         colorScheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.045)
+    }
+}
+
+private struct SettingsDetailHeader: View {
+    let section: TraceSettingsSection
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(section.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(section.subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SettingsLayout.detailHorizontalInset)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+
+            Rectangle()
+                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.10))
+                .frame(height: 1)
+        }
     }
 }
 
