@@ -22,7 +22,7 @@ struct TraceSettings: Codable {
     var accentColor: String = TraceAccent.system.rawValue
     var launcherVerticalPositionRatio: Double = TraceSettings.defaultLauncherVerticalPositionRatio
     var caffeinateFlags: String = CaffeinateManager.defaultFlags
-    /// Empty string means automatic camera selection (prefer built-in FaceTime camera).
+    /// Empty string means camera selection follows the macOS system preference.
     var mirrorCameraDeviceID: String = ""
     var dictationEnabled: Bool = false
     var dictationHotkey: String = ""

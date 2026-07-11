@@ -184,7 +184,7 @@ struct GeneralSettingsView: View {
                     subtitle: mirrorCameraSubtitle
                 ) {
                     Picker("", selection: $selectedMirrorCameraID) {
-                        Text("Automatic (Built-in)").tag("")
+                        Text("System Default").tag("")
 
                         ForEach(availableMirrorCameras, id: \.uniqueID) { device in
                             Text(MirrorManager.displayName(for: device)).tag(device.uniqueID)
@@ -198,8 +198,10 @@ struct GeneralSettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .frame(minWidth: 200, maxWidth: 260)
-                    .disabled(cameraAuthorizationStatus != .authorized && availableMirrorCameras.isEmpty)
+                    .disabled(cameraAuthorizationStatus != .authorized)
                     .onChange(of: selectedMirrorCameraID) { _, newValue in
+                        guard newValue != settingsManager.settings.mirrorCameraDeviceID else { return }
+
                         settingsManager.updateMirrorCameraDeviceID(newValue)
                         Task { @MainActor in
                             ServiceContainer.shared.mirrorManager.applyCameraSelectionChange()
@@ -207,7 +209,7 @@ struct GeneralSettingsView: View {
                     }
                 }
             } footer: {
-                Text("Choose which camera Mirror uses. Automatic prefers the built-in FaceTime camera. Continuity Camera (iPhone/iPad) appears when the device is nearby, unlocked, and camera access is granted.")
+                Text("Choose which camera Mirror uses. System Default follows the camera recommended by macOS. Continuity Camera (iPhone/iPad) appears when the device is nearby, unlocked, and camera access is granted.")
             }
 
             NativeSettingsSection("Interface") {
@@ -629,16 +631,15 @@ struct GeneralSettingsView: View {
         if availableMirrorCameras.isEmpty {
             return "No cameras detected"
         }
+        let cameraCount = availableMirrorCameras.count
+        let cameraLabel = cameraCount == 1 ? "camera" : "cameras"
         let continuityCount = availableMirrorCameras.filter {
-            if #available(macOS 14.0, *) {
-                return $0.isContinuityCamera || $0.deviceType == .continuityCamera
-            }
-            return false
+            $0.isContinuityCamera || $0.deviceType == .continuityCamera
         }.count
         if continuityCount > 0 {
-            return "\(availableMirrorCameras.count) cameras · includes Continuity Camera"
+            return "\(cameraCount) \(cameraLabel) · includes Continuity Camera"
         }
-        return "\(availableMirrorCameras.count) cameras available for Mirror"
+        return "\(cameraCount) \(cameraLabel) available for Mirror"
     }
 
     private func checkCameraPermissions() {
