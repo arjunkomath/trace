@@ -11,10 +11,10 @@ import Carbon
 
 enum TraceSettingsSection: String, CaseIterable, Identifiable {
     case general
+    case windowHotkeys
     case mirror
     case dictation
     case caffeinate
-    case windowHotkeys
     case appHotkeys
     case quickLinks
     case backupSync
