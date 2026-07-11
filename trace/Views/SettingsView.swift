@@ -17,6 +17,7 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
     case windowHotkeys
     case appHotkeys
     case quickLinks
+    case backupSync
     case about
 
     var id: String { rawValue }
@@ -37,6 +38,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return "Application Hotkeys"
         case .quickLinks:
             return "Quick Links"
+        case .backupSync:
+            return "Backup & Sync"
         case .about:
             return "About"
         }
@@ -45,7 +48,7 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .general:
-            return "Permissions, startup, appearance, and backups"
+            return "Permissions, startup, appearance, and search"
         case .mirror:
             return "Camera access and preview preferences"
         case .dictation:
@@ -58,6 +61,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return "Global shortcuts for launching apps"
         case .quickLinks:
             return "Folders, files, and web links in search"
+        case .backupSync:
+            return "Import, export, and remote synchronization"
         case .about:
             return "Version, data, and maintenance"
         }
@@ -79,6 +84,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return "app.badge"
         case .quickLinks:
             return "link"
+        case .backupSync:
+            return "arrow.triangle.2.circlepath"
         case .about:
             return "info.circle"
         }
@@ -100,6 +107,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return Color(nsColor: .systemOrange)
         case .quickLinks:
             return Color(nsColor: .systemGreen)
+        case .backupSync:
+            return Color(nsColor: .systemIndigo)
         case .about:
             return Color(nsColor: .systemPurple)
         }
@@ -178,6 +187,8 @@ struct SettingsView: View {
             AppHotkeysSettingsView()
         case .quickLinks:
             QuickLinksSettingsView()
+        case .backupSync:
+            BackupSyncSettingsView()
         case .about:
             AboutSettingsView()
         }
