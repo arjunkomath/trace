@@ -27,7 +27,7 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         case .dictation:
             return "Dictation"
         case .caffeinate:
-            return "Caffeinate"
+            return "Keep Awake"
         case .windowHotkeys:
             return "Window Management"
         case .appHotkeys:
@@ -46,7 +46,7 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         case .dictation:
             return "Dictation"
         case .caffeinate:
-            return "Caffeinate"
+            return "Keep Awake"
         case .windowHotkeys:
             return "Windows"
         case .appHotkeys:

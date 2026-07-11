@@ -40,20 +40,20 @@ struct AboutSettingsView: View {
                     }
 
 
-                    // Developer Info and Links
+                    // Open-source community and links
                     VStack(spacing: 8) {
-                        Text("Created by Arjun Komath")
+                        Text("Built by the Trace open-source community")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
 
                         HStack(spacing: 20) {
-                            if let githubURL = URL(string: "https://github.com/arjunkomath") {
-                                Link("GitHub", destination: githubURL)
+                            if let contributorsURL = URL(string: "https://github.com/arjunkomath/trace/graphs/contributors?all=1") {
+                                Link("Contributors", destination: contributorsURL)
                                     .font(.system(size: 12))
                             }
 
-                            if let twitterURL = URL(string: "https://twitter.com/arjunz") {
-                                Link("Twitter / X", destination: twitterURL)
+                            if let repositoryURL = URL(string: "https://github.com/arjunkomath/trace") {
+                                Link("Source Code", destination: repositoryURL)
                                     .font(.system(size: 12))
                             }
                         }
