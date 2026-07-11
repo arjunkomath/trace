@@ -123,6 +123,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBar() {
         guard settingsManager.settings.showMenuBarIcon else { return }
 
+        createMenuBarStatusItem()
+    }
+
+    private func createMenuBarStatusItem() {
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
             self.statusItem = nil
@@ -237,10 +241,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func settingsChanged() {
-        // Check if menu bar preference changed
-        if settingsManager.settings.showMenuBarIcon {
+        applyMenuBarIconVisibility(settingsManager.settings.showMenuBarIcon)
+    }
+
+    private func applyMenuBarIconVisibility(_ isVisible: Bool) {
+        if isVisible {
             if statusItem == nil {
-                setupMenuBar()
+                createMenuBarStatusItem()
             } else {
                 // Refresh the menu to update hotkey display
                 updateStatusItemAppearance()
@@ -259,8 +266,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .map { $0.showMenuBarIcon }
             .removeDuplicates()
             .dropFirst()
-            .sink { [weak self] _ in
-                self?.settingsChanged()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isVisible in
+                // @Published emits from willSet, so use the emitted value instead
+                // of reading SettingsManager.settings before storage is updated.
+                self?.applyMenuBarIconVisibility(isVisible)
             }
     }
     
