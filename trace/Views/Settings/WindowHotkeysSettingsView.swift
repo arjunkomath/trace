@@ -37,7 +37,7 @@ struct WindowCommandRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             HStack(spacing: 12) {
-                Image(systemName: getWindowIcon(for: position))
+                Image(systemName: position.icon)
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
                     .frame(width: 24)
@@ -149,27 +149,6 @@ struct WindowCommandRow: View {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
-        }
-    }
-    
-    private func getWindowIcon(for position: WindowPosition) -> String {
-        switch position {
-        case .leftHalf: return "rectangle.split.2x1"
-        case .rightHalf: return "rectangle.split.2x1"
-        case .centerHalf: return "rectangle.center.inset.filled"
-        case .topHalf: return "rectangle.split.1x2"
-        case .bottomHalf: return "rectangle.split.1x2"
-        case .topLeft, .topRight, .bottomLeft, .bottomRight: return "rectangle.split.2x2"
-        case .firstThird, .centerThird, .lastThird: return "rectangle.split.3x1"
-        case .firstTwoThirds, .lastTwoThirds, .centerThreeFourths: return "rectangle.split.3x1"
-        case .maximize: return "arrow.up.left.and.arrow.down.right"
-        case .fullScreen: return "rectangle.fill"
-        case .almostMaximize: return "macwindow"
-        case .maximizeHeight: return "arrow.up.and.down"
-        case .smaller: return "minus.rectangle"
-        case .larger: return "plus.rectangle"
-        case .center: return "target"
-        case .centerProminently: return "viewfinder"
         }
     }
 }
