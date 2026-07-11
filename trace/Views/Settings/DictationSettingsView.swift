@@ -1,14 +1,22 @@
 import AppKit
+import AVFoundation
 import Carbon
+import Speech
 import SwiftUI
 
 struct DictationSettingsView: View {
     @ObservedObject private var settingsManager = SettingsManager.shared
     @ObservedObject private var assetManager = DictationAssetManager.shared
+    @ObservedObject private var permissionManager = PermissionManager.shared
     @Environment(\.traceTheme) private var traceTheme
 
     @State private var isRecordingHotkey = false
     @State private var eventMonitor: Any?
+    @State private var requestingMicrophone = false
+    @State private var requestingSpeechRecognition = false
+    @State private var microphoneAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+    @State private var speechRecognitionAuthorizationStatus = SFSpeechRecognizer.authorizationStatus()
+    @State private var accessibilityTrusted = AXIsProcessTrusted()
 
     var body: some View {
         NativeSettingsPane {
@@ -100,11 +108,47 @@ struct DictationSettingsView: View {
                 Text("Speech assets are downloaded only when you click Download. Assets are managed by macOS and shared with system dictation.")
             }
 
+            NativeSettingsSection("Permissions") {
+                PermissionRow(
+                    title: "Microphone",
+                    subtitle: "Captures audio only while you hold the push-to-talk hotkey. Trace does not save the audio.",
+                    icon: "mic",
+                    status: microphonePermissionStatus,
+                    action: handleMicrophonePermission,
+                    buttonTitle: microphonePermissionButtonTitle
+                )
+
+                NativeSettingsDivider()
+
+                PermissionRow(
+                    title: "Speech Recognition",
+                    subtitle: "Uses Apple’s on-device speech recognition and downloaded language assets to turn dictation into text. Trace does not store transcripts.",
+                    icon: "waveform",
+                    status: speechRecognitionPermissionStatus,
+                    action: handleSpeechRecognitionPermission,
+                    buttonTitle: speechRecognitionPermissionButtonTitle
+                )
+
+                NativeSettingsDivider()
+
+                PermissionRow(
+                    title: "Accessibility",
+                    subtitle: "Lets Trace paste dictated text into the active app.",
+                    icon: "accessibility",
+                    status: accessibilityTrusted ? .granted : .denied,
+                    action: openAccessibilitySettings,
+                    buttonTitle: "Open Settings"
+                )
+            } footer: {
+                Text("These controls are also available in the Permissions tab for easy access.")
+            }
         }
         .onAppear {
+            refreshPermissions()
             Task { await assetManager.refresh() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshPermissions()
             Task { await assetManager.refresh() }
         }
         .onDisappear {
@@ -182,6 +226,92 @@ struct DictationSettingsView: View {
     private var assetButtonTitle: String {
         if case .failed = assetManager.state { return "Retry" }
         return "Download"
+    }
+
+    private var microphonePermissionStatus: PermissionStatus {
+        if requestingMicrophone { return .checking }
+        switch microphoneAuthorizationStatus {
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .denied, .restricted:
+            return .denied
+        @unknown default:
+            return .denied
+        }
+    }
+
+    private var speechRecognitionPermissionStatus: PermissionStatus {
+        if requestingSpeechRecognition { return .checking }
+        switch speechRecognitionAuthorizationStatus {
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .denied, .restricted:
+            return .denied
+        @unknown default:
+            return .denied
+        }
+    }
+
+    private var microphonePermissionButtonTitle: String {
+        microphoneAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
+    }
+
+    private var speechRecognitionPermissionButtonTitle: String {
+        speechRecognitionAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
+    }
+
+    private func handleMicrophonePermission() {
+        refreshPermissions()
+        guard microphoneAuthorizationStatus == .notDetermined else {
+            permissionManager.openMicrophonePrivacySettings()
+            return
+        }
+
+        Task {
+            requestingMicrophone = true
+            _ = await permissionManager.requestMicrophonePermission()
+            requestingMicrophone = false
+            refreshPermissions()
+        }
+    }
+
+    private func handleSpeechRecognitionPermission() {
+        refreshPermissions()
+        guard speechRecognitionAuthorizationStatus == .notDetermined else {
+            permissionManager.openSpeechRecognitionPrivacySettings()
+            return
+        }
+
+        Task {
+            requestingSpeechRecognition = true
+            let granted = await permissionManager.requestSpeechRecognitionPermission()
+            requestingSpeechRecognition = false
+            refreshPermissions()
+            if granted {
+                await assetManager.refresh()
+            }
+        }
+    }
+
+    private func openAccessibilitySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else {
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func refreshPermissions() {
+        permissionManager.refreshMicrophoneCapability()
+        permissionManager.refreshSpeechRecognitionCapability()
+        microphoneAuthorizationStatus = permissionManager.microphoneAuthorizationStatus
+        speechRecognitionAuthorizationStatus = permissionManager.speechRecognitionAuthorizationStatus
+        accessibilityTrusted = AXIsProcessTrusted()
     }
 
     private func startRecordingHotkey() {
