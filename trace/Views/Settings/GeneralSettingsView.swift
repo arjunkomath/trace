@@ -178,24 +178,6 @@ struct GeneralSettingsView: View {
 
             NativeSettingsSection("Interface") {
                 NativeSettingsRow(
-                    title: "Results Layout",
-                    subtitle: "Choose how search results are displayed"
-                ) {
-                    Picker("", selection: $resultsLayout) {
-                        ForEach(ResultsLayout.allCases, id: \.self) { layout in
-                            Text(layout.displayName).tag(layout)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 140)
-                    .onChange(of: resultsLayout) { _, newValue in
-                        settingsManager.updateResultsLayout(newValue.rawValue)
-                    }
-                }
-                
-                NativeSettingsDivider()
-                
-                NativeSettingsRow(
                     title: "Accent Color",
                     subtitle: "Tint Trace foregrounds and Liquid Glass surfaces",
                     minHeight: 66
@@ -264,26 +246,47 @@ struct GeneralSettingsView: View {
                             settingsManager.updateShowMenuBarIcon(newValue)
                         }
                 }
-                
-                NativeSettingsDivider()
-                
+            }
+
+            NativeSettingsSection("Search Results") {
                 NativeSettingsRow(
-                    title: "Calendar Search",
-                    subtitle: "Search and open calendar events"
+                    title: "Results Layout",
+                    subtitle: "Choose how search results are displayed"
                 ) {
-                    Toggle("", isOn: Binding(
-                        get: { settingsManager.settings.calendarSearchEnabled },
-                        set: { newValue in
-                            settingsManager.updateCalendarSearchEnabled(newValue)
-                            if newValue && !calendarEnabled {
-                                requestCalendarPermission()
-                            }
+                    Picker("", selection: $resultsLayout) {
+                        ForEach(ResultsLayout.allCases, id: \.self) { layout in
+                            Text(layout.displayName).tag(layout)
                         }
-                    ))
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .disabled(!calendarEnabled)
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 140)
+                    .onChange(of: resultsLayout) { _, newValue in
+                        settingsManager.updateResultsLayout(newValue.rawValue)
+                    }
                 }
+
+                ForEach(SearchResultSource.allCases) { source in
+                    NativeSettingsDivider()
+
+                    NativeSettingsRow(
+                        title: source.displayName,
+                        subtitle: source.subtitle
+                    ) {
+                        Toggle("", isOn: Binding(
+                            get: { settingsManager.isSearchResultSourceEnabled(source) },
+                            set: { newValue in
+                                settingsManager.updateSearchResultSource(source, enabled: newValue)
+                                if source == .calendar, newValue, !calendarEnabled {
+                                    requestCalendarPermission()
+                                }
+                            }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    }
+                }
+            } footer: {
+                Text("Choose which result types appear in Trace search. Calendar search is opt-in and requires permission.")
             }
             
             NativeSettingsSection("Settings Backup") {
@@ -611,6 +614,9 @@ struct GeneralSettingsView: View {
                 if granted {
                     // Automatically enable calendar search when permission is granted
                     settingsManager.updateCalendarSearchEnabled(true)
+                } else {
+                    // Do not show Calendar as enabled when EventKit access was denied.
+                    settingsManager.updateSearchResultSource(.calendar, enabled: false)
                 }
             }
         }
