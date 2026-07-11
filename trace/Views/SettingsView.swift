@@ -12,6 +12,7 @@ import Carbon
 enum TraceSettingsSection: String, CaseIterable, Identifiable {
     case general
     case windowHotkeys
+    case permissions
     case mirror
     case dictation
     case caffeinate
@@ -26,6 +27,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .permissions:
+            return "Permissions"
         case .mirror:
             return "Mirror"
         case .dictation:
@@ -48,7 +51,9 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .general:
-            return "Permissions, startup, appearance, and search"
+            return "Startup, appearance, and search"
+        case .permissions:
+            return "Privacy access used by Trace features"
         case .mirror:
             return "Camera access and preview preferences"
         case .dictation:
@@ -72,6 +77,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "gearshape"
+        case .permissions:
+            return "hand.raised"
         case .mirror:
             return "video"
         case .dictation:
@@ -95,6 +102,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return Color(nsColor: .systemGray)
+        case .permissions:
+            return Color(nsColor: .systemYellow)
         case .mirror:
             return Color(nsColor: .systemTeal)
         case .dictation:
@@ -183,6 +192,8 @@ struct SettingsView: View {
             CaffeinateSettingsView()
         case .windowHotkeys:
             WindowManagementSettingsView()
+        case .permissions:
+            PermissionsSettingsView()
         case .appHotkeys:
             AppHotkeysSettingsView()
         case .quickLinks:

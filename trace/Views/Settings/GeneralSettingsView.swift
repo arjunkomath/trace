@@ -22,11 +22,8 @@ struct GeneralSettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.traceTheme) private var traceTheme
     
-    // Permissions states
     @ObservedObject private var permissionManager = PermissionManager.shared
-    @State private var accessibilityEnabled = false
     @State private var calendarEnabled = false
-    @State private var checkingPermissions = false
     @State private var requestingCalendarPermission = false
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
@@ -92,61 +89,6 @@ struct GeneralSettingsView: View {
                             onLaunchAtLoginChange(newValue)
                         }
                 }
-            }
-
-            NativeSettingsSection("Permissions") {
-                PermissionRow(
-                    title: "Accessibility Access",
-                    subtitle: "Enables window management and global hotkeys",
-                    icon: "accessibility",
-                    status: accessibilityEnabled ? .granted : .denied,
-                    action: {
-                        openAccessibilitySettings()
-                    }
-                )
-
-                NativeSettingsDivider()
-
-                PermissionRow(
-                    title: "Calendar Access",
-                    subtitle: "Enables calendar event search",
-                    icon: "calendar",
-                    status: requestingCalendarPermission || checkingPermissions ? .checking : (calendarEnabled ? .granted : .denied),
-                    action: {
-                        if calendarEnabled {
-                            openCalendarPrivacySettings()
-                        } else {
-                            requestCalendarPermission()
-                        }
-                    },
-                    buttonTitle: calendarEnabled ? "Open Settings" : "Request Permission"
-                )
-
-                NativeSettingsDivider()
-                
-                HStack {
-                    Text("Permission status is checked automatically when this tab opens.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    Button(action: checkPermissions) {
-                        HStack(spacing: 4) {
-                            Image(systemName: checkingPermissions ? "arrow.clockwise" : "arrow.clockwise")
-                                .font(.system(size: 11))
-                            Text("Refresh")
-                                .font(.system(size: 11))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(checkingPermissions)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .frame(minHeight: 44)
-            } footer: {
-                Text("All permissions are optional. Features that need a permission may be unavailable until you grant it, and you can change access any time in System Settings.")
             }
 
             NativeSettingsSection("Interface") {
@@ -269,8 +211,10 @@ struct GeneralSettingsView: View {
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
             accentColor = settingsManager.selectedAccent
             
-            // Check permissions
-            checkPermissions()
+            calendarEnabled = permissionManager.testCalendarCapability()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            calendarEnabled = permissionManager.testCalendarCapability()
         }
         .onDisappear {
             stopRecording()
@@ -357,53 +301,6 @@ struct GeneralSettingsView: View {
         }
     }
     
-    // MARK: - Permissions Methods
-    
-    private func checkPermissions() {
-        guard !checkingPermissions else { return } // Prevent concurrent checks
-        checkingPermissions = true
-        
-        // Check accessibility permissions with retry mechanism for release builds
-        checkAccessibilityPermissions()
-        
-        // Check calendar permissions
-        checkCalendarPermissions()
-    }
-    
-    private func checkAccessibilityPermissions() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let capability = self.permissionManager.testWindowManagementCapability()
-            
-            DispatchQueue.main.async {
-                switch capability {
-                case .available:
-                    self.accessibilityEnabled = true
-                    
-                case .permissionDenied:
-                    self.accessibilityEnabled = false
-                    
-                case .noTargetApp, .noWindows:
-                    // These states don't indicate permission problems - use system API as fallback
-                    self.accessibilityEnabled = AXIsProcessTrusted()
-                }
-                
-                self.checkingPermissions = false // Reset the concurrent check guard
-            }
-        }
-    }
-    
-    /// Checks calendar permissions in the background and updates UI state
-    private func checkCalendarPermissions() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let hasCalendarAccess = self.permissionManager.testCalendarCapability()
-            
-            DispatchQueue.main.async {
-                self.calendarEnabled = hasCalendarAccess
-                self.checkingPermissions = false
-            }
-        }
-    }
-
     /// Requests calendar permissions from the user and enables calendar search if granted
     private func requestCalendarPermission() {
         guard !requestingCalendarPermission else { return }
@@ -426,109 +323,4 @@ struct GeneralSettingsView: View {
         }
     }
     
-    private func openAccessibilitySettings() {
-        // Open System Settings to Accessibility
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-    
-    /// Opens System Settings to the Calendar privacy section
-    private func openCalendarPrivacySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-}
-
-// MARK: - Permission Types
-
-enum PermissionStatus {
-    case granted
-    case denied
-    case notDetermined
-    case checking
-    
-    var color: Color {
-        switch self {
-        case .granted: return .green
-        case .denied: return .orange
-        case .notDetermined: return .secondary
-        case .checking: return .secondary
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .granted: return "checkmark.circle.fill"
-        case .denied: return "exclamationmark.triangle.fill"
-        case .notDetermined: return "questionmark.circle.fill"
-        case .checking: return "clock"
-        }
-    }
-    
-    var statusText: String {
-        switch self {
-        case .granted: return "Granted"
-        case .denied: return "Not Granted"
-        case .notDetermined: return "Not Requested"
-        case .checking: return "Checking..."
-        }
-    }
-}
-
-struct PermissionRow: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let status: PermissionStatus
-    let action: () -> Void
-    let buttonTitle: String?
-    
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13))
-                Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 4) {
-                    Image(systemName: status.icon)
-                        .font(.system(size: 12))
-                        .foregroundColor(status.color)
-                    
-                    Text(status.statusText)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(status.color)
-                }
-                
-                if status != .granted {
-                    Button(buttonTitle ?? "Open Settings") {
-                        action()
-                    }
-                    .font(.system(size: 11))
-                    .buttonStyle(.link)
-                }
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .frame(minHeight: 54)
-    }
-    
-    init(title: String, subtitle: String, icon: String, status: PermissionStatus, action: @escaping () -> Void, buttonTitle: String? = nil) {
-        self.title = title
-        self.subtitle = subtitle
-        self.icon = icon
-        self.status = status
-        self.action = action
-        self.buttonTitle = buttonTitle
-    }
 }

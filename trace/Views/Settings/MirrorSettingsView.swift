@@ -9,24 +9,10 @@ import SwiftUI
 struct MirrorSettingsView: View {
     @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
-    @State private var requestingCameraPermission = false
     @State private var availableCameras: [AVCaptureDevice] = []
 
     var body: some View {
         NativeSettingsPane {
-            NativeSettingsSection("Permission") {
-                PermissionRow(
-                    title: "Camera Access",
-                    subtitle: "Enables the local Mirror preview",
-                    icon: "video",
-                    status: requestingCameraPermission ? .checking : cameraPermissionStatus,
-                    action: handleCameraPermissionAction,
-                    buttonTitle: cameraPermissionButtonTitle
-                )
-            } footer: {
-                Text("Camera access is only used for the local Mirror preview. You can change access any time in System Settings.")
-            }
-
             NativeSettingsSection("Camera") {
                 NativeSettingsRow(
                     title: "Camera",
@@ -51,7 +37,7 @@ struct MirrorSettingsView: View {
                     .disabled(cameraAuthorizationStatus != .authorized)
                 }
             } footer: {
-                Text("System Default follows the camera recommended by macOS. Continuity Camera appears when your iPhone or iPad is nearby, unlocked, and camera access is granted.")
+                Text("System Default follows the camera recommended by macOS. Continuity Camera appears when your iPhone or iPad is nearby and unlocked. Grant Camera access from the Permissions tab to choose a device.")
             }
         }
         .onAppear(perform: refreshCameraState)
@@ -78,23 +64,6 @@ struct MirrorSettingsView: View {
         )
     }
 
-    private var cameraPermissionStatus: PermissionStatus {
-        switch cameraAuthorizationStatus {
-        case .authorized:
-            return .granted
-        case .notDetermined:
-            return .notDetermined
-        case .denied, .restricted:
-            return .denied
-        @unknown default:
-            return .denied
-        }
-    }
-
-    private var cameraPermissionButtonTitle: String {
-        cameraAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
-    }
-
     private var cameraSubtitle: String {
         guard cameraAuthorizationStatus == .authorized else {
             return "Grant camera access to choose a Mirror camera"
@@ -115,14 +84,6 @@ struct MirrorSettingsView: View {
         return "\(cameraCount) \(cameraLabel) available"
     }
 
-    private func handleCameraPermissionAction() {
-        if cameraAuthorizationStatus == .notDetermined {
-            requestCameraPermission()
-        } else {
-            openCameraPrivacySettings()
-        }
-    }
-
     private func refreshCameraState() {
         cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
         refreshAvailableCameras()
@@ -132,28 +93,4 @@ struct MirrorSettingsView: View {
         availableCameras = MirrorManager.availableCameras()
     }
 
-    private func requestCameraPermission() {
-        guard !requestingCameraPermission else { return }
-
-        Task {
-            requestingCameraPermission = true
-            let granted = await AVCaptureDevice.requestAccess(for: .video)
-            await MainActor.run {
-                cameraAuthorizationStatus = granted
-                    ? .authorized
-                    : AVCaptureDevice.authorizationStatus(for: .video)
-                requestingCameraPermission = false
-                refreshAvailableCameras()
-            }
-        }
-    }
-
-    private func openCameraPrivacySettings() {
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera"
-        ) else {
-            return
-        }
-        NSWorkspace.shared.open(url)
-    }
 }
