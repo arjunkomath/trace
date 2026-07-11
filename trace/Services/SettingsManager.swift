@@ -27,6 +27,7 @@ struct TraceSettings: Codable {
     /// Empty string means camera selection follows the macOS system preference.
     var mirrorCameraDeviceID: String = ""
     var startCaffeinateOnLaunch: Bool = false
+    var stopCaffeinateOnSleep: Bool = false
     var dictationEnabled: Bool = false
     var dictationHotkey: String = ""
     var dictationHotkeyKeyCode: Int = 0
@@ -74,6 +75,7 @@ struct TraceSettings: Codable {
         caffeinateFlags = try container.decodeIfPresent(String.self, forKey: .caffeinateFlags) ?? CaffeinateManager.defaultFlags
         mirrorCameraDeviceID = try container.decodeIfPresent(String.self, forKey: .mirrorCameraDeviceID) ?? ""
         startCaffeinateOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .startCaffeinateOnLaunch) ?? false
+        stopCaffeinateOnSleep = try container.decodeIfPresent(Bool.self, forKey: .stopCaffeinateOnSleep) ?? false
         dictationEnabled = try container.decodeIfPresent(Bool.self, forKey: .dictationEnabled) ?? false
         dictationHotkey = try container.decodeIfPresent(String.self, forKey: .dictationHotkey) ?? ""
         dictationHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .dictationHotkeyKeyCode) ?? 0
@@ -456,6 +458,13 @@ class SettingsManager: ObservableObject {
         saveSettings()
     }
 
+    func updateStopCaffeinateOnSleep(_ enabled: Bool) {
+        guard settings.stopCaffeinateOnSleep != enabled else { return }
+
+        settings.stopCaffeinateOnSleep = enabled
+        saveSettings()
+    }
+
     // MARK: - Dictation
 
     func updateDictationEnabled(_ enabled: Bool) {
@@ -624,6 +633,14 @@ class SettingsManager: ObservableObject {
 
             if settings.mirrorCameraDeviceID.isEmpty {
                 settings.mirrorCameraDeviceID = importedSettings.mirrorCameraDeviceID
+            }
+
+            if !settings.startCaffeinateOnLaunch {
+                settings.startCaffeinateOnLaunch = importedSettings.startCaffeinateOnLaunch
+            }
+
+            if !settings.stopCaffeinateOnSleep {
+                settings.stopCaffeinateOnSleep = importedSettings.stopCaffeinateOnSleep
             }
 
             // Main hotkey - only update if current is default

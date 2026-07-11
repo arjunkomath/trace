@@ -63,6 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         setupSettingsObservation()
         setupCaffeinateObservation()
+        setupCaffeinateSleepObservation()
         startCaffeinateIfNeededOnLaunch()
         
         // Initialize window hotkey manager to register saved hotkeys
@@ -112,6 +113,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.hide()
         settingsWindow = nil
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         settingsCancellable?.cancel()
         logger.debug("AppDelegate deinitialized")
     }
@@ -310,6 +312,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: CaffeinateManager.statusDidChangeNotification,
             object: nil
         )
+    }
+
+    private func setupCaffeinateSleepObservation() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceWillSleep(_:)),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+    }
+
+    @objc private func workspaceWillSleep(_ notification: Notification) {
+        guard settingsManager.settings.stopCaffeinateOnSleep,
+              caffeinateManager.isActive else { return }
+
+        logger.notice("Stopping caffeinate because the Mac is going to sleep")
+        caffeinateManager.stop()
     }
 
     private func startCaffeinateIfNeededOnLaunch() {

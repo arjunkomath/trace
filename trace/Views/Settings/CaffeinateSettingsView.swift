@@ -10,6 +10,7 @@ import SwiftUI
 struct CaffeinateSettingsView: View {
     @State private var caffeinateActive = false
     @State private var startCaffeinateOnLaunch = false
+    @State private var stopCaffeinateOnSleep = false
     @State private var keepDisplayAwake = true
     @State private var preventIdleSleep = true
     @State private var preventDiskSleep = true
@@ -23,7 +24,7 @@ struct CaffeinateSettingsView: View {
 
     var body: some View {
         NativeSettingsPane {
-            NativeSettingsSection("Caffeinate") {
+            NativeSettingsSection("Keep Awake") {
                 NativeSettingsRow(
                     title: "Command",
                     subtitle: "Built automatically from your choices"
@@ -60,8 +61,24 @@ struct CaffeinateSettingsView: View {
                     Toggle("", isOn: $startCaffeinateOnLaunch)
                         .toggleStyle(.checkbox)
                         .labelsHidden()
+                        .accessibilityLabel(Text("Start on Launch"))
                         .onChange(of: startCaffeinateOnLaunch) { _, enabled in
                             settingsManager.updateStartCaffeinateOnLaunch(enabled)
+                        }
+                }
+
+                NativeSettingsDivider()
+
+                NativeSettingsRow(
+                    title: "Stop When Mac Sleeps",
+                    subtitle: "Turns off Caffeinate when macOS sleeps; it stays off after wake"
+                ) {
+                    Toggle("", isOn: $stopCaffeinateOnSleep)
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                        .accessibilityLabel(Text("Stop When Mac Sleeps"))
+                        .onChange(of: stopCaffeinateOnSleep) { _, enabled in
+                            settingsManager.updateStopCaffeinateOnSleep(enabled)
                         }
                 }
 
@@ -193,6 +210,7 @@ struct CaffeinateSettingsView: View {
         .onAppear {
             caffeinateActive = ServiceContainer.shared.caffeinateManager.isActive
             startCaffeinateOnLaunch = settingsManager.settings.startCaffeinateOnLaunch
+            stopCaffeinateOnSleep = settingsManager.settings.stopCaffeinateOnSleep
             loadCaffeinateOptions()
         }
         .onReceive(NotificationCenter.default.publisher(for: CaffeinateManager.statusDidChangeNotification)) { _ in
