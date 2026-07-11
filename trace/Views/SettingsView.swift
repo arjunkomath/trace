@@ -349,14 +349,11 @@ private struct SettingsSidebarRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(section.iconColor)
+                Image(systemName: section.systemImage)
+                    .font(.system(size: 15, weight: .medium))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(section.iconColor)
                     .frame(width: 22, height: 22)
-                    .overlay(
-                        Image(systemName: section.systemImage)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white)
-                    )
 
                 Text(section.title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
