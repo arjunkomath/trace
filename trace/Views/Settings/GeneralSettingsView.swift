@@ -265,7 +265,7 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                ForEach(Array(SearchResultSource.allCases.enumerated()), id: \.element.id) { _, source in
+                ForEach(SearchResultSource.allCases) { source in
                     NativeSettingsDivider()
 
                     NativeSettingsRow(
@@ -286,7 +286,7 @@ struct GeneralSettingsView: View {
                     }
                 }
             } footer: {
-                Text("Choose which result types appear in Trace search. All sources are enabled by default.")
+                Text("Choose which result types appear in Trace search. Calendar search is opt-in and requires permission.")
             }
             
             NativeSettingsSection("Settings Backup") {
@@ -614,6 +614,9 @@ struct GeneralSettingsView: View {
                 if granted {
                     // Automatically enable calendar search when permission is granted
                     settingsManager.updateCalendarSearchEnabled(true)
+                } else {
+                    // Do not show Calendar as enabled when EventKit access was denied.
+                    settingsManager.updateSearchResultSource(.calendar, enabled: false)
                 }
             }
         }

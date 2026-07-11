@@ -37,7 +37,6 @@ enum ResultsLayout: String, CaseIterable {
 /// Each case maps to a result provider in the launcher search pipeline.
 enum SearchResultSource: String, CaseIterable, Codable, Identifiable {
     case applications
-    case commands
     case network
     case systemSettings
     case windowManagement
@@ -54,8 +53,6 @@ enum SearchResultSource: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .applications:
             return "Applications"
-        case .commands:
-            return "Commands"
         case .network:
             return "Network"
         case .systemSettings:
@@ -73,7 +70,7 @@ enum SearchResultSource: String, CaseIterable, Codable, Identifiable {
         case .webSearch:
             return "Web Search"
         case .menuItems:
-            return "Menu Items"
+            return "Search Menu Items"
         }
     }
 
@@ -81,8 +78,6 @@ enum SearchResultSource: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .applications:
             return "Installed apps and launch results"
-        case .commands:
-            return "Trace commands like Settings, Quit, Caffeinate, and Mirror"
         case .network:
             return "Public and private IP lookup commands"
         case .systemSettings:
@@ -104,9 +99,11 @@ enum SearchResultSource: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Defaults: every source enabled.
+    /// Defaults: every source enabled except Calendar, which remains opt-in.
     static var defaultEnabledMap: [String: Bool] {
-        Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, true) })
+        Dictionary(uniqueKeysWithValues: allCases.map { source in
+            (source.rawValue, source != .calendar)
+        })
     }
 
     /// Merge saved values with defaults so new sources stay on when added later.

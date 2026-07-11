@@ -145,14 +145,13 @@ extension LauncherView {
         if settings.isSearchResultSourceEnabled(.menuItems) {
             providers.append(createMenuItemProvider())
         }
-        if settings.isSearchResultSourceEnabled(.commands) {
-            providers.append(
-                SystemCommandProvider(
-                    clearSearch: clearSearch,
-                    onClose: onClose
-                )
+        // Commands are always available, including Trace Settings and Quit.
+        providers.append(
+            SystemCommandProvider(
+                clearSearch: clearSearch,
+                onClose: onClose
             )
-        }
+        )
         if settings.isSearchResultSourceEnabled(.network) {
             providers.append(NetworkCommandProvider())
         }
