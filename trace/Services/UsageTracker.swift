@@ -91,29 +91,29 @@ class UsageTracker {
         }
     }
     
+    // Must never touch `queue`: called from inside queue.sync blocks, and
+    // re-entering a concurrent queue with sync while a barrier is pending deadlocks it.
+    private func score(for record: UsageRecord) -> Double {
+        let baseScore = Double(record.count)
+
+        let daysSinceLastUse = Date().timeIntervalSince(record.lastUsed) / (24 * 60 * 60)
+        let recencyMultiplier = max(0.5, 1.0 - (daysSinceLastUse / 30.0))
+
+        let daysSinceFirstUse = Date().timeIntervalSince(record.firstUsed) / (24 * 60 * 60)
+        let frequencyScore = daysSinceFirstUse > 0 ? baseScore / daysSinceFirstUse : baseScore
+
+        return (baseScore * 0.5 + frequencyScore * 100 * 0.5) * recencyMultiplier
+    }
+
     func getUsageScore(for identifier: String) -> Double {
         queue.sync {
-            guard let record = usageData[identifier] else { return 0.0 }
-            
-            let baseScore = Double(record.count)
-            
-            let daysSinceLastUse = Date().timeIntervalSince(record.lastUsed) / (24 * 60 * 60)
-            let recencyMultiplier = max(0.5, 1.0 - (daysSinceLastUse / 30.0))
-            
-            let daysSinceFirstUse = Date().timeIntervalSince(record.firstUsed) / (24 * 60 * 60)
-            let frequencyScore = daysSinceFirstUse > 0 ? baseScore / daysSinceFirstUse : baseScore
-            
-            return (baseScore * 0.5 + frequencyScore * 100 * 0.5) * recencyMultiplier
+            usageData[identifier].map(score(for:)) ?? 0.0
         }
     }
-    
+
     func getAllUsageScores() -> [String: Double] {
         queue.sync {
-            var scores: [String: Double] = [:]
-            for (identifier, _) in usageData {
-                scores[identifier] = getUsageScore(for: identifier)
-            }
-            return scores
+            usageData.mapValues(score(for:))
         }
     }
     
