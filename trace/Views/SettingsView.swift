@@ -126,7 +126,7 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
 
 private enum SettingsLayout {
     static let contentMaxWidth: CGFloat = 620
-    static let headerTopInset: CGFloat = 4
+    static let headerTopInset: CGFloat = 2
     static let contentTopInset: CGFloat = 12
     static let detailHorizontalInset: CGFloat = 18
     static let sidebarWidth: CGFloat = 215
