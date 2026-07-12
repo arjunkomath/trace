@@ -126,7 +126,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
 
 private enum SettingsLayout {
     static let contentMaxWidth: CGFloat = 620
-    static let detailTopInset: CGFloat = 18
+    static let headerTopInset: CGFloat = 4
+    static let contentTopInset: CGFloat = 12
     static let detailHorizontalInset: CGFloat = 18
     static let sidebarWidth: CGFloat = 215
 }
@@ -349,11 +350,15 @@ private struct SettingsSidebarRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 15, weight: .medium))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(section.iconColor)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(iconBackgroundFill)
                     .frame(width: 22, height: 22)
+                    .overlay {
+                        Image(systemName: section.systemImage)
+                            .font(.system(size: 13, weight: .medium))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(section.iconColor)
+                    }
 
                 Text(section.title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
@@ -382,6 +387,10 @@ private struct SettingsSidebarRow: View {
             return colorScheme == .dark ? Color.white.opacity(0.94) : Color.black.opacity(0.86)
         }
         return colorScheme == .dark ? Color.white.opacity(0.78) : Color.black.opacity(0.7)
+    }
+
+    private var iconBackgroundFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
     }
 
     private var backgroundFill: Color {
@@ -416,7 +425,7 @@ private struct SettingsDetailHeader: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, SettingsLayout.detailHorizontalInset)
-            .padding(.top, 10)
+            .padding(.top, SettingsLayout.headerTopInset)
             .padding(.bottom, 12)
 
             Rectangle()
@@ -443,11 +452,12 @@ struct NativeSettingsPane<Content: View>: View {
                 content
             }
             .padding(.horizontal, SettingsLayout.detailHorizontalInset)
-            .padding(.top, SettingsLayout.detailTopInset)
+            .padding(.top, SettingsLayout.contentTopInset)
             .padding(.bottom, 16)
             .frame(maxWidth: SettingsLayout.contentMaxWidth, alignment: .topLeading)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color(nsColor: .windowBackgroundColor))
     }
