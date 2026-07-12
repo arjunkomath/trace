@@ -65,7 +65,8 @@ struct ProcessUsageSnapshot: Equatable {
     }
 }
 
-final class ProcessUsageMonitor {
+/// Mutable sampling state is confined to `queue`; synchronous reads use the same queue.
+final class ProcessUsageMonitor: @unchecked Sendable {
     private static let minimumCPUCalculationInterval: TimeInterval = 0.5
     private static let processTreeSnapshotStaleness: TimeInterval = 1.0
 

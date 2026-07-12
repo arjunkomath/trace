@@ -3,7 +3,8 @@ import Network
 import AppKit
 import os.log
 
-class NetworkUtilities {
+/// All mutable cache state is confined to `queue`.
+final class NetworkUtilities: @unchecked Sendable {
     static let shared = NetworkUtilities()
     private let logger = AppLogger.networkUtilities
     
@@ -11,7 +12,7 @@ class NetworkUtilities {
     private var cachedPublicIP: (ip: String, timestamp: Date)?
     private var cachedPrivateIP: (ip: String, timestamp: Date)?
     private let cacheTimeout: TimeInterval = 300 // 5 minutes
-    private let queue = DispatchQueue(label: "com.trace.networkutilities", attributes: .concurrent)
+    private let queue = DispatchQueue(label: "com.trace.networkutilities")
     
     private init() {
         // NetworkUtilities initialized - public IP will be fetched only when requested
@@ -39,7 +40,7 @@ class NetworkUtilities {
     /// Get public IP address (async, always fresh)
     func getPublicIPAddress() async -> String? {
         if let ip = await fetchPublicIPAddress() {
-            queue.async(flags: .barrier) {
+            queue.async {
                 self.cachedPublicIP = (ip: ip, timestamp: Date())
             }
             return ip

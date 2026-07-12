@@ -12,6 +12,29 @@ import CoreServices
 import Darwin
 import Ifrit
 
+private final class AppIconCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var icons: [String: NSImage] = [:]
+
+    func icon(for bundleIdentifier: String) -> NSImage? {
+        lock.lock()
+        defer { lock.unlock() }
+        return icons[bundleIdentifier]
+    }
+
+    func insert(_ icon: NSImage, for bundleIdentifier: String) {
+        lock.lock()
+        icons[bundleIdentifier] = icon
+        lock.unlock()
+    }
+
+    func removeAll() {
+        lock.lock()
+        icons.removeAll()
+        lock.unlock()
+    }
+}
+
 class AppSearchManager: ObservableObject {
 
     private let logger = AppLogger.appSearchManager
@@ -20,8 +43,7 @@ class AppSearchManager: ObservableObject {
     private var apps: [String: Application] = [:] // bundleId -> Application
     private var appsByName: [String: Set<String>] = [:] // lowercase name -> bundle IDs
     private let iconQueue = DispatchQueue(label: "com.trace.appsearch.icons", qos: .utility)
-    private var iconCache: [String: NSImage] = [:] // bundleId -> NSImage cache
-    private let iconCacheQueue = DispatchQueue(label: "com.trace.appsearch.iconcache", attributes: .concurrent)
+    private let iconCache = AppIconCache()
     private var fileSystemEventStream: FSEventStreamRef?
     private var scheduledRefreshWorkItem: DispatchWorkItem?
     private var currentLoadTask: Task<Void, Never>?
@@ -111,36 +133,22 @@ class AppSearchManager: ObservableObject {
     func getAppIcon(for app: Application) async -> NSImage? {
         let bundleId = app.bundleIdentifier
 
-        // Check cache first (concurrent read)
-        let cachedIcon = await withCheckedContinuation { continuation in
-            iconCacheQueue.async { [weak self] in
-                let icon = self?.iconCache[bundleId]
+        if let cachedIcon = iconCache.icon(for: bundleId) {
+            return cachedIcon
+        }
+
+        let appPath = app.url.path
+        let icon = await withCheckedContinuation { continuation in
+            iconQueue.async {
+                let icon = NSWorkspace.shared.icon(forFile: appPath)
+                icon.size = AppConstants.Search.iconSize
                 continuation.resume(returning: icon)
             }
         }
 
-        if let cachedIcon = cachedIcon {
-            return cachedIcon
-        }
-
-        // Load icon asynchronously
-        return await withCheckedContinuation { continuation in
-            iconQueue.async { [weak self] in
-                let icon = NSWorkspace.shared.icon(forFile: app.url.path)
-                icon.size = AppConstants.Search.iconSize
-
-                // Store in concurrent cache
-                self?.iconCacheQueue.async(flags: .barrier) {
-                    self?.iconCache[bundleId] = icon
-                }
-
-                // Also update the app's icon property for direct access
-                Task { @MainActor in
-                    self?.apps[bundleId]?.icon = icon
-                    continuation.resume(returning: icon)
-                }
-            }
-        }
+        iconCache.insert(icon, for: bundleId)
+        apps[bundleId]?.icon = icon
+        return icon
     }
 
 
@@ -453,9 +461,7 @@ class AppSearchManager: ObservableObject {
     }
 
     private func clearIconCache() {
-        iconCacheQueue.async(flags: .barrier) { [weak self] in
-            self?.iconCache.removeAll()
-        }
+        iconCache.removeAll()
     }
 
     private func rebuildNameIndex() {

@@ -46,11 +46,11 @@ struct MathEvaluator {
         end try
         """
         
-        let appleScript = NSAppleScript(source: script)
-        var error: NSDictionary?
-        
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
+                let appleScript = NSAppleScript(source: script)
+                var error: NSDictionary?
+
                 guard let output = appleScript?.executeAndReturnError(&error),
                       error == nil,
                       let result = output.stringValue,

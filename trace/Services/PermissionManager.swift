@@ -212,7 +212,7 @@ class PermissionManager: ObservableObject {
                 }
                 
                 // Restore focus to the target application after successful window operation
-                app.activate(options: [.activateIgnoringOtherApps])
+                _ = app.activate()
                 logger.debug("Restored focus to app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")")
                 
                 // Clear lastActiveApplication to prevent double focus restoration when clicking elsewhere
@@ -360,7 +360,7 @@ class PermissionManager: ObservableObject {
         if pidResult == .success,
            let targetApp = NSRunningApplication(processIdentifier: appPid) {
             // Activate the app to restore focus after window manipulation
-            targetApp.activate(options: [.activateIgnoringOtherApps])
+            _ = targetApp.activate()
             logger.debug("Restored focus to app: \(targetApp.localizedName ?? targetApp.bundleIdentifier ?? "Unknown")")
         } else {
             logger.warning("Failed to activate app for window - could not get process ID")
@@ -398,7 +398,7 @@ class PermissionManager: ObservableObject {
         let calendarManager = CalendarManager.shared
         let granted = await calendarManager.requestAccess()
         
-        DispatchQueue.main.async {
+        await MainActor.run {
             self.calendarAvailable = granted
         }
         

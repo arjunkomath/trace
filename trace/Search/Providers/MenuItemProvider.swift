@@ -251,7 +251,9 @@ class MenuItemProvider: ResultProvider {
     }
 }
 
-struct MenuItemCommandAction: DisplayableCommandAction {
+/// The payload is immutable, and MenuBarService protects its shared cache with a lock.
+/// App activation is explicitly marshalled onto the main queue before the AX action runs.
+struct MenuItemCommandAction: DisplayableCommandAction, @unchecked Sendable {
     let id: String
     let displayName: String
     let iconName: String?
