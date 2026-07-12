@@ -44,14 +44,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalEventMonitor: Any?
     private var skipQuitConfirmation = false
     private var statusItem: NSStatusItem?
+    private weak var updateMenuItem: NSMenuItem?
     private var onboardingWindow: OnboardingWindow?
     private var settingsCancellable: AnyCancellable?
-    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    private var availableUpdateVersion: String?
+    private lazy var updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: self
+    )
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure the app is truly a background app without dock icon
         NSApp.setActivationPolicy(.accessory)
         logger.notice("✅ Set app activation policy to .accessory (background app)")
+
+        // Start Sparkle even when the user has hidden Trace's menu bar icon.
+        _ = updaterController
         
         
         // Initialize unified hotkey registry first
@@ -130,6 +139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
             self.statusItem = nil
+            updateMenuItem = nil
         }
         
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -150,6 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let statusItem {
                 NSStatusBar.system.removeStatusItem(statusItem)
                 self.statusItem = nil
+                updateMenuItem = nil
                 logger.debug("Menu bar status item removed because setting is disabled")
             }
             return
@@ -200,10 +211,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Check for Updates - Connect directly to Sparkle as per documentation
-        let updateItem = NSMenuItem(title: "Check for Updates", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        let updateItem = NSMenuItem(
+            title: "Check for Updates",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
         updateItem.target = updaterController
         menu.addItem(updateItem)
+        updateMenuItem = updateItem
+        updateUpdateMenuItemAppearance()
         
         // Report Issue
         let reportIssueItem = NSMenuItem(title: "Report Issue", action: #selector(reportIssue), keyEquivalent: "")
@@ -257,6 +273,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let statusItem = statusItem {
                 NSStatusBar.system.removeStatusItem(statusItem)
                 self.statusItem = nil
+                updateMenuItem = nil
             }
         }
     }
@@ -355,15 +372,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
 
         let isCaffeinateActive = caffeinateManager.isActive
-        let description = isCaffeinateActive ? "Trace Caffeinate On" : "Trace"
+        let description: String
 
         if isCaffeinateActive {
+            description = availableUpdateVersion.map {
+                "Trace Caffeinate On, version \($0) update available"
+            } ?? "Trace Caffeinate On"
             button.image = makeMenuBarSymbolImage(
                 named: "mug.fill",
                 fallbackSymbolName: "cup.and.saucer.fill",
                 accessibilityDescription: description
             )
         } else {
+            description = availableUpdateVersion.map {
+                "Trace \($0) update available"
+            } ?? "Trace"
             button.image = makeMenuBarImage(
                 named: "MenuBarIcon",
                 fallbackSymbolName: "filemenu.and.selection",
@@ -372,7 +395,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         button.image?.size = NSSize(width: 18, height: 18)
         button.image?.isTemplate = true
-        button.toolTip = isCaffeinateActive ? "Trace - Caffeinate is on" : "Trace - Click to open launcher"
+        button.title = availableUpdateVersion == nil ? "" : "•"
+        if let availableUpdateVersion, isCaffeinateActive {
+            button.toolTip = "Trace - Caffeinate is on · \(availableUpdateVersion) is available"
+        } else if let availableUpdateVersion {
+            button.toolTip = "Trace \(availableUpdateVersion) is available"
+        } else {
+            button.toolTip = isCaffeinateActive
+                ? "Trace - Caffeinate is on"
+                : "Trace - Click to open launcher"
+        }
+    }
+
+    private func showUpdateReminder(for version: String) {
+        availableUpdateVersion = version
+        updateStatusItemAppearance()
+        updateUpdateMenuItemAppearance()
+    }
+
+    private func clearUpdateReminder() {
+        guard availableUpdateVersion != nil else { return }
+        availableUpdateVersion = nil
+        updateStatusItemAppearance()
+        updateUpdateMenuItemAppearance()
+    }
+
+    private func updateUpdateMenuItemAppearance() {
+        guard let updateMenuItem else { return }
+
+        let title = availableUpdateVersion.map { "Update to Trace \($0)…" }
+            ?? "Check for Updates"
+        updateMenuItem.title = title
+        updateMenuItem.image = availableUpdateVersion == nil
+            ? nil
+            : NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: title)
     }
 
     private func makeMenuBarImage(
@@ -599,4 +655,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
     
+}
+
+extension AppDelegate: SPUStandardUserDriverDelegate {
+    var supportsGentleScheduledUpdateReminders: Bool {
+        true
+    }
+
+    func standardUserDriverShouldHandleShowingScheduledUpdate(
+        _ update: SUAppcastItem,
+        andInImmediateFocus immediateFocus: Bool
+    ) -> Bool {
+        // Let Sparkle present its standard alert when the app already has the
+        // user's attention, or when the menu-bar reminder has no visible home.
+        immediateFocus || statusItem == nil
+    }
+
+    func standardUserDriverWillHandleShowingUpdate(
+        _ handleShowingUpdate: Bool,
+        forUpdate update: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        guard !state.userInitiated else { return }
+        showUpdateReminder(for: update.displayVersionString)
+    }
+
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
+        clearUpdateReminder()
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        clearUpdateReminder()
+    }
 }

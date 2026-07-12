@@ -389,7 +389,7 @@ private final class MirrorCloseButton: NSButton {
 
     override func layout() {
         super.layout()
-        updateAppearance()
+        updateLayerGeometry()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -415,10 +415,11 @@ private final class MirrorCloseButton: NSButton {
         isBordered = false
         focusRingType = .none
 
+        updateLayerGeometry()
         updateAppearance()
     }
 
-    private func updateAppearance() {
+    private func updateLayerGeometry() {
         visualLayer.frame = NSRect(
             x: 0,
             y: 0,
@@ -426,6 +427,9 @@ private final class MirrorCloseButton: NSButton {
             height: bounds.height
         )
         visualLayer.cornerRadius = bounds.height / 2
+    }
+
+    private func updateAppearance() {
         visualLayer.backgroundColor = backgroundColor.cgColor
 
         let foregroundColor = NSColor.white.withAlphaComponent(isHighlighted ? 0.96 : 0.86)
