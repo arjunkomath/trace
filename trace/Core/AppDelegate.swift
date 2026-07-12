@@ -211,22 +211,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        let updateTitle = availableUpdateVersion.map { "Update to Trace \($0)…" }
-            ?? "Check for Updates"
         let updateItem = NSMenuItem(
-            title: updateTitle,
+            title: "Check for Updates",
             action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
             keyEquivalent: ""
         )
         updateItem.target = updaterController
-        if availableUpdateVersion != nil {
-            updateItem.image = NSImage(
-                systemSymbolName: "arrow.down.circle.fill",
-                accessibilityDescription: updateTitle
-            )
-        }
         menu.addItem(updateItem)
         updateMenuItem = updateItem
+        updateUpdateMenuItemAppearance()
         
         // Report Issue
         let reportIssueItem = NSMenuItem(title: "Report Issue", action: #selector(reportIssue), keyEquivalent: "")
@@ -390,15 +383,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 fallbackSymbolName: "cup.and.saucer.fill",
                 accessibilityDescription: description
             )
-        } else if let availableUpdateVersion {
-            description = "Trace \(availableUpdateVersion) update available"
-            button.image = makeMenuBarSymbolImage(
-                named: "arrow.down.circle.fill",
-                fallbackSymbolName: "arrow.down.circle",
-                accessibilityDescription: description
-            )
         } else {
-            description = "Trace"
+            description = availableUpdateVersion.map {
+                "Trace \($0) update available"
+            } ?? "Trace"
             button.image = makeMenuBarImage(
                 named: "MenuBarIcon",
                 fallbackSymbolName: "filemenu.and.selection",
@@ -407,7 +395,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         button.image?.size = NSSize(width: 18, height: 18)
         button.image?.isTemplate = true
-        button.title = isCaffeinateActive && availableUpdateVersion != nil ? "•" : ""
+        button.title = availableUpdateVersion == nil ? "" : "•"
         if let availableUpdateVersion, isCaffeinateActive {
             button.toolTip = "Trace - Caffeinate is on · \(availableUpdateVersion) is available"
         } else if let availableUpdateVersion {
@@ -678,7 +666,9 @@ extension AppDelegate: SPUStandardUserDriverDelegate {
         _ update: SUAppcastItem,
         andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        true
+        // Let Sparkle present its standard alert when the app already has the
+        // user's attention, or when the menu-bar reminder has no visible home.
+        immediateFocus || statusItem == nil
     }
 
     func standardUserDriverWillHandleShowingUpdate(
