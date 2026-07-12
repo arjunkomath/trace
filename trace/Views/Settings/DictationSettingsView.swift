@@ -110,34 +110,37 @@ struct DictationSettingsView: View {
 
             NativeSettingsSection("Permissions") {
                 PermissionRow(
-                    title: "Microphone Access",
-                    subtitle: "Required to capture your speech while the hotkey is held",
+                    title: "Microphone",
+                    subtitle: "Captures audio only while you hold the push-to-talk hotkey. Trace does not save the audio.",
                     icon: "mic",
                     status: microphonePermissionStatus,
                     action: handleMicrophonePermission,
-                    buttonTitle: microphoneButtonTitle
+                    buttonTitle: microphonePermissionButtonTitle
                 )
 
                 NativeSettingsDivider()
 
                 PermissionRow(
                     title: "Speech Recognition",
-                    subtitle: "Required to transcribe audio on this Mac",
+                    subtitle: "Uses Apple’s on-device speech recognition and downloaded language assets to turn dictation into text. Trace does not store transcripts.",
                     icon: "waveform",
                     status: speechRecognitionPermissionStatus,
                     action: handleSpeechRecognitionPermission,
-                    buttonTitle: speechRecognitionButtonTitle
+                    buttonTitle: speechRecognitionPermissionButtonTitle
                 )
 
                 NativeSettingsDivider()
 
                 PermissionRow(
-                    title: "Accessibility Access",
-                    subtitle: "Required to paste dictated text into the active app",
+                    title: "Accessibility",
+                    subtitle: "Lets Trace paste dictated text into the active app.",
                     icon: "accessibility",
                     status: accessibilityTrusted ? .granted : .denied,
-                    action: openAccessibilitySettings
+                    action: openAccessibilitySettings,
+                    buttonTitle: "Open Settings"
                 )
+            } footer: {
+                Text("These controls are also available in the Permissions tab for easy access.")
             }
         }
         .onAppear {
@@ -146,6 +149,7 @@ struct DictationSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshPermissions()
+            Task { await assetManager.refresh() }
         }
         .onDisappear {
             stopRecordingHotkey()
@@ -227,70 +231,79 @@ struct DictationSettingsView: View {
     private var microphonePermissionStatus: PermissionStatus {
         if requestingMicrophone { return .checking }
         switch microphoneAuthorizationStatus {
-        case .authorized: return .granted
-        case .notDetermined: return .notDetermined
-        case .denied, .restricted: return .denied
-        @unknown default: return .denied
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .denied, .restricted:
+            return .denied
+        @unknown default:
+            return .denied
         }
     }
 
     private var speechRecognitionPermissionStatus: PermissionStatus {
         if requestingSpeechRecognition { return .checking }
         switch speechRecognitionAuthorizationStatus {
-        case .authorized: return .granted
-        case .notDetermined: return .notDetermined
-        case .denied, .restricted: return .denied
-        @unknown default: return .denied
+        case .authorized:
+            return .granted
+        case .notDetermined:
+            return .notDetermined
+        case .denied, .restricted:
+            return .denied
+        @unknown default:
+            return .denied
         }
     }
 
-    private var microphoneButtonTitle: String {
+    private var microphonePermissionButtonTitle: String {
         microphoneAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
     }
 
-    private var speechRecognitionButtonTitle: String {
+    private var speechRecognitionPermissionButtonTitle: String {
         speechRecognitionAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
     }
 
     private func handleMicrophonePermission() {
         refreshPermissions()
-
-        if microphoneAuthorizationStatus == .notDetermined {
-            Task {
-                requestingMicrophone = true
-                _ = await permissionManager.requestMicrophonePermission()
-                refreshPermissions()
-                requestingMicrophone = false
-            }
-        } else {
+        guard microphoneAuthorizationStatus == .notDetermined else {
             permissionManager.openMicrophonePrivacySettings()
+            return
+        }
+
+        Task {
+            requestingMicrophone = true
+            _ = await permissionManager.requestMicrophonePermission()
+            requestingMicrophone = false
+            refreshPermissions()
         }
     }
 
     private func handleSpeechRecognitionPermission() {
         refreshPermissions()
-
-        if speechRecognitionAuthorizationStatus == .notDetermined {
-            Task {
-                requestingSpeechRecognition = true
-                let granted = await permissionManager.requestSpeechRecognitionPermission()
-                refreshPermissions()
-                if granted {
-                    await assetManager.refresh()
-                }
-                requestingSpeechRecognition = false
-            }
-        } else {
+        guard speechRecognitionAuthorizationStatus == .notDetermined else {
             permissionManager.openSpeechRecognitionPrivacySettings()
+            return
+        }
+
+        Task {
+            requestingSpeechRecognition = true
+            let granted = await permissionManager.requestSpeechRecognitionPermission()
+            requestingSpeechRecognition = false
+            refreshPermissions()
+            if granted {
+                await assetManager.refresh()
+            }
         }
     }
 
     private func openAccessibilitySettings() {
-        refreshPermissions()
-
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else {
+            return
         }
+        NSWorkspace.shared.open(url)
     }
 
     private func refreshPermissions() {

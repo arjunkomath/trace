@@ -6,10 +6,7 @@
 //
 
 import SwiftUI
-import AVFoundation
 import Carbon
-import UniformTypeIdentifiers
-import os.log
 
 struct GeneralSettingsView: View {
     @Binding var launchAtLogin: Bool
@@ -21,26 +18,13 @@ struct GeneralSettingsView: View {
     @State private var hoveredAccent: TraceAccent?
     @State private var eventMonitor: Any?
     @State private var showingRestartAlert = false
-    @State private var showingExportSuccessAlert = false
-    @State private var showingImportAlert = false
-    @State private var showingImportFileImporter = false
-    @State private var showingExportFileExporter = false
-    @State private var exportedFileURL: URL?
-    @State private var importOverwriteExisting = false
-    @State private var importError: String?
     @ObservedObject private var settingsManager = SettingsManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.traceTheme) private var traceTheme
     
-    // Permissions states
     @ObservedObject private var permissionManager = PermissionManager.shared
-    @State private var accessibilityEnabled = false
     @State private var calendarEnabled = false
-    @State private var cameraAuthorizationStatus: AVAuthorizationStatus = .notDetermined
-    @State private var checkingPermissions = false
     @State private var requestingCalendarPermission = false
-    @State private var requestingCameraPermission = false
-    @State private var availableMirrorCameras: [AVCaptureDevice] = []
     let onLaunchAtLoginChange: (Bool) -> Void
     let onHotkeyRecord: (UInt32, UInt32) -> Void
     let onHotkeyReset: () -> Void
@@ -107,108 +91,7 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            NativeSettingsSection("Permissions") {
-                PermissionRow(
-                    title: "Accessibility Access",
-                    subtitle: "Enables window management and global hotkeys",
-                    icon: "accessibility",
-                    status: accessibilityEnabled ? .granted : .denied,
-                    action: {
-                        openAccessibilitySettings()
-                    }
-                )
-                
-                PermissionRow(
-                    title: "Calendar Access",
-                    subtitle: "Enables calendar event search",
-                    icon: "calendar",
-                    status: requestingCalendarPermission || checkingPermissions ? .checking : (calendarEnabled ? .granted : .denied),
-                    action: {
-                        if calendarEnabled {
-                            openCalendarPrivacySettings()
-                        } else {
-                            requestCalendarPermission()
-                        }
-                    },
-                    buttonTitle: calendarEnabled ? "Open Settings" : "Request Permission"
-                )
-
-                NativeSettingsDivider()
-
-                PermissionRow(
-                    title: "Camera Access",
-                    subtitle: "Enables the local Mirror preview",
-                    icon: "video",
-                    status: requestingCameraPermission || checkingPermissions ? .checking : cameraPermissionStatus,
-                    action: {
-                        if cameraAuthorizationStatus == .notDetermined {
-                            requestCameraPermission()
-                        } else {
-                            openCameraPrivacySettings()
-                        }
-                    },
-                    buttonTitle: cameraPermissionButtonTitle
-                )
-                
-                NativeSettingsDivider()
-                
-                HStack {
-                    Text("Permission status is checked automatically when this tab opens.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    Button(action: checkPermissions) {
-                        HStack(spacing: 4) {
-                            Image(systemName: checkingPermissions ? "arrow.clockwise" : "arrow.clockwise")
-                                .font(.system(size: 11))
-                            Text("Refresh")
-                                .font(.system(size: 11))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(checkingPermissions)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .frame(minHeight: 44)
-            } footer: {
-                Text("All permissions are optional. Features that need a permission may be unavailable until you grant it, and you can change access any time in System Settings.")
-            }
-
-            NativeSettingsSection("Mirror") {
-                NativeSettingsRow(
-                    title: "Camera",
-                    subtitle: mirrorCameraSubtitle
-                ) {
-                    Picker("", selection: Binding(
-                        get: { settingsManager.settings.mirrorCameraDeviceID },
-                        set: { settingsManager.updateMirrorCameraDeviceID($0) }
-                    )) {
-                        Text("System Default").tag("")
-
-                        ForEach(availableMirrorCameras, id: \.uniqueID) { device in
-                            Text(MirrorManager.displayName(for: device)).tag(device.uniqueID)
-                        }
-
-                        // Keep a previously saved camera visible if it is currently disconnected.
-                        if !settingsManager.settings.mirrorCameraDeviceID.isEmpty,
-                           !availableMirrorCameras.contains(where: {
-                               $0.uniqueID == settingsManager.settings.mirrorCameraDeviceID
-                           }) {
-                            Text("Unavailable camera").tag(settingsManager.settings.mirrorCameraDeviceID)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(minWidth: 200, maxWidth: 260)
-                    .disabled(cameraAuthorizationStatus != .authorized)
-                }
-            } footer: {
-                Text("Choose which camera Mirror uses. System Default follows the camera recommended by macOS. Continuity Camera (iPhone/iPad) appears when the device is nearby, unlocked, and camera access is granted.")
-            }
-
-            NativeSettingsSection("Interface") {
+            NativeSettingsSection("Appearance") {
                 NativeSettingsRow(
                     title: "Accent Color",
                     subtitle: "Tint Trace foregrounds and Liquid Glass surfaces",
@@ -278,9 +161,9 @@ struct GeneralSettingsView: View {
                             settingsManager.updateShowMenuBarIcon(newValue)
                         }
                 }
-            }
 
-            NativeSettingsSection("Search Results") {
+                NativeSettingsDivider()
+
                 NativeSettingsRow(
                     title: "Results Layout",
                     subtitle: "Choose how search results are displayed"
@@ -296,9 +179,13 @@ struct GeneralSettingsView: View {
                         settingsManager.updateResultsLayout(newValue.rawValue)
                     }
                 }
+            }
 
+            NativeSettingsSection("Search Results") {
                 ForEach(SearchResultSource.allCases) { source in
-                    NativeSettingsDivider()
+                    if source != .applications {
+                        NativeSettingsDivider()
+                    }
 
                     NativeSettingsRow(
                         title: source.displayName,
@@ -321,54 +208,17 @@ struct GeneralSettingsView: View {
                 Text("Choose which result types appear in Trace search. Calendar search is opt-in and requires permission.")
             }
             
-            NativeSettingsSection("Settings Backup") {
-                NativeSettingsRow(
-                    title: "Export Settings",
-                    subtitle: "Save all your Trace settings to a file"
-                ) {
-                    Button("Export...") {
-                        exportSettings()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                
-                NativeSettingsDivider()
-                
-                NativeSettingsRow(
-                    title: "Import Settings",
-                    subtitle: "Restore settings from a previously exported file"
-                ) {
-                    Button("Import...") {
-                        showingImportAlert = true
-                    }
-                    .buttonStyle(.bordered)
-                }
-            } footer: {
-                Text("Export includes hotkeys, custom folders, app preferences, and usage statistics.")
-            }
-
-            RemoteSettingsSyncView()
         }
         .onAppear {
             // Load settings from SettingsManager
             resultsLayout = ResultsLayout(rawValue: settingsManager.settings.resultsLayout) ?? .compact
             showMenuBarIcon = settingsManager.settings.showMenuBarIcon
             accentColor = settingsManager.selectedAccent
-            refreshAvailableMirrorCameras()
             
-            // Check permissions
-            checkPermissions()
+            calendarEnabled = permissionManager.testCalendarCapability()
         }
-        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasConnectedNotification)) { _ in
-            refreshAvailableMirrorCameras()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { _ in
-            refreshAvailableMirrorCameras()
-        }
-        .onChange(of: settingsManager.settings.mirrorCameraDeviceID) { _, _ in
-            Task { @MainActor in
-                ServiceContainer.shared.mirrorManager.applyCameraSelectionChange()
-            }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            calendarEnabled = permissionManager.testCalendarCapability()
         }
         .onDisappear {
             stopRecording()
@@ -380,111 +230,6 @@ struct GeneralSettingsView: View {
             Button("Later", role: .cancel) { }
         } message: {
             Text("The global hotkey change requires restarting Trace to take effect.")
-        }
-        .alert("Export Successful", isPresented: $showingExportSuccessAlert) {
-            Button("Open in Finder") {
-                if let url = exportedFileURL {
-                    NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
-                }
-            }
-            Button("OK") { }
-        } message: {
-            if let url = exportedFileURL {
-                Text("Settings exported to:\n\(url.lastPathComponent)")
-            }
-        }
-        .alert("Import Settings", isPresented: $showingImportAlert) {
-            Button("Replace All Settings") {
-                importOverwriteExisting = true
-                showingImportFileImporter = true
-            }
-            Button("Keep Existing (Add Missing)") {
-                importOverwriteExisting = false
-                showingImportFileImporter = true
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Choose how to handle existing settings when importing.")
-        }
-        .fileImporter(
-            isPresented: $showingImportFileImporter,
-            allowedContentTypes: [UTType.json],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImportFileSelection(result)
-        }
-    }
-    
-    // MARK: - Settings Import/Export
-    
-    private func exportSettings() {
-        do {
-            let fileURL = try settingsManager.exportToFile()
-            exportedFileURL = fileURL
-            showingExportSuccessAlert = true
-        } catch {
-            showAlert(title: "Export Failed", message: error.localizedDescription)
-        }
-    }
-    
-    private func handleImportFileSelection(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            importSettings(from: url)
-        case .failure(let error):
-            showAlert(title: "File Selection Failed", message: error.localizedDescription)
-        }
-    }
-    
-    private func importSettings(from url: URL) {
-        do {
-            try settingsManager.importFromFile(url, overwriteExisting: importOverwriteExisting)
-            
-            // Reload all managers after import
-            reloadManagersAfterImport()
-            
-            showAlert(title: "Import Successful", 
-                     message: "Settings have been imported and all managers have been reloaded. All imported hotkeys should now work immediately.")
-        } catch {
-            showAlert(title: "Import Failed", message: error.localizedDescription)
-        }
-    }
-    
-    private func reloadManagersAfterImport() {
-        // Reload app hotkeys
-        AppHotkeyManager.shared.setupHotkeys()
-        
-        // Reload window hotkeys
-        let windowHotkeyManager = WindowHotkeyManager.shared
-        for (position, hotkeyData) in settingsManager.settings.windowHotkeys {
-            if let windowPosition = WindowPosition(rawValue: position) {
-                windowHotkeyManager.updateHotkey(
-                    for: windowPosition,
-                    keyCombo: hotkeyData.hotkey,
-                    keyCode: UInt32(hotkeyData.keyCode),
-                    modifiers: UInt32(hotkeyData.modifiers)
-                )
-            }
-        }
-        
-        // Reload quick links manager
-        DispatchQueue.main.async {
-            let serviceContainer = ServiceContainer.shared
-            serviceContainer.quickLinksManager.loadQuickLinks()
-        }
-
-        DictationHotkeyManager.shared.reload()
-    }
-    
-    private func showAlert(title: String, message: String) {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = title
-            alert.informativeText = message
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
         }
     }
     
@@ -560,114 +305,6 @@ struct GeneralSettingsView: View {
         }
     }
     
-    // MARK: - Permissions Methods
-    
-    private func checkPermissions() {
-        guard !checkingPermissions else { return } // Prevent concurrent checks
-        checkingPermissions = true
-        
-        // Check accessibility permissions with retry mechanism for release builds
-        checkAccessibilityPermissions()
-        
-        // Check calendar permissions
-        checkCalendarPermissions()
-
-        // Check camera permissions
-        checkCameraPermissions()
-    }
-    
-    private func checkAccessibilityPermissions() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let capability = self.permissionManager.testWindowManagementCapability()
-            
-            DispatchQueue.main.async {
-                switch capability {
-                case .available:
-                    self.accessibilityEnabled = true
-                    
-                case .permissionDenied:
-                    self.accessibilityEnabled = false
-                    
-                case .noTargetApp, .noWindows:
-                    // These states don't indicate permission problems - use system API as fallback
-                    self.accessibilityEnabled = AXIsProcessTrusted()
-                }
-                
-                self.checkingPermissions = false // Reset the concurrent check guard
-            }
-        }
-    }
-    
-    /// Checks calendar permissions in the background and updates UI state
-    private func checkCalendarPermissions() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let hasCalendarAccess = self.permissionManager.testCalendarCapability()
-            
-            DispatchQueue.main.async {
-                self.calendarEnabled = hasCalendarAccess
-                self.checkingPermissions = false
-            }
-        }
-    }
-
-    private var cameraPermissionStatus: PermissionStatus {
-        switch cameraAuthorizationStatus {
-        case .authorized:
-            return .granted
-        case .notDetermined:
-            return .notDetermined
-        case .denied, .restricted:
-            return .denied
-        @unknown default:
-            return .denied
-        }
-    }
-
-    private var cameraPermissionButtonTitle: String {
-        cameraAuthorizationStatus == .notDetermined ? "Request Permission" : "Open Settings"
-    }
-
-    private var mirrorCameraSubtitle: String {
-        if cameraAuthorizationStatus != .authorized {
-            return "Grant camera access to choose a Mirror camera"
-        }
-        if availableMirrorCameras.isEmpty {
-            return "No cameras detected"
-        }
-        let cameraCount = availableMirrorCameras.count
-        let cameraLabel = cameraCount == 1 ? "camera" : "cameras"
-        let continuityCount = availableMirrorCameras.filter {
-            $0.isContinuityCamera || $0.deviceType == .continuityCamera
-        }.count
-        if continuityCount > 0 {
-            return "\(cameraCount) \(cameraLabel) · includes Continuity Camera"
-        }
-        return "\(cameraCount) \(cameraLabel) available for Mirror"
-    }
-
-    private func checkCameraPermissions() {
-        cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        refreshAvailableMirrorCameras()
-    }
-
-    private func refreshAvailableMirrorCameras() {
-        availableMirrorCameras = MirrorManager.availableCameras()
-    }
-
-    private func requestCameraPermission() {
-        guard !requestingCameraPermission else { return }
-
-        Task {
-            requestingCameraPermission = true
-            let granted = await AVCaptureDevice.requestAccess(for: .video)
-            await MainActor.run {
-                cameraAuthorizationStatus = granted ? .authorized : AVCaptureDevice.authorizationStatus(for: .video)
-                requestingCameraPermission = false
-                refreshAvailableMirrorCameras()
-            }
-        }
-    }
-    
     /// Requests calendar permissions from the user and enables calendar search if granted
     private func requestCalendarPermission() {
         guard !requestingCalendarPermission else { return }
@@ -690,114 +327,4 @@ struct GeneralSettingsView: View {
         }
     }
     
-    private func openAccessibilitySettings() {
-        // Open System Settings to Accessibility
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-    
-    /// Opens System Settings to the Calendar privacy section
-    private func openCalendarPrivacySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func openCameraPrivacySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-}
-
-// MARK: - Permission Types
-
-enum PermissionStatus {
-    case granted
-    case denied
-    case notDetermined
-    case checking
-    
-    var color: Color {
-        switch self {
-        case .granted: return .green
-        case .denied: return .orange
-        case .notDetermined: return .secondary
-        case .checking: return .secondary
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .granted: return "checkmark.circle.fill"
-        case .denied: return "exclamationmark.triangle.fill"
-        case .notDetermined: return "questionmark.circle.fill"
-        case .checking: return "clock"
-        }
-    }
-    
-    var statusText: String {
-        switch self {
-        case .granted: return "Granted"
-        case .denied: return "Not Granted"
-        case .notDetermined: return "Not Requested"
-        case .checking: return "Checking..."
-        }
-    }
-}
-
-struct PermissionRow: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let status: PermissionStatus
-    let action: () -> Void
-    let buttonTitle: String?
-    
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13))
-                Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 4) {
-                    Image(systemName: status.icon)
-                        .font(.system(size: 12))
-                        .foregroundColor(status.color)
-                    
-                    Text(status.statusText)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(status.color)
-                }
-                
-                if status != .granted {
-                    Button(buttonTitle ?? "Open Settings") {
-                        action()
-                    }
-                    .font(.system(size: 11))
-                    .buttonStyle(.link)
-                }
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .frame(minHeight: 54)
-    }
-    
-    init(title: String, subtitle: String, icon: String, status: PermissionStatus, action: @escaping () -> Void, buttonTitle: String? = nil) {
-        self.title = title
-        self.subtitle = subtitle
-        self.icon = icon
-        self.status = status
-        self.action = action
-        self.buttonTitle = buttonTitle
-    }
 }

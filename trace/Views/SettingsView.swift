@@ -11,11 +11,14 @@ import Carbon
 
 enum TraceSettingsSection: String, CaseIterable, Identifiable {
     case general
+    case permissions
+    case windowHotkeys
+    case mirror
     case dictation
     case caffeinate
-    case windowHotkeys
     case appHotkeys
     case quickLinks
+    case backupSync
     case about
 
     var id: String { rawValue }
@@ -24,6 +27,10 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .permissions:
+            return "Permissions"
+        case .mirror:
+            return "Mirror"
         case .dictation:
             return "Dictation"
         case .caffeinate:
@@ -34,25 +41,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return "Application Hotkeys"
         case .quickLinks:
             return "Quick Links"
-        case .about:
-            return "About"
-        }
-    }
-
-    var tabTitle: String {
-        switch self {
-        case .general:
-            return "General"
-        case .dictation:
-            return "Dictation"
-        case .caffeinate:
-            return "Keep Awake"
-        case .windowHotkeys:
-            return "Windows"
-        case .appHotkeys:
-            return "Apps"
-        case .quickLinks:
-            return "Links"
+        case .backupSync:
+            return "Backup & Sync"
         case .about:
             return "About"
         }
@@ -61,7 +51,11 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .general:
-            return "Permissions, startup, appearance, and backups"
+            return "Startup, appearance, and search"
+        case .permissions:
+            return "Privacy access used by Trace features"
+        case .mirror:
+            return "Camera access and preview preferences"
         case .dictation:
             return "Push-to-talk offline dictation"
         case .caffeinate:
@@ -72,6 +66,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return "Global shortcuts for launching apps"
         case .quickLinks:
             return "Folders, files, and web links in search"
+        case .backupSync:
+            return "Import, export, and remote synchronization"
         case .about:
             return "Version, data, and maintenance"
         }
@@ -81,6 +77,10 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "gearshape"
+        case .permissions:
+            return "hand.raised"
+        case .mirror:
+            return "video"
         case .dictation:
             return "waveform.and.mic"
         case .caffeinate:
@@ -91,6 +91,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return "app.badge"
         case .quickLinks:
             return "link"
+        case .backupSync:
+            return "arrow.triangle.2.circlepath"
         case .about:
             return "info.circle"
         }
@@ -100,6 +102,10 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return Color(nsColor: .systemGray)
+        case .permissions:
+            return Color(nsColor: .systemYellow)
+        case .mirror:
+            return Color(nsColor: .systemTeal)
         case .dictation:
             return Color(nsColor: .systemRed)
         case .caffeinate:
@@ -110,6 +116,8 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
             return Color(nsColor: .systemOrange)
         case .quickLinks:
             return Color(nsColor: .systemGreen)
+        case .backupSync:
+            return Color(nsColor: .systemIndigo)
         case .about:
             return Color(nsColor: .systemPurple)
         }
@@ -118,8 +126,10 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
 
 private enum SettingsLayout {
     static let contentMaxWidth: CGFloat = 620
-    static let detailTopInset: CGFloat = 18
+    static let headerTopInset: CGFloat = 2
+    static let contentTopInset: CGFloat = 12
     static let detailHorizontalInset: CGFloat = 18
+    static let sidebarWidth: CGFloat = 215
 }
 
 struct SettingsView: View {
@@ -140,11 +150,15 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsTopTabBar(selection: $selectedSection)
+        HStack(spacing: 0) {
+            SettingsSidebar(selection: $selectedSection)
 
-            selectedSectionView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                SettingsDetailHeader(section: selectedSection)
+
+                selectedSectionView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(
@@ -171,16 +185,22 @@ struct SettingsView: View {
                 onHotkeyRecord: handleHotkeyRecord,
                 onHotkeyReset: handleHotkeyReset
             )
+        case .mirror:
+            MirrorSettingsView()
         case .dictation:
             DictationSettingsView()
         case .caffeinate:
             CaffeinateSettingsView()
         case .windowHotkeys:
             WindowManagementSettingsView()
+        case .permissions:
+            PermissionsSettingsView()
         case .appHotkeys:
             AppHotkeysSettingsView()
         case .quickLinks:
             QuickLinksSettingsView()
+        case .backupSync:
+            BackupSyncSettingsView()
         case .about:
             AboutSettingsView()
         }
@@ -288,44 +308,37 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsTopTabBar: View {
+private struct SettingsSidebar: View {
     @Binding var selection: TraceSettingsSection
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 0) {
-            GeometryReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(TraceSettingsSection.allCases) { section in
-                            SettingsTopTabButton(
-                                section: section,
-                                isSelected: selection == section
-                            ) {
-                                selection = section
-                            }
-                        }
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 2) {
+                ForEach(TraceSettingsSection.allCases) { section in
+                    SettingsSidebarRow(
+                        section: section,
+                        isSelected: selection == section
+                    ) {
+                        selection = section
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
-                    .frame(minWidth: proxy.size.width, alignment: .center)
                 }
             }
-            .frame(height: 68)
-
-            Rectangle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.10))
-                .frame(height: 1)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
         }
-        .background(
-            Rectangle()
-                .fill(Color(nsColor: .windowBackgroundColor))
-        )
+        .frame(width: SettingsLayout.sidebarWidth)
+        .frame(maxHeight: .infinity)
+        .background(sidebarBackground)
+    }
+
+    private var sidebarBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.035) : Color.black.opacity(0.03)
     }
 }
 
-private struct SettingsTopTabButton: View {
+private struct SettingsSidebarRow: View {
     let section: TraceSettingsSection
     let isSelected: Bool
     let action: () -> Void
@@ -336,29 +349,32 @@ private struct SettingsTopTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 24, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(isSelected ? traceTheme.accentForegroundSecondary : section.iconColor)
-                    .frame(width: 30, height: 28)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(iconBackgroundFill)
+                    .frame(width: 22, height: 22)
+                    .overlay {
+                        Image(systemName: section.systemImage)
+                            .font(.system(size: 13, weight: .medium))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(section.iconColor)
+                    }
 
-                Text(section.tabTitle)
-                    .font(.system(size: 10.5, weight: isSelected ? .semibold : .medium))
+                Text(section.title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(textColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
+
+                Spacer(minLength: 0)
             }
-            .frame(width: 78, height: 52)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(backgroundFill)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isSelected ? traceTheme.accentBorder : Color.primary.opacity(0.08), lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(section.title))
@@ -368,9 +384,13 @@ private struct SettingsTopTabButton: View {
 
     private var textColor: Color {
         if isSelected {
-            return colorScheme == .dark ? Color.white.opacity(0.92) : Color.black.opacity(0.84)
+            return colorScheme == .dark ? Color.white.opacity(0.94) : Color.black.opacity(0.86)
         }
-        return colorScheme == .dark ? Color.white.opacity(0.76) : Color.black.opacity(0.66)
+        return colorScheme == .dark ? Color.white.opacity(0.78) : Color.black.opacity(0.7)
+    }
+
+    private var iconBackgroundFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
     }
 
     private var backgroundFill: Color {
@@ -385,6 +405,33 @@ private struct SettingsTopTabButton: View {
 
     private var hoverFill: Color {
         colorScheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.045)
+    }
+}
+
+private struct SettingsDetailHeader: View {
+    let section: TraceSettingsSection
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(section.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(section.subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SettingsLayout.detailHorizontalInset)
+            .padding(.top, SettingsLayout.headerTopInset)
+            .padding(.bottom, 12)
+
+            Rectangle()
+                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.10))
+                .frame(height: 1)
+        }
     }
 }
 
@@ -405,11 +452,12 @@ struct NativeSettingsPane<Content: View>: View {
                 content
             }
             .padding(.horizontal, SettingsLayout.detailHorizontalInset)
-            .padding(.top, SettingsLayout.detailTopInset)
+            .padding(.top, SettingsLayout.contentTopInset)
             .padding(.bottom, 16)
             .frame(maxWidth: SettingsLayout.contentMaxWidth, alignment: .topLeading)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color(nsColor: .windowBackgroundColor))
     }

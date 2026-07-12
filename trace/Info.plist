@@ -34,8 +34,6 @@
     <string>26.0</string>
     <key>LSUIElement</key>
     <true/>
-    <key>NSAccentColorName</key>
-    <string>AccentColor</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Trace needs permission to control system settings like appearance through Apple Events.</string>
     <key>NSAccessibilityUsageDescription</key>

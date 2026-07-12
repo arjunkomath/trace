@@ -236,7 +236,7 @@ class CalendarManager: ObservableObject {
         
         var error: NSDictionary?
         let appleScript = NSAppleScript(source: script)
-        let result = appleScript?.executeAndReturnError(&error)
+        _ = appleScript?.executeAndReturnError(&error)
         
         if error == nil {
             logger.info("Opened calendar event using AppleScript")

@@ -100,9 +100,9 @@ class MenuBarService {
 
     private func activate(_ app: NSRunningApplication) {
         if Thread.isMainThread {
-            app.activate()
+            _ = app.activate()
         } else {
-            DispatchQueue.main.sync {
+            _ = DispatchQueue.main.sync {
                 app.activate()
             }
         }
