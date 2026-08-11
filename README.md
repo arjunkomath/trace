@@ -1,3 +1,5 @@
+
+
 # Trace
 
 **Spotlight alternative and shortcut toolkit for macOS**
@@ -97,7 +99,8 @@ xcodebuild -project trace.xcodeproj -scheme trace clean build
 trace/
 ├── Core/                 # Application lifecycle, logging
 ├── Views/               # SwiftUI interface components
-├── Services/            # Business logic, managers
+├── Managers/            # Business logic managers
+├── Services/            # System integration services
 ├── Models/              # Data structures, search results
 ├── Search/Providers/    # Pluggable search implementations
 └── Windows/            # NSWindow subclasses
