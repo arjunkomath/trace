@@ -26,7 +26,7 @@ enum AppConstants {
     static let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
     enum Window {
         static let launcherWidth: CGFloat = 750
-        static let launcherHeight: CGFloat = 60
+        static let launcherHeight: CGFloat = 72
         static let maxResultsHeight: CGFloat = 320
         static let cornerRadius: CGFloat = 12
         static let shadowRadius: CGFloat = 12

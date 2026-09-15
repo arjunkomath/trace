@@ -35,30 +35,6 @@ struct AppHotkeysSettingsView: View {
     var body: some View {
         NativeSettingsPane {
             NativeSettingsSection("Application Hotkeys") {
-                // Search Field
-                HStack {
-                    Image(systemName: "filemenu.and.selection")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
-                    
-                    TextField("Search applications...", text: $searchQuery)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 13))
-                    
-                    if !searchQuery.isEmpty {
-                        Button(action: { searchQuery = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 10)
-                
-                NativeSettingsDivider()
-                
                 // Apps List
                 if isLoading {
                     HStack {
@@ -73,6 +49,8 @@ struct AppHotkeysSettingsView: View {
                         Spacer()
                     }
                     .padding(.vertical, 20)
+                } else if filteredApps.isEmpty && !searchQuery.isEmpty {
+                    ContentUnavailableView.search(text: searchQuery)
                 } else {
                     ForEach(Array(filteredApps.enumerated()), id: \.element.bundleIdentifier) { index, app in
                         AppHotkeyRow(
@@ -94,6 +72,7 @@ struct AppHotkeysSettingsView: View {
                 Text("Assign global keyboard shortcuts to launch your favorite applications instantly.")
             }
         }
+        .searchable(text: $searchQuery, placement: .toolbar, prompt: "Search applications")
         .onAppear {
             loadApps()
             loadConfiguredHotkeys()

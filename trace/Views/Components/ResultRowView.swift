@@ -101,8 +101,9 @@ struct ResultRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            isSelected ? traceTheme.accentFill :
-            (isHovered ? traceTheme.accentFillMuted : Color.clear)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isSelected ? traceTheme.accentFill :
+                    (isHovered ? traceTheme.accentFillMuted : Color.clear))
         )
         .onHover { hovering in
             isHovered = hovering

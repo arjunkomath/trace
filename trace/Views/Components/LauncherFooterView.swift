@@ -51,7 +51,7 @@ struct LauncherFooterView: View {
                 .padding(.vertical, 5)
                 .background(floatingBarBackground)
                 .overlay(
-                    Capsule()
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .stroke(floatingBarBorder, lineWidth: 0.75)
                 )
                 .shadow(
@@ -93,11 +93,11 @@ struct LauncherFooterView: View {
                     .padding(.horizontal, keys[index].count > 1 ? 6 : 5)
                     .frame(height: 18)
                     .background(
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 3)
                             .fill(keyCapFill)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: 3)
                             .stroke(keyCapBorder, lineWidth: 0.8)
                     )
             }
@@ -106,10 +106,10 @@ struct LauncherFooterView: View {
     }
     
     private var floatingBarBackground: some View {
-        Capsule()
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(.regularMaterial)
             .overlay(
-                Capsule()
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(traceTheme.accentGlassTint)
             )
     }
