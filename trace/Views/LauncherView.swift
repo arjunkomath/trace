@@ -14,6 +14,7 @@ struct LauncherView: View {
     @State var searchText = ""
     @State var selectedIndex = 0
     @State var selectedActionIndex = 0 // Track which action is selected
+    @State private var isSearchBarHovered = false
     @FocusState private var isSearchFocused: Bool
     @Environment(\.openSettings) var openSettings
     @ObservedObject var services = ServiceContainer.shared
@@ -32,7 +33,8 @@ struct LauncherView: View {
     private let effectiveColorScheme: ColorScheme = .dark
 
     var body: some View {
-        liquidGlassContainer(spacing: 0) {
+        // Render the two glass surfaces independently as results appear and disappear.
+        Group {
             VStack(spacing: 10) {
                 // Search Input - Fixed height section
                 HStack(spacing: 12) {
@@ -45,6 +47,7 @@ struct LauncherView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 22))
                         .foregroundStyle(.primary)
+                        .pointerStyle(.horizontalText)
                         .focused($isSearchFocused)
                         .accessibilityLabel("Search Trace")
                         .onChange(of: searchText) { _, newValue in
@@ -64,31 +67,31 @@ struct LauncherView: View {
                             }
                         }
 
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            clearSearch()
-                            // Restore focus after clearing search
-                            DispatchQueue.main.async {
-                                isSearchFocused = true
-                            }
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 24, height: 24)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Clear search")
-                        .help("Clear search (Esc)")
-                    }
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .opacity(isSearchBarHovered ? 1 : 0)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .gesture(WindowDragGesture())
+                        .pointerStyle(.grabIdle)
+                        .help("Drag to reposition")
+                        .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 16)
+                .padding(.leading, 28)
+                .padding(.trailing, 20)
                 .padding(.vertical, 14)
                 .frame(height: AppConstants.Window.launcherHeight)
-                .background(containerGradient(topOpacity: 0.95), in: Capsule())
+                .background(
+                    containerGradient(topOpacity: 0.98, bottomOpacity: 0.25, fadeExponent: 1.5),
+                    in: Capsule()
+                )
                 .glassEffect(.regular, in: Capsule())
                 .clipShape(Capsule())
+                .contentShape(Capsule())
+                .gesture(WindowDragGesture())
+                .pointerStyle(.grabIdle)
+                .onHover { isSearchBarHovered = $0 }
 
                 // Results section - expandable
                 if hasResults {
@@ -99,9 +102,13 @@ struct LauncherView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .padding(.top, 14)
+                                .padding(.bottom, 8)
                             Spacer()
                         }
+                        .contentShape(Rectangle())
+                        .gesture(WindowDragGesture())
+                        .pointerStyle(.grabIdle)
 
                         ScrollViewReader { proxy in
                             ScrollView {
@@ -155,8 +162,8 @@ struct LauncherView: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: AppConstants.Window.launcherWidth)
             .shadow(
-                color: Color.black.opacity(effectiveColorScheme == .dark ? 0.4 : 0.2),
-                radius: AppConstants.Window.shadowRadius * 0.8,
+                color: Color.black.opacity(effectiveColorScheme == .dark ? 0.25 : 0.125),
+                radius: AppConstants.Window.shadowRadius * 1.25,
                 x: AppConstants.Window.shadowOffset.width,
                 y: AppConstants.Window.shadowOffset.height
             )
@@ -231,9 +238,21 @@ struct LauncherView: View {
         }
     }
 
-    private func containerGradient(topOpacity: Double) -> LinearGradient {
+    private func containerGradient(
+        topOpacity: Double,
+        bottomOpacity: Double = 0,
+        fadeExponent: Double = 1
+    ) -> LinearGradient {
         LinearGradient(
-            colors: [.black.opacity(topOpacity), .clear],
+            stops: (0...32).map { index in
+                let position = Double(index) / 32
+                let progress = pow(position, fadeExponent)
+                let fade = progress * progress * (3 - 2 * progress)
+                return .init(
+                    color: .black.opacity(topOpacity * (1 - fade) + bottomOpacity * fade),
+                    location: CGFloat(position)
+                )
+            },
             startPoint: .top,
             endPoint: .bottom
         )

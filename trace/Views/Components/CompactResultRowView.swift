@@ -100,7 +100,7 @@ struct CompactResultRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8) // Reduced from 12 to make it more compact
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            Rectangle()
                 .fill(isSelected ? traceTheme.accentFill :
                     (isHovered ? traceTheme.accentFillMuted : Color.clear))
         )
