@@ -14,11 +14,11 @@ struct LauncherView: View {
     @State var searchText = ""
     @State var selectedIndex = 0
     @State var selectedActionIndex = 0 // Track which action is selected
+    @State private var isSearchBarHovered = false
     @FocusState private var isSearchFocused: Bool
     @Environment(\.openSettings) var openSettings
     @ObservedObject var services = ServiceContainer.shared
     @ObservedObject var settingsManager = SettingsManager.shared
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State var cachedResults: [SearchResult] = [] // Background-computed results
     @State var currentSearchTask: Task<Void, Never>? // Track current search task
     @StateObject var actionExecutor = ActionExecutor() // Handle async actions
@@ -29,27 +29,27 @@ struct LauncherView: View {
 
     let onClose: () -> Void
 
-    private var effectiveColorScheme: ColorScheme {
-        appearanceManager.colorScheme
-    }
-
-    private var theme: TraceTheme {
-        TraceTheme(accent: settingsManager.selectedAccent, colorScheme: effectiveColorScheme)
-    }
+    // Keep semantic text and material colors legible on the launcher's black surface.
+    private let effectiveColorScheme: ColorScheme = .dark
 
     var body: some View {
-        liquidGlassContainer(spacing: 12) {
-            VStack(spacing: 0) {
+        // Render the two glass surfaces independently as results appear and disappear.
+        Group {
+            VStack(spacing: 10) {
                 // Search Input - Fixed height section
                 HStack(spacing: 12) {
-                    Image(systemName: "filemenu.and.selection")
+                    Image(systemName: "magnifyingglass")
                         .font(.system(size: 16))
-                        .foregroundColor(theme.accentForegroundSecondary)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
 
-                    TextField("What would you like to do?", text: $searchText)
+                    TextField("Search apps, commands, and quick links", text: $searchText)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 18))
+                        .font(.system(size: 22))
+                        .foregroundStyle(.primary)
+                        .pointerStyle(.horizontalText)
                         .focused($isSearchFocused)
+                        .accessibilityLabel("Search Trace")
                         .onChange(of: searchText) { _, newValue in
                             selectedIndex = 0
                             selectedActionIndex = 0
@@ -67,41 +67,48 @@ struct LauncherView: View {
                             }
                         }
 
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            clearSearch()
-                            // Restore focus after clearing search
-                            DispatchQueue.main.async {
-                                isSearchFocused = true
-                            }
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(theme.accentForegroundSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .opacity(isSearchBarHovered ? 1 : 0)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .gesture(WindowDragGesture())
+                        .pointerStyle(.grabIdle)
+                        .help("Drag to reposition")
+                        .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 16)
+                .padding(.leading, 28)
+                .padding(.trailing, 20)
                 .padding(.vertical, 14)
                 .frame(height: AppConstants.Window.launcherHeight)
+                .background(
+                    containerGradient(topOpacity: 0.98, bottomOpacity: 0.25, fadeExponent: 1.5),
+                    in: Capsule()
+                )
+                .glassEffect(.regular, in: Capsule())
+                .clipShape(Capsule())
+                .contentShape(Capsule())
+                .gesture(WindowDragGesture())
+                .pointerStyle(.grabIdle)
+                .onHover { isSearchBarHovered = $0 }
 
                 // Results section - expandable
-                VStack(spacing: 0) {
-                    if hasResults {
-                        Divider()
-                            .overlay(theme.accentBorder)
-                            .opacity(0.45)
-
+                if hasResults {
+                    VStack(spacing: 0) {
                         // Results header
                         HStack {
                             Text("Results")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(theme.accentForegroundSecondary)
+                                .foregroundStyle(.secondary)
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .padding(.top, 14)
+                                .padding(.bottom, 8)
                             Spacer()
                         }
+                        .contentShape(Rectangle())
+                        .gesture(WindowDragGesture())
+                        .pointerStyle(.grabIdle)
 
                         ScrollViewReader { proxy in
                             ScrollView {
@@ -144,23 +151,19 @@ struct LauncherView: View {
                             selectedActionIndex: selectedActionIndex
                         )
                     }
+                    .background(
+                        containerGradient(topOpacity: 0.3),
+                        in: RoundedRectangle(cornerRadius: adaptiveCornerRadius)
+                    )
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: adaptiveCornerRadius))
+                    .clipShape(RoundedRectangle(cornerRadius: adaptiveCornerRadius))
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: AppConstants.Window.launcherWidth)
-            .background(
-                RoundedRectangle(cornerRadius: adaptiveCornerRadius)
-                    .fill(theme.accentGlassTint)
-            )
-            .liquidGlassEffect(interactive: true)
-            .clipShape(RoundedRectangle(cornerRadius: adaptiveCornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: adaptiveCornerRadius)
-                    .stroke(theme.accentBorder, lineWidth: 0.5)
-            )
             .shadow(
-                color: Color.black.opacity(effectiveColorScheme == .dark ? 0.4 : 0.2),
-                radius: AppConstants.Window.shadowRadius * 0.8,
+                color: Color.black.opacity(effectiveColorScheme == .dark ? 0.25 : 0.125),
+                radius: AppConstants.Window.shadowRadius * 1.25,
                 x: AppConstants.Window.shadowOffset.width,
                 y: AppConstants.Window.shadowOffset.height
             )
@@ -200,7 +203,12 @@ struct LauncherView: View {
             cancellables.removeAll()
         }
         .onKeyPress(.escape) {
-            onClose()
+            if searchText.isEmpty {
+                onClose()
+            } else {
+                clearSearch()
+                isSearchFocused = true
+            }
             return .handled
         }
         .onKeyPress(.return) {
@@ -228,6 +236,26 @@ struct LauncherView: View {
             }
             return .handled
         }
+    }
+
+    private func containerGradient(
+        topOpacity: Double,
+        bottomOpacity: Double = 0,
+        fadeExponent: Double = 1
+    ) -> LinearGradient {
+        LinearGradient(
+            stops: (0...32).map { index in
+                let position = Double(index) / 32
+                let progress = pow(position, fadeExponent)
+                let fade = progress * progress * (3 - 2 * progress)
+                return .init(
+                    color: .black.opacity(topOpacity * (1 - fade) + bottomOpacity * fade),
+                    location: CGFloat(position)
+                )
+            },
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private func notifyContentSizeDidChange() {

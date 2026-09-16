@@ -68,6 +68,18 @@ class SettingsWindow: NSWindow {
     
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command,
+           event.charactersIgnoringModifiers?.lowercased() == "f",
+           attachedSheet == nil,
+           let searchItem = toolbar?.items.compactMap({ $0 as? NSSearchToolbarItem }).first {
+            searchItem.beginSearchInteraction()
+            searchItem.searchField.selectText(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
     
     func show() {
         NSApp.activate(ignoringOtherApps: true)

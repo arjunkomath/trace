@@ -344,6 +344,7 @@ private struct SettingsSidebarRow: View {
     let action: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.traceTheme) private var traceTheme
 
@@ -357,12 +358,12 @@ private struct SettingsSidebarRow: View {
                         Image(systemName: section.systemImage)
                             .font(.system(size: 13, weight: .medium))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(section.iconColor)
+                            .foregroundStyle(appearsActive ? section.iconColor : .secondary)
                     }
 
                 Text(section.title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(textColor)
+                    .foregroundStyle(appearsActive ? Color.primary : Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
 
@@ -382,20 +383,15 @@ private struct SettingsSidebarRow: View {
         .onHover { isHovering = $0 }
     }
 
-    private var textColor: Color {
-        if isSelected {
-            return colorScheme == .dark ? Color.white.opacity(0.94) : Color.black.opacity(0.86)
-        }
-        return colorScheme == .dark ? Color.white.opacity(0.78) : Color.black.opacity(0.7)
-    }
-
     private var iconBackgroundFill: Color {
         colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
     }
 
     private var backgroundFill: Color {
         if isSelected {
-            return traceTheme.accentFillMuted
+            return appearsActive
+                ? traceTheme.accentFillMuted
+                : Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
         }
         if isHovering {
             return hoverFill

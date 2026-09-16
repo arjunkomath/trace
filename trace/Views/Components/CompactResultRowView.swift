@@ -100,8 +100,9 @@ struct CompactResultRowView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8) // Reduced from 12 to make it more compact
         .background(
-            isSelected ? traceTheme.accentFill :
-            (isHovered ? traceTheme.accentFillMuted : Color.clear)
+            Rectangle()
+                .fill(isSelected ? traceTheme.accentFill :
+                    (isHovered ? traceTheme.accentFillMuted : Color.clear))
         )
         .onHover { hovering in
             isHovered = hovering

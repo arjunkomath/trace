@@ -15,32 +15,41 @@ struct QuickLinksSettingsView: View {
     @State private var editingQuickLink: QuickLink?
     @State private var showingAddSheet = false
     @State private var showingAddWebLinkSheet = false
+    @State private var searchQuery = ""
     @Environment(\.traceTheme) private var traceTheme
     
     var body: some View {
         NativeSettingsPane {
-            NativeSettingsSection("System Folders") {
-                let systemLinks = quickLinksManager.quickLinks.filter { $0.isSystemDefault }
-                ForEach(Array(systemLinks.enumerated()), id: \.element.id) { index, quickLink in
-                    QuickLinkRowView(
-                        quickLink: quickLink,
-                        onEdit: { editingQuickLink = quickLink },
-                        onDelete: nil // System defaults cannot be deleted
-                    )
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .frame(minHeight: 54)
-                    
-                    if index < systemLinks.count - 1 {
-                        NativeSettingsDivider()
+            let matchingLinks = quickLinksManager.searchQuickLinks(query: searchQuery)
+            let systemLinks = matchingLinks.filter { $0.isSystemDefault }
+            let customLinks = matchingLinks.filter { !$0.isSystemDefault }
+
+            if matchingLinks.isEmpty && !searchQuery.isEmpty {
+                ContentUnavailableView.search(text: searchQuery)
+            }
+
+            if !systemLinks.isEmpty {
+                NativeSettingsSection("System Folders") {
+                    ForEach(Array(systemLinks.enumerated()), id: \.element.id) { index, quickLink in
+                        QuickLinkRowView(
+                            quickLink: quickLink,
+                            onEdit: { editingQuickLink = quickLink },
+                            onDelete: nil // System defaults cannot be deleted
+                        )
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .frame(minHeight: 54)
+
+                        if index < systemLinks.count - 1 {
+                            NativeSettingsDivider()
+                        }
                     }
+                } footer: {
+                    Text("Default macOS folders that are always available. You can customize their hotkeys but cannot delete them.")
                 }
-            } footer: {
-                Text("Default macOS folders that are always available. You can customize their hotkeys but cannot delete them.")
             }
             
             NativeSettingsSection("Custom Quick Links") {
-                let customLinks = quickLinksManager.quickLinks.filter { !$0.isSystemDefault }
                 ForEach(Array(customLinks.enumerated()), id: \.element.id) { index, quickLink in
                     QuickLinkRowView(
                         quickLink: quickLink,
@@ -92,6 +101,7 @@ struct QuickLinksSettingsView: View {
                 Text("Create shortcuts to websites and files you access frequently. They'll appear in search results when you type relevant keywords.")
             }
         }
+        .searchable(text: $searchQuery, placement: .toolbar, prompt: "Search quick links")
         .sheet(item: $editingQuickLink) { quickLink in
             EditQuickLinkView(quickLink: quickLink, quickLinksManager: quickLinksManager)
         }

@@ -8,15 +8,11 @@
 import SwiftUI
 
 extension View {
-    @ViewBuilder
-    func liquidGlassEffect(interactive: Bool = true) -> some View {
+    // Containers stay passive; only actionable controls should opt into click effects.
+    func liquidGlassEffect(interactive: Bool = false, tint: Color? = nil) -> some View {
         let cornerRadius = self.adaptiveCornerRadius
         let shape = RoundedRectangle(cornerRadius: cornerRadius)
-        if interactive {
-            self.glassEffect(.regular.interactive(), in: shape)
-        } else {
-            self.glassEffect(.regular, in: shape)
-        }
+        return self.glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
     }
     
     var adaptiveCornerRadius: CGFloat {
@@ -45,7 +41,7 @@ extension View {
 struct LiquidGlassModifier: ViewModifier {
     let interactive: Bool
     
-    init(interactive: Bool = true) {
+    init(interactive: Bool = false) {
         self.interactive = interactive
     }
     
@@ -55,7 +51,7 @@ struct LiquidGlassModifier: ViewModifier {
 }
 
 extension View {
-    func liquidGlass(interactive: Bool = true) -> some View {
+    func liquidGlass(interactive: Bool = false) -> some View {
         modifier(LiquidGlassModifier(interactive: interactive))
     }
 }

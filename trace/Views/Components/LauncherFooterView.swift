@@ -10,8 +10,6 @@ import SwiftUI
 struct LauncherFooterView: View {
     let selectedResult: SearchResult?
     let selectedActionIndex: Int
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.traceTheme) private var traceTheme
     
     private enum FooterActionTone {
         case primary
@@ -38,7 +36,6 @@ struct LauncherFooterView: View {
                     if result.hasMultipleActions {
                         Divider()
                             .frame(height: 16)
-                            .overlay(traceTheme.accentBorder.opacity(0.58))
                         
                         footerAction(
                             title: "Actions",
@@ -49,19 +46,16 @@ struct LauncherFooterView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(floatingBarBackground)
-                .overlay(
-                    Capsule()
-                        .stroke(floatingBarBorder, lineWidth: 0.75)
+                .background(
+                    Color.primary.opacity(0.04),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
                 )
-                .shadow(
-                    color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.09),
-                    radius: 8,
-                    x: 0,
-                    y: 3
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
                 )
             }
-            .padding(.trailing, 12)
+            .padding(.trailing, 18)
             .padding(.leading, 26)
             .padding(.top, 6)
             .padding(.bottom, 14)
@@ -72,7 +66,7 @@ struct LauncherFooterView: View {
         HStack(spacing: 6) {
             Text(title)
                 .font(.system(size: tone == .primary ? 12 : 11, weight: tone == .primary ? .medium : .regular))
-                .foregroundColor(tone == .primary ? traceTheme.accentForeground : .secondary)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .minimumScaleFactor(0.86)
@@ -86,50 +80,19 @@ struct LauncherFooterView: View {
         HStack(spacing: 3) {
             ForEach(keys.indices, id: \.self) { index in
                 Text(keys[index])
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(traceTheme.accentForegroundSecondary)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .padding(.horizontal, keys[index].count > 1 ? 6 : 5)
                     .frame(height: 18)
                     .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(keyCapFill)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(keyCapBorder, lineWidth: 0.8)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.primary.opacity(0.06))
                     )
             }
         }
         .fixedSize()
-    }
-    
-    private var floatingBarBackground: some View {
-        Capsule()
-            .fill(.regularMaterial)
-            .overlay(
-                Capsule()
-                    .fill(traceTheme.accentGlassTint)
-            )
-    }
-    
-    private var floatingBarBorder: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.14)
-            : traceTheme.accentBorder
-    }
-    
-    private var keyCapFill: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : traceTheme.accentFillMuted
-    }
-    
-    private var keyCapBorder: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.16)
-            : traceTheme.accentBorder
     }
     
     private func primaryActionTitle(for result: SearchResult) -> String {
