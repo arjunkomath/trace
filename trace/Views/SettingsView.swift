@@ -126,7 +126,6 @@ enum TraceSettingsSection: String, CaseIterable, Identifiable {
 
 private enum SettingsLayout {
     static let contentMaxWidth: CGFloat = 620
-    static let headerTopInset: CGFloat = 2
     static let contentTopInset: CGFloat = 12
     static let detailHorizontalInset: CGFloat = 18
     static let sidebarWidth: CGFloat = 215
@@ -150,17 +149,32 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView {
             SettingsSidebar(selection: $selectedSection)
-
+                .navigationSplitViewColumnWidth(
+                    min: SettingsLayout.sidebarWidth,
+                    ideal: SettingsLayout.sidebarWidth,
+                    max: 280
+                )
+        } detail: {
             VStack(spacing: 0) {
-                SettingsDetailHeader(section: selectedSection)
+                Text(selectedSection.subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, SettingsLayout.detailHorizontalInset)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                    .frame(maxWidth: SettingsLayout.contentMaxWidth)
+                    .frame(maxWidth: .infinity)
 
                 selectedSectionView
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .background(Color(nsColor: .windowBackgroundColor))
+            .navigationTitle(selectedSection.title)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .navigationSplitViewStyle(.balanced)
         .frame(
             minWidth: AppConstants.Window.settingsWidth,
             minHeight: AppConstants.Window.settingsHeight
@@ -310,124 +324,21 @@ struct SettingsView: View {
 
 private struct SettingsSidebar: View {
     @Binding var selection: TraceSettingsSection
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 2) {
-                ForEach(TraceSettingsSection.allCases) { section in
-                    SettingsSidebarRow(
-                        section: section,
-                        isSelected: selection == section
-                    ) {
-                        selection = section
-                    }
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 10)
-            .padding(.bottom, 12)
-        }
-        .frame(width: SettingsLayout.sidebarWidth)
-        .frame(maxHeight: .infinity)
-        .background(sidebarBackground)
-    }
-
-    private var sidebarBackground: Color {
-        colorScheme == .dark ? Color.white.opacity(0.035) : Color.black.opacity(0.03)
-    }
-}
-
-private struct SettingsSidebarRow: View {
-    let section: TraceSettingsSection
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
     @Environment(\.appearsActive) private var appearsActive
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.traceTheme) private var traceTheme
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(iconBackgroundFill)
-                    .frame(width: 22, height: 22)
-                    .overlay {
-                        Image(systemName: section.systemImage)
-                            .font(.system(size: 13, weight: .medium))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(appearsActive ? section.iconColor : .secondary)
-                    }
-
-                Text(section.title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(appearsActive ? Color.primary : Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.86)
-
-                Spacer(minLength: 0)
+        List(selection: Binding<TraceSettingsSection?>($selection)) {
+            ForEach(TraceSettingsSection.allCases) { section in
+                Label {
+                    Text(section.title)
+                } icon: {
+                    Image(systemName: section.systemImage)
+                        .foregroundStyle(appearsActive ? section.iconColor : .secondary)
+                }
+                .tag(section)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(backgroundFill)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(section.title))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .onHover { isHovering = $0 }
-    }
-
-    private var iconBackgroundFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
-    }
-
-    private var backgroundFill: Color {
-        if isSelected {
-            return appearsActive
-                ? traceTheme.accentFillMuted
-                : Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
-        }
-        if isHovering {
-            return hoverFill
-        }
-        return .clear
-    }
-
-    private var hoverFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.055) : Color.black.opacity(0.045)
-    }
-}
-
-private struct SettingsDetailHeader: View {
-    let section: TraceSettingsSection
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(section.title)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.primary)
-
-                Text(section.subtitle)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, SettingsLayout.detailHorizontalInset)
-            .padding(.top, SettingsLayout.headerTopInset)
-            .padding(.bottom, 12)
-
-            Rectangle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.10))
-                .frame(height: 1)
-        }
+        .listStyle(.sidebar)
     }
 }
 

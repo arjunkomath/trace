@@ -34,7 +34,7 @@ struct AppHotkeysSettingsView: View {
     
     var body: some View {
         NativeSettingsPane {
-            NativeSettingsSection("Application Hotkeys") {
+            NativeSettingsSection("") {
                 // Apps List
                 if isLoading {
                     HStack {
@@ -68,8 +68,6 @@ struct AppHotkeysSettingsView: View {
                         }
                     }
                 }
-            } footer: {
-                Text("Assign global keyboard shortcuts to launch your favorite applications instantly.")
             }
         }
         .searchable(text: $searchQuery, placement: .toolbar, prompt: "Search applications")

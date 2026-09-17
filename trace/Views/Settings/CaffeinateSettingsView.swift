@@ -24,7 +24,7 @@ struct CaffeinateSettingsView: View {
 
     var body: some View {
         NativeSettingsPane {
-            NativeSettingsSection("Keep Awake") {
+            NativeSettingsSection("") {
                 NativeSettingsRow(
                     title: "Command",
                     subtitle: "Built automatically from your choices"

@@ -34,7 +34,7 @@ class SettingsWindow: NSWindow {
         isReleasedWhenClosed = false
         level = .normal
         title = "Trace Settings"
-        titleVisibility = .hidden
+        titleVisibility = .visible
         minSize = NSSize(width: 700, height: 560)
         setContentSize(NSSize(
             width: AppConstants.Window.settingsWidth,

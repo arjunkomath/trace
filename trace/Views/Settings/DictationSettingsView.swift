@@ -20,7 +20,7 @@ struct DictationSettingsView: View {
 
     var body: some View {
         NativeSettingsPane {
-            NativeSettingsSection("Dictation") {
+            NativeSettingsSection("") {
                 NativeSettingsRow(
                     title: "Enable Dictation",
                     subtitle: "Use push-to-talk dictation processed on this Mac"
