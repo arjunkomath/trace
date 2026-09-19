@@ -2,7 +2,7 @@
 
 **Spotlight alternative and shortcut toolkit for macOS**
 
-<img width="1774" height="1075" alt="CleanShot 2026-05-19 at 22 50 42@2x" src="https://github.com/user-attachments/assets/5249826e-206b-423b-beb0-afa034599c44" />
+<img width="1654" height="1120" alt="CleanShot 2026-09-19 at 3 19 40 PM@2x" src="https://github.com/user-attachments/assets/274a77a2-8d91-4136-abf0-22934bbd5ac8" />
 
 A SwiftUI-based application launcher that runs as a background service (LSUIElement) with global hotkey access. Features fuzzy search, window management, quick links, push-to-talk dictation, and system integration.
 
