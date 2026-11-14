@@ -10,9 +10,16 @@ import AVFoundation
 
 final class MirrorWindow: NSPanel {
     private enum Layout {
-        static let windowSize = NSSize(width: 456, height: 304)
-        static let collapsedSize = NSSize(width: 185, height: 32)
-        static let topBleed: CGFloat = 0
+        static let cardSize = NSSize(width: 400, height: 274)
+        static let cardCornerRadius: CGFloat = 30
+        // Liquid Glass draws its shadow outside the card's bounds, mostly below it, so the window
+        // needs transparent room around the card or the shadow gets clipped at the window edge.
+        static let margin = NSEdgeInsets(top: 12, left: 48, bottom: 64, right: 48)
+        static let slideDistance: CGFloat = 10
+        static let windowSize = NSSize(
+            width: cardSize.width + margin.left + margin.right,
+            height: cardSize.height + margin.top + margin.bottom
+        )
     }
 
     private let onClose: () -> Void
@@ -58,23 +65,24 @@ final class MirrorWindow: NSPanel {
         super.keyDown(with: event)
     }
 
+    private var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
     func show() {
         let selectedScreen = NSScreen.active
         targetScreen = selectedScreen
 
-        let finalFrame = windowFrame(for: Layout.windowSize, on: selectedScreen)
-        let initialFrame = windowFrame(for: Layout.collapsedSize, on: selectedScreen)
+        let finalFrame = windowFrame(on: selectedScreen)
         setFrame(
-            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? finalFrame : initialFrame,
+            reduceMotion ? finalFrame : finalFrame.offsetBy(dx: 0, dy: Layout.slideDistance),
             display: true
         )
+        alphaValue = reduceMotion ? 1 : 0
         orderFrontRegardless()
         makeKeyAndOrderFront(nil)
 
-        alphaValue = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 1 : 0
-        setIsVisible(true)
-
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        guard !reduceMotion else { return }
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.28
@@ -88,7 +96,7 @@ final class MirrorWindow: NSPanel {
         guard let selectedScreen = NSScreen.active else { return }
 
         targetScreen = selectedScreen
-        setFrame(windowFrame(for: Layout.windowSize, on: selectedScreen), display: true)
+        setFrame(windowFrame(on: selectedScreen), display: true)
     }
 
     func hide(notify: Bool = true, completion: (() -> Void)? = nil) {
@@ -103,28 +111,26 @@ final class MirrorWindow: NSPanel {
         }
         isAnimatingOut = true
 
-        let selectedScreen = screen ?? targetScreen ?? NSScreen.active
-        let collapsedFrame = windowFrame(for: Layout.collapsedSize, on: selectedScreen)
-
         let completionHandler = { [weak self] in
             self?.orderOut(nil)
-            self?.setIsVisible(false)
             self?.isAnimatingOut = false
             completion?()
         }
 
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+        guard !reduceMotion else {
             alphaValue = 0
-            setFrame(collapsedFrame, display: true)
             completionHandler()
             return
         }
+
+        let selectedScreen = screen ?? targetScreen ?? NSScreen.active
+        let exitFrame = windowFrame(on: selectedScreen).offsetBy(dx: 0, dy: Layout.slideDistance)
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.18
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             animator().alphaValue = 0
-            animator().setFrame(collapsedFrame, display: true)
+            animator().setFrame(exitFrame, display: true)
         }, completionHandler: completionHandler)
     }
 
@@ -135,30 +141,45 @@ final class MirrorWindow: NSPanel {
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
-        titleVisibility = .hidden
-        titlebarAppearsTransparent = true
         isMovableByWindowBackground = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-
-        standardWindowButton(.closeButton)?.isHidden = true
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
     }
 
     private func setupContent(session: AVCaptureSession) {
-        contentView = MirrorPreviewView(session: session, onClose: onClose)
+        let cardFrame = NSRect(
+            origin: NSPoint(x: Layout.margin.left, y: Layout.margin.bottom),
+            size: Layout.cardSize
+        )
+        let glassView = NSGlassEffectView(frame: cardFrame)
+        glassView.cornerRadius = Layout.cardCornerRadius
+        glassView.autoresizingMask = [.width, .height]
+
+        let previewView = MirrorPreviewView(session: session, onClose: onClose)
+        previewView.frame = glassView.bounds
+        previewView.autoresizingMask = [.width, .height]
+        glassView.contentView = previewView
+
+        let container = NSView(frame: NSRect(origin: .zero, size: Layout.windowSize))
+        container.addSubview(glassView)
+        contentView = container
     }
 
-    private func windowFrame(for size: NSSize, on screen: NSScreen?) -> NSRect {
+    private func windowFrame(on screen: NSScreen?) -> NSRect {
         guard let screen else {
-            return NSRect(origin: .zero, size: size)
+            return NSRect(origin: .zero, size: Layout.windowSize)
         }
 
+        // visibleFrame alone isn't enough: with an auto-hiding menu bar it reaches the top edge,
+        // where a notch or Dynamic Island would cover the card. The safe area keeps us clear of either.
         let screenFrame = screen.frame
-        let x = screenFrame.midX - size.width / 2
-        let y = screenFrame.maxY - size.height + Layout.topBleed
+        let top = min(screen.visibleFrame.maxY, screenFrame.maxY - screen.safeAreaInsets.top)
 
-        return NSRect(x: x, y: y, width: size.width, height: size.height)
+        return NSRect(
+            x: screenFrame.midX - Layout.windowSize.width / 2,
+            y: top - Layout.windowSize.height,
+            width: Layout.windowSize.width,
+            height: Layout.windowSize.height
+        )
     }
 }
 
@@ -168,21 +189,14 @@ private enum KeyCode {
 
 private final class MirrorPreviewView: NSView {
     private enum Layout {
-        static let outerTopCornerRadius: CGFloat = 19
-        static let outerBottomCornerRadius: CGFloat = 24
-        static let innerCornerRadius: CGFloat = 22
-        static let islandInset = NSEdgeInsets(top: 0, left: 14, bottom: 12, right: 14)
-        static let previewInset = NSEdgeInsets(top: 44, left: 32, bottom: 48, right: 32)
-        static let minimumPreviewSide: CGFloat = 72
-        static let closeButtonSize = NSSize(width: 76, height: 30)
-        static let closeButtonBottomInset: CGFloat = 11
+        static let previewInset = NSEdgeInsets(top: 10, left: 10, bottom: 52, right: 10)
+        // Concentric with the glass card: card radius minus the inset.
+        static let previewCornerRadius: CGFloat = 20
     }
 
-    private let islandBodyLayer = CAShapeLayer()
     private let previewContainerLayer = CALayer()
-    private let previewBorderLayer = CALayer()
     private let previewLayer: AVCaptureVideoPreviewLayer
-    private let closeButton = MirrorCloseButton()
+    private let closeButton = NSButton(title: "Close", target: nil, action: nil)
     private let onClose: () -> Void
     private var didConfigureMirroring = false
 
@@ -207,76 +221,42 @@ private final class MirrorPreviewView: NSView {
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
 
-        let islandFrame = NSRect(
-            x: bounds.minX + Layout.islandInset.left,
-            y: bounds.minY + Layout.islandInset.bottom,
-            width: bounds.width - Layout.islandInset.left - Layout.islandInset.right,
-            height: bounds.height - Layout.islandInset.top - Layout.islandInset.bottom
+        let previewFrame = NSRect(
+            x: bounds.minX + Layout.previewInset.left,
+            y: bounds.minY + Layout.previewInset.bottom,
+            width: bounds.width - Layout.previewInset.left - Layout.previewInset.right,
+            height: bounds.height - Layout.previewInset.top - Layout.previewInset.bottom
         )
-        islandBodyLayer.frame = islandFrame
-        let islandPath = TopAttachedIslandPath.make(
-            in: islandBodyLayer.bounds,
-            topRadius: Layout.outerTopCornerRadius,
-            bottomRadius: Layout.outerBottomCornerRadius
-        )
-        islandBodyLayer.path = islandPath
-        islandBodyLayer.shadowPath = islandPath
-
-        previewContainerLayer.frame = NSRect(
-            x: islandFrame.minX + Layout.previewInset.left,
-            y: islandFrame.minY + Layout.previewInset.bottom,
-            width: islandFrame.width - Layout.previewInset.left - Layout.previewInset.right,
-            height: islandFrame.height - Layout.previewInset.top - Layout.previewInset.bottom
-        )
-        let shouldShowPreview = previewContainerLayer.frame.width >= Layout.minimumPreviewSide
-            && previewContainerLayer.frame.height >= Layout.minimumPreviewSide
-        previewContainerLayer.isHidden = !shouldShowPreview
-        previewBorderLayer.isHidden = !shouldShowPreview
-        closeButton.isHidden = !shouldShowPreview
-
-        previewContainerLayer.cornerRadius = Layout.innerCornerRadius
-        previewBorderLayer.frame = previewContainerLayer.frame
-        previewBorderLayer.cornerRadius = Layout.innerCornerRadius
+        previewContainerLayer.frame = previewFrame
         previewLayer.frame = previewContainerLayer.bounds
-        previewLayer.position = CGPoint(
-            x: previewContainerLayer.bounds.midX,
-            y: previewContainerLayer.bounds.midY
-        )
         configureMirroringIfNeeded()
 
+        let buttonSize = closeButton.fittingSize
         closeButton.frame = NSRect(
-            x: islandFrame.midX - Layout.closeButtonSize.width / 2,
-            y: islandFrame.minY + Layout.closeButtonBottomInset,
-            width: Layout.closeButtonSize.width,
-            height: Layout.closeButtonSize.height
+            x: bounds.midX - buttonSize.width / 2,
+            y: bounds.minY + (Layout.previewInset.bottom - buttonSize.height) / 2,
+            width: buttonSize.width,
+            height: buttonSize.height
         )
     }
 
     private func setupLayers() {
         wantsLayer = true
-        layer = CALayer()
         layer?.backgroundColor = NSColor.clear.cgColor
-
-        islandBodyLayer.fillColor = NSColor.black.cgColor
-        islandBodyLayer.shadowOpacity = 0
 
         previewContainerLayer.masksToBounds = true
         previewContainerLayer.backgroundColor = NSColor.black.cgColor
         previewContainerLayer.cornerCurve = .continuous
-        previewContainerLayer.cornerRadius = Layout.innerCornerRadius
-
-        previewBorderLayer.cornerCurve = .continuous
-        previewBorderLayer.borderColor = NSColor.white.withAlphaComponent(0.04).cgColor
-        previewBorderLayer.borderWidth = 1
+        previewContainerLayer.cornerRadius = Layout.previewCornerRadius
+        previewContainerLayer.borderColor = NSColor.white.withAlphaComponent(0.08).cgColor
+        previewContainerLayer.borderWidth = 1
 
         previewLayer.videoGravity = .resizeAspectFill
         previewLayer.backgroundColor = NSColor.black.cgColor
         configureMirroringIfNeeded()
 
-        layer?.addSublayer(islandBodyLayer)
         previewContainerLayer.addSublayer(previewLayer)
         layer?.addSublayer(previewContainerLayer)
-        layer?.addSublayer(previewBorderLayer)
     }
 
     private func configureMirroringIfNeeded() {
@@ -294,164 +274,15 @@ private final class MirrorPreviewView: NSView {
     }
 
     private func setupCloseButton() {
-        closeButton.setAccessibilityLabel("Close Mirror")
+        closeButton.bezelStyle = .glass
+        closeButton.controlSize = .large
         closeButton.target = self
         closeButton.action = #selector(closePressed)
+        closeButton.setAccessibilityLabel("Close Mirror")
         addSubview(closeButton)
     }
 
     @objc private func closePressed() {
         onClose()
-    }
-}
-
-enum TopAttachedIslandPath {
-    static func make(
-        in rect: CGRect,
-        topRadius: CGFloat,
-        bottomRadius: CGFloat
-    ) -> CGPath {
-        guard !rect.isEmpty else { return CGPath(rect: rect, transform: nil) }
-
-        var topRadius = min(topRadius, rect.width / 2, rect.height / 2)
-        var bottomRadius = min(bottomRadius, rect.width / 2, rect.height / 2)
-        let combinedRadius = topRadius + bottomRadius
-        if combinedRadius > rect.height, combinedRadius > 0 {
-            let scale = rect.height / combinedRadius
-            topRadius *= scale
-            bottomRadius *= scale
-        }
-
-        let path = CGMutablePath()
-
-        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - topRadius, y: rect.maxY - topRadius),
-            control: CGPoint(x: rect.maxX - topRadius, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY + bottomRadius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - topRadius - bottomRadius, y: rect.minY),
-            control: CGPoint(x: rect.maxX - topRadius, y: rect.minY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX + topRadius + bottomRadius, y: rect.minY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + topRadius, y: rect.minY + bottomRadius),
-            control: CGPoint(x: rect.minX + topRadius, y: rect.minY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX + topRadius, y: rect.maxY - topRadius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.maxY),
-            control: CGPoint(x: rect.minX + topRadius, y: rect.maxY)
-        )
-        path.closeSubpath()
-
-        return path
-    }
-}
-
-private final class MirrorCloseButton: NSButton {
-    private let visualLayer = CALayer()
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false {
-        didSet { updateAppearance() }
-    }
-
-    override var isHighlighted: Bool {
-        didSet { updateAppearance() }
-    }
-
-    init() {
-        super.init(frame: .zero)
-        setup()
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-
-        let trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self
-        )
-        addTrackingArea(trackingArea)
-        self.trackingArea = trackingArea
-    }
-
-    override func layout() {
-        super.layout()
-        updateLayerGeometry()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        isHovered = false
-    }
-
-    private func setup() {
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
-
-        visualLayer.cornerCurve = .continuous
-        visualLayer.masksToBounds = true
-        layer?.addSublayer(visualLayer)
-
-        image = nil
-        imagePosition = .noImage
-        imageScaling = .scaleNone
-        bezelStyle = .regularSquare
-        isBordered = false
-        focusRingType = .none
-
-        updateLayerGeometry()
-        updateAppearance()
-    }
-
-    private func updateLayerGeometry() {
-        visualLayer.frame = NSRect(
-            x: 0,
-            y: 0,
-            width: bounds.width,
-            height: bounds.height
-        )
-        visualLayer.cornerRadius = bounds.height / 2
-    }
-
-    private func updateAppearance() {
-        visualLayer.backgroundColor = backgroundColor.cgColor
-
-        let foregroundColor = NSColor.white.withAlphaComponent(isHighlighted ? 0.96 : 0.86)
-        attributedTitle = NSAttributedString(
-            string: "Close",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: foregroundColor
-            ]
-        )
-        alphaValue = isHighlighted ? 0.9 : 1
-    }
-
-    private var backgroundColor: NSColor {
-        if isHighlighted {
-            return NSColor.white.withAlphaComponent(0.28)
-        }
-
-        if isHovered {
-            return NSColor.gray.withAlphaComponent(0.20)
-        }
-
-        return NSColor.white.withAlphaComponent(0.10)
     }
 }
