@@ -1,7 +1,9 @@
 import AppKit
+import SwiftUI
 
 @MainActor
 final class DictationIndicatorController {
+    private let model = DictationIndicatorModel()
     private var window: DictationIndicatorWindow?
 
     func showListening() {
@@ -13,7 +15,7 @@ final class DictationIndicatorController {
     }
 
     func updateAudioLevel(_ level: Float) {
-        window?.updateAudioLevel(level)
+        model.ingestAudioLevel(level)
     }
 
     func hide() {
@@ -21,12 +23,10 @@ final class DictationIndicatorController {
     }
 
     private func show(mode: DictationIndicatorMode) {
-        if window == nil {
-            window = DictationIndicatorWindow(mode: mode)
-        }
-
-        window?.update(mode: mode)
-        window?.show()
+        let window = self.window ?? DictationIndicatorWindow(model: model)
+        self.window = window
+        model.setMode(mode)
+        window.show()
     }
 }
 
@@ -42,21 +42,46 @@ enum DictationIndicatorMode {
     }
 }
 
-final class DictationIndicatorWindow: NSPanel {
-    private enum Layout {
-        static let expandedSize = NSSize(width: 340, height: 92)
-        static let collapsedSize = NSSize(width: 190, height: 36)
-        static let topBleed: CGFloat = 0
+@MainActor
+@Observable
+final class DictationIndicatorModel {
+    private(set) var mode: DictationIndicatorMode = .listening
+    private(set) var audioLevel: CGFloat = 0
+    var isPresented = false
+
+    @ObservationIgnored private var smoothedLevel: Float = 0
+
+    func setMode(_ mode: DictationIndicatorMode) {
+        self.mode = mode
+        smoothedLevel = 0
+        audioLevel = 0
     }
 
-    private var indicatorView: DictationIndicatorView?
-    private var mode: DictationIndicatorMode
-    private var isAnimatingOut = false
+    func ingestAudioLevel(_ level: Float) {
+        guard mode == .listening, isPresented else { return }
 
-    init(mode: DictationIndicatorMode) {
-        self.mode = mode
+        // Gate out room noise, then rise fast and fall slower so speech reads as lively but not jittery.
+        let gatedLevel = max(0, min(1, (level - 0.08) / 0.72))
+        let responsiveLevel = Float(pow(Double(gatedLevel), 0.85))
+        let smoothing: Float = responsiveLevel > smoothedLevel ? 0.82 : 0.58
+        smoothedLevel += (responsiveLevel - smoothedLevel) * smoothing
+        audioLevel = CGFloat(smoothedLevel)
+    }
+}
+
+final class DictationIndicatorWindow: NSPanel {
+    private enum Layout {
+        // Oversized so the pill can change width and the glass can draw its edge without clipping.
+        static let size = NSSize(width: 320, height: 72)
+    }
+
+    private let model: DictationIndicatorModel
+    private var presentationGeneration = 0
+
+    init(model: DictationIndicatorModel) {
+        self.model = model
         super.init(
-            contentRect: NSRect(origin: .zero, size: Layout.expandedSize),
+            contentRect: NSRect(origin: .zero, size: Layout.size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -66,61 +91,47 @@ final class DictationIndicatorWindow: NSPanel {
         setupContent()
     }
 
-    func update(mode: DictationIndicatorMode) {
-        self.mode = mode
-        indicatorView?.update(mode: mode)
-    }
-
-    func updateAudioLevel(_ level: Float) {
-        guard mode == .listening else { return }
-        indicatorView?.updateAudioLevel(level)
+    private var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
     func show() {
-        let finalFrame = windowFrame(for: Layout.expandedSize)
-        let initialFrame = windowFrame(for: Layout.collapsedSize)
-        setFrame(
-            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? finalFrame : initialFrame,
-            display: true
-        )
+        presentationGeneration += 1
+        setFrame(windowFrame(), display: false)
         orderFrontRegardless()
 
-        alphaValue = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 1 : 0
-        setIsVisible(true)
-
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.22
-            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
-            animator().alphaValue = 1
-            animator().setFrame(finalFrame, display: true)
+        guard !model.isPresented else { return }
+        if reduceMotion {
+            model.isPresented = true
+        } else {
+            withAnimation(.spring(duration: 0.28, bounce: 0.18)) {
+                model.isPresented = true
+            }
         }
     }
 
     func hide() {
-        guard !isAnimatingOut else { return }
-        isAnimatingOut = true
+        guard model.isPresented else { return }
+        presentationGeneration += 1
+        let generation = presentationGeneration
 
-        let completionHandler = { [weak self] in
-            self?.orderOut(nil)
-            self?.setIsVisible(false)
-            self?.isAnimatingOut = false
+        // A show() that lands mid fade-out bumps the generation, so the stale completion must not order the window out.
+        let finish = { [weak self] in
+            guard let self, self.presentationGeneration == generation else { return }
+            self.orderOut(nil)
         }
 
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            alphaValue = 0
-            setFrame(windowFrame(for: Layout.collapsedSize), display: true)
-            completionHandler()
+        if reduceMotion {
+            model.isPresented = false
+            finish()
             return
         }
 
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.16
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            animator().alphaValue = 0
-            animator().setFrame(windowFrame(for: Layout.collapsedSize), display: true)
-        }, completionHandler: completionHandler)
+        withAnimation(.easeIn(duration: 0.16)) {
+            model.isPresented = false
+        } completion: {
+            finish()
+        }
     }
 
     private func setupWindow() {
@@ -130,230 +141,99 @@ final class DictationIndicatorWindow: NSPanel {
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
-        titleVisibility = .hidden
-        titlebarAppearsTransparent = true
-        isMovableByWindowBackground = false
+        ignoresMouseEvents = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-
-        standardWindowButton(.closeButton)?.isHidden = true
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
     }
 
     private func setupContent() {
-        let indicatorView = DictationIndicatorView(mode: mode)
-        self.indicatorView = indicatorView
-        contentView = indicatorView
+        let hostingView = NSHostingView(rootView: DictationIndicatorView(model: model))
+        hostingView.sizingOptions = []
+        contentView = hostingView
     }
 
-    private func windowFrame(for size: NSSize) -> NSRect {
-        let screen = NSScreen.main ?? NSScreen.screens.first
-        guard let screen else {
-            return NSRect(origin: .zero, size: size)
+    private func windowFrame() -> NSRect {
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else {
+            return NSRect(origin: .zero, size: Layout.size)
         }
 
+        // visibleFrame alone isn't enough: with an auto-hiding menu bar it reaches the top edge,
+        // where a notch or Dynamic Island would cover the pill. The safe area keeps us clear of either.
         let screenFrame = screen.frame
-        let x = screenFrame.midX - size.width / 2
-        let y = screenFrame.maxY - size.height + Layout.topBleed
+        let top = min(screen.visibleFrame.maxY, screenFrame.maxY - screen.safeAreaInsets.top)
 
-        return NSRect(x: x, y: y, width: size.width, height: size.height)
+        return NSRect(
+            x: screenFrame.midX - Layout.size.width / 2,
+            y: top - Layout.size.height,
+            width: Layout.size.width,
+            height: Layout.size.height
+        )
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
-private final class DictationIndicatorView: NSView {
-    private enum Layout {
-        static let outerTopCornerRadius: CGFloat = 24
-        static let outerBottomCornerRadius: CGFloat = 34
-        static let islandInset = NSEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
-        static let minimumTextWidth: CGFloat = 92
-        static let maximumTextWidth: CGFloat = 220
-        static let contentGap: CGFloat = 12
-        static let dotSize: CGFloat = 13
-        static let pulseSize: CGFloat = 32
-    }
+private struct DictationIndicatorView: View {
+    let model: DictationIndicatorModel
 
-    private let islandBodyLayer = CAShapeLayer()
-    private let pulseLayer = CAShapeLayer()
-    private let dotLayer = CAShapeLayer()
-    private let titleLabel = NSTextField(labelWithString: "")
-    private let progressIndicator = NSProgressIndicator()
-    private var mode: DictationIndicatorMode
-    private var displayedAudioLevel: Float = 0
+    var body: some View {
+        HStack(spacing: 10) {
+            DictationStatusGlyph(mode: model.mode, audioLevel: model.audioLevel)
 
-    init(mode: DictationIndicatorMode) {
-        self.mode = mode
-        super.init(frame: .zero)
-        setupLayers()
-        setupLabels()
-        setupProgressIndicator()
-        update(mode: mode)
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func layout() {
-        super.layout()
-
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        defer { CATransaction.commit() }
-
-        let islandFrame = NSRect(
-            x: bounds.minX + Layout.islandInset.left,
-            y: bounds.minY + Layout.islandInset.bottom,
-            width: bounds.width - Layout.islandInset.left - Layout.islandInset.right,
-            height: bounds.height - Layout.islandInset.top - Layout.islandInset.bottom
-        )
-        islandBodyLayer.frame = islandFrame
-        let islandPath = TopAttachedIslandPath.make(
-            in: islandBodyLayer.bounds,
-            topRadius: Layout.outerTopCornerRadius,
-            bottomRadius: Layout.outerBottomCornerRadius
-        )
-        islandBodyLayer.path = islandPath
-        islandBodyLayer.shadowPath = islandPath
-
-        let topObscuredInset = window?.screen?.safeAreaInsets.top ?? 0
-        let contentCenterY = islandFrame.midY - min(topObscuredInset / 2, islandFrame.height * 0.24)
-        let textWidth = min(
-            max(titleLabel.intrinsicContentSize.width + 6, Layout.minimumTextWidth),
-            Layout.maximumTextWidth
-        )
-        let contentWidth = Layout.pulseSize + Layout.contentGap + textWidth
-        let contentMinX = islandFrame.midX - contentWidth / 2
-        let dotCenter = CGPoint(
-            x: contentMinX + Layout.pulseSize / 2,
-            y: contentCenterY
-        )
-        pulseLayer.frame = NSRect(
-            x: dotCenter.x - Layout.pulseSize / 2,
-            y: dotCenter.y - Layout.pulseSize / 2,
-            width: Layout.pulseSize,
-            height: Layout.pulseSize
-        )
-        pulseLayer.path = CGPath(ellipseIn: pulseLayer.bounds, transform: nil)
-
-        dotLayer.frame = NSRect(
-            x: dotCenter.x - Layout.dotSize / 2,
-            y: dotCenter.y - Layout.dotSize / 2,
-            width: Layout.dotSize,
-            height: Layout.dotSize
-        )
-        dotLayer.path = CGPath(ellipseIn: dotLayer.bounds, transform: nil)
-
-        progressIndicator.frame = NSRect(
-            x: dotCenter.x - 8,
-            y: dotCenter.y - 8,
-            width: 16,
-            height: 16
-        )
-
-        let textX = contentMinX + Layout.pulseSize + Layout.contentGap
-        titleLabel.frame = NSRect(x: textX, y: contentCenterY - 9, width: textWidth, height: 18)
-    }
-
-    func update(mode: DictationIndicatorMode) {
-        self.mode = mode
-        titleLabel.stringValue = mode.title
-        needsLayout = true
-
-        let color: NSColor = mode == .listening ? .systemRed : .controlAccentColor
-        dotLayer.fillColor = color.cgColor
-        pulseLayer.fillColor = color.withAlphaComponent(mode == .listening ? 0.22 : 0.12).cgColor
-        progressIndicator.isHidden = mode != .processing
-        dotLayer.isHidden = mode == .processing
-
-        if mode == .processing {
-            resetAudioLevel()
-            progressIndicator.startAnimation(nil)
-            pulseLayer.removeAnimation(forKey: "dictationPulse")
-        } else {
-            resetAudioLevel()
-            progressIndicator.stopAnimation(nil)
-            startPulseAnimation()
+            Text(model.mode.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .contentTransition(.opacity)
         }
+        .padding(.leading, 10)
+        .padding(.trailing, 16)
+        .frame(height: 40)
+        .glassEffect(.regular, in: Capsule())
+        .animation(.snappy(duration: 0.2), value: model.mode)
+        .scaleEffect(model.isPresented ? 1 : 0.88, anchor: .top)
+        .opacity(model.isPresented ? 1 : 0)
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct DictationStatusGlyph: View {
+    let mode: DictationIndicatorMode
+    let audioLevel: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPulsing = false
+
+    var body: some View {
+        ZStack {
+            switch mode {
+            case .listening:
+                Circle()
+                    .fill(Color.red.opacity(0.22))
+                    .scaleEffect(isPulsing ? 1.15 : 0.82)
+                    .opacity(isPulsing ? 0.3 : 0.85)
+                    .onAppear(perform: startPulse)
+                    .onDisappear { isPulsing = false }
+
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(0.45 + audioLevel * 1.35)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.05), value: audioLevel)
+
+            case .processing:
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .frame(width: 24, height: 24)
     }
 
-    func updateAudioLevel(_ level: Float) {
-        guard mode == .listening else { return }
-
-        let gatedLevel = max(0, min(1, (level - 0.08) / 0.72))
-        let responsiveLevel = Float(pow(Double(gatedLevel), 0.85))
-        let smoothing: Float = responsiveLevel > displayedAudioLevel ? 0.82 : 0.58
-        displayedAudioLevel += (responsiveLevel - displayedAudioLevel) * smoothing
-
-        let scale = 0.24 + (CGFloat(displayedAudioLevel) * 1.72)
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.025)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        dotLayer.transform = CATransform3DMakeScale(scale, scale, 1)
-        CATransaction.commit()
-    }
-
-    private func setupLayers() {
-        wantsLayer = true
-        layer = CALayer()
-        layer?.backgroundColor = NSColor.clear.cgColor
-
-        islandBodyLayer.fillColor = NSColor.black.cgColor
-        islandBodyLayer.shadowOpacity = 0
-
-        pulseLayer.opacity = 0.85
-
-        layer?.addSublayer(islandBodyLayer)
-        layer?.addSublayer(pulseLayer)
-        layer?.addSublayer(dotLayer)
-    }
-
-    private func setupLabels() {
-        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        titleLabel.textColor = NSColor.white.withAlphaComponent(0.94)
-        titleLabel.backgroundColor = .clear
-        titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.alignment = .left
-
-        addSubview(titleLabel)
-    }
-
-    private func setupProgressIndicator() {
-        progressIndicator.style = .spinning
-        progressIndicator.controlSize = .small
-        progressIndicator.isDisplayedWhenStopped = false
-        progressIndicator.isHidden = true
-        addSubview(progressIndicator)
-    }
-
-    private func resetAudioLevel() {
-        displayedAudioLevel = 0
-
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        dotLayer.transform = CATransform3DIdentity
-        CATransaction.commit()
-    }
-
-    private func startPulseAnimation() {
-        guard pulseLayer.animation(forKey: "dictationPulse") == nil else { return }
-
-        let scale = CABasicAnimation(keyPath: "transform.scale")
-        scale.fromValue = 0.82
-        scale.toValue = 1.18
-
-        let opacity = CABasicAnimation(keyPath: "opacity")
-        opacity.fromValue = 0.85
-        opacity.toValue = 0.28
-
-        let group = CAAnimationGroup()
-        group.animations = [scale, opacity]
-        group.duration = 0.8
-        group.autoreverses = true
-        group.repeatCount = .infinity
-        group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        pulseLayer.add(group, forKey: "dictationPulse")
+    private func startPulse() {
+        guard !reduceMotion else { return }
+        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+            isPulsing = true
+        }
     }
 }
